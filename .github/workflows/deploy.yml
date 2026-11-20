@@ -1,14 +1,16 @@
-name: Build, Test, and Deploy ExoNovel (Rust + Leptos)
+name: Build, Package, and Deploy ExoNovel (Rust + Leptos)
 
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build-test-deploy:
-    name: Build, Test & Deploy ExoNovel
-    runs-on: [self-hosted, linux, x64]
+  build:
+    name: Build & Package ExoNovel (Leptos 0.8)
+    runs-on: ubuntu-latest
     env:
       CARGO_TERM_COLOR: always
 
@@ -16,50 +18,123 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Cache Rust build artifacts
+      - name: Install stable Rust toolchain with WASM target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          key: "exonovel-cargo-leptos"
+          key: exonovel-leptos-08
 
-      - name: Verify Rust & cargo-leptos toolchain
-        run: |
-          rustup target add wasm32-unknown-unknown
-          command -v cargo-leptos >/dev/null 2>&1 || cargo install cargo-leptos --locked
+      - name: Install cargo-leptos
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-leptos
 
-      - name: Run Rust unit & module tests
+      - name: Run Rust workspace unit tests
         run: cargo test --workspace
 
-      - name: Build ExoNovel Leptos release binary & WASM bundle
+      - name: Build finished ExoNovel release binary and WASM site assets
         run: cargo leptos build --release
 
-      - name: Stage release bundle
+      - name: Package finished release bundle
         run: |
-          rm -rf dist-exonovel
-          mkdir -p dist-exonovel
+          rm -rf deploy
+          mkdir -p deploy
           BIN_PATH=$(find target/release target/server -maxdepth 4 -type f -name exonovel-server | head -n 1)
           test -n "$BIN_PATH"
-          cp "$BIN_PATH" dist-exonovel/exonovel-server
-          cp -r target/site dist-exonovel/site
-          cp -r docs dist-exonovel/docs
-          cp AGENTS.md dist-exonovel/AGENTS.md
+          cp "$BIN_PATH" deploy/exonovel-server
+          chmod +x deploy/exonovel-server
+          cp -r target/site deploy/site
+          cp -r docs deploy/docs
+          cp AGENTS.md deploy/AGENTS.md
 
-      - name: Deploy and restart ExoNovel service
-        run: |
-          DEPLOY_DIR="${EXONOVEL_DEPLOY_DIR:-/opt/exonovel}"
-          SERVICE_NAME="${EXONOVEL_SERVICE_NAME:-exonovel.service}"
-          sudo mkdir -p "$DEPLOY_DIR"
-          sudo rsync -a --delete --exclude='.env*' dist-exonovel/ "$DEPLOY_DIR/"
-          sudo chmod +x "$DEPLOY_DIR/exonovel-server"
-          sudo systemctl restart "$SERVICE_NAME"
+      - name: Upload finished package artifact
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: exonovel-package
+          path: deploy
+          retention-days: 5
 
-      - name: Verify live ExoNovel deployment
-        run: |
-          for i in $(seq 1 15); do
-            if curl -fsS "https://exonovel.exosystems.net/api/health" | grep -q '"runtime":"rust-leptos"'; then
-              echo "ExoNovel Rust + Leptos is live and healthy."
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Health check failed for https://exonovel.exosystems.net/api/health"
-          exit 1
+  deploy:
+    name: Deploy Finished ExoNovel Package to Tencent
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download finished package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: exonovel-package
+          path: deploy
+
+      - name: Upload finished package to Tencent server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          source: "deploy/*"
+          target: "/tmp/exonovel-incoming"
+          strip_components: 1
+          overwrite: true
+
+      - name: Install package and restart exonovel systemd service
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          script: |
+            set -euo pipefail
+            sudo mkdir -p /opt/exonovel
+            sudo systemctl stop exonovel || true
+            sudo rm -rf /opt/exonovel/site /opt/exonovel/docs
+            sudo cp /tmp/exonovel-incoming/exonovel-server /opt/exonovel/exonovel-server
+            sudo chmod +x /opt/exonovel/exonovel-server
+            sudo cp -r /tmp/exonovel-incoming/site /opt/exonovel/site
+            sudo cp -r /tmp/exonovel-incoming/docs /opt/exonovel/docs
+            sudo cp /tmp/exonovel-incoming/AGENTS.md /opt/exonovel/AGENTS.md
+            sudo rm -rf /tmp/exonovel-incoming
+
+            sudo tee /etc/systemd/system/exonovel.service >/dev/null <<'UNIT'
+            [Unit]
+            Description=ExoNovel Rust + Leptos SSR Server
+            After=network.target
+
+            [Service]
+            Type=simple
+            WorkingDirectory=/opt/exonovel
+            Environment=PORT=3001
+            Environment=LEPTOS_SITE_ADDR=127.0.0.1:3001
+            Environment=LEPTOS_SITE_ROOT=/opt/exonovel/site
+            Environment=LEPTOS_SITE_PKG_DIR=pkg
+            Environment=LEPTOS_OUTPUT_NAME=exonovel
+            EnvironmentFile=-/opt/exonovel/env
+            ExecStart=/opt/exonovel/exonovel-server
+            Restart=always
+            RestartSec=3
+
+            [Install]
+            WantedBy=multi-user.target
+            UNIT
+
+            sudo systemctl daemon-reload
+            sudo systemctl enable exonovel
+            sudo systemctl restart exonovel
+
+            for i in $(seq 1 15); do
+              if curl -fsS "http://127.0.0.1:3001/api/health" | grep -q '"runtime":"rust-leptos"'; then
+                echo "ExoNovel service healthy on 127.0.0.1:3001."
+                exit 0
+              fi
+              sleep 2
+            done
+
+            echo "ExoNovel failed to answer cleanly on 127.0.0.1:3001."
+            sudo journalctl -u exonovel -n 40 --no-pager || true
+            exit 1

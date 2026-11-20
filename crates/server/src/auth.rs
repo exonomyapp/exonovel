@@ -190,7 +190,6 @@ pub async fn verify_neon_auth_token(
 
 pub struct AuthUser(pub VerifiedSessionUser);
 
-#[axum::async_trait]
 impl FromRequestParts<AppState> for AuthUser {
     type Rejection = (StatusCode, Json<serde_json::Value>);
 

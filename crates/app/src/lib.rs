@@ -1,6 +1,10 @@
 use gloo_net::http::Request;
 use leptos::prelude::*;
-use leptos_meta::{provide_meta_context, MetaTags, Title};
+use leptos_meta::{provide_meta_context, Title};
+use leptos_router::{
+    components::{Route, Router, Routes},
+    path,
+};
 use serde::{Deserialize, Serialize};
 use web_sys::RequestCredentials;
 
@@ -173,6 +177,19 @@ fn filter_tree(nodes: &[DocNode], query: &str) -> Vec<DocNode> {
 pub fn App() -> impl IntoView {
     provide_meta_context();
 
+    view! {
+        <Title text="ExoNovel" />
+        <Router>
+            <Routes fallback=|| view! { <HomeView /> }>
+                <Route path=path!("/") view=HomeView />
+            </Routes>
+        </Router>
+    }
+}
+
+#[component]
+fn HomeView() -> impl IntoView {
+
     let (auth_config, set_auth_config) = signal::<Option<AuthConfigResponse>>(None);
     let (loading_session, set_loading_session) = signal(true);
     let (current_user, set_current_user) = signal::<Option<VerifiedUser>>(None);
@@ -286,9 +303,6 @@ pub fn App() -> impl IntoView {
     };
 
     view! {
-        <MetaTags />
-        <Title text="ExoNovel" />
-
         <Show
             when=move || !loading_session.get()
             fallback=|| view! {
@@ -307,7 +321,9 @@ pub fn App() -> impl IntoView {
                 }
             >
                 {move || {
-                    let user = current_user.get().unwrap();
+                    let Some(user) = current_user.get() else {
+                        return view! { <span /> }.into_any();
+                    };
                     let can_read_docs = user.authorized;
                     let is_admin = user.is_admin;
                     let email_label = user.email.clone().unwrap_or_else(|| "Signed-in writer".to_string());
@@ -430,7 +446,7 @@ pub fn App() -> impl IntoView {
                                 }.into_any(),
                             }}
                         </div>
-                    }
+                    }.into_any()
                 }}
             </Show>
         </Show>

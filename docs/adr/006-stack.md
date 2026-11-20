@@ -16,9 +16,11 @@ During documentation interviews inside **Google AI Studio**, the AI Studio previ
 ### 1. Independent ExoNovel Product & Built-In Leptos Docs Reader (Zero Node.js)
 
 - **Independence from `exosystems.net`**: ExoNovel (`https://exonovel.exosystems.net`) is deployed and operated as its own standalone application, not merged into `exosystems.net`.
-- **Full-Stack Rust & Leptos (`cargo-leptos` + Axum)**:
-  - **Workspace Layout**: `app` (shared Leptos UI + server functions), `frontend` (WASM client hydration), and `backend` (Axum native server binary).
-  - **Built-In Leptos Docs Reader**: Implemented natively inside ExoNovel using Leptos components and Rust Markdown rendering (`comrak` with GitHub Flavored Markdown extensions plus `ammonia` HTML sanitization, or `leptos_md`).
+- **Full-Stack Rust & Leptos (`cargo-leptos` + Axum, unpinned `0.8` family)**:
+  - **Version Policy**: Uses unpinned minor ranges (`leptos = "0.8"`, `axum = "0.8"`) aligned with `exosystems_net`'s `0.8.20` Leptos generation without locking patch versions.
+  - **Workspace Layout**: `crates/app` (shared Leptos UI + router), `crates/frontend` (WASM client hydration), and `crates/server` (Axum native server binary).
+  - **Build & Packaging Pipeline**: GitHub Actions compiles, tests, and bundles a finished release package (`exonovel-server` + `site/` + `docs/` + `AGENTS.md`) on GitHub-hosted `ubuntu-latest` machines and deploys only that finished package to `/opt/exonovel` on Tencent Cloud (`127.0.0.1:3001`, separate from `exosystems_net` on `127.0.0.1:3000`). No Rust build tools are required on the Tencent server.
+  - **Built-In Leptos Docs Reader**: Implemented natively inside ExoNovel using Leptos components and Rust Markdown rendering (`comrak` with GitHub Flavored Markdown extensions plus `ammonia` HTML sanitization).
   - **Immediate Admin & Reader Visibility**: As soon as `exonomyapp@gmail.com` (or any email allowlisted in `docs_access_allowlist`) signs in to ExoNovel (`https://exonovel.exosystems.net`), the **Docs Reader** option is visible in ExoNovel's Leptos navigation, alongside **Settings** for the admin account.
 - **Native Rust Connections to Neon Services**:
   - **Neon PostgreSQL**: Connected directly via `sqlx` (or `tokio-postgres`) with `?sslmode=require` using `DATABASE_URL` / `DATABASE_URL_UNPOOLED`.
