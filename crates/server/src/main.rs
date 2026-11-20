@@ -30,7 +30,7 @@ use crate::{
     },
 };
 
-#[derive(Clone, FromRef)]
+#[derive(Clone)]
 pub struct AppState {
     pub leptos_options: LeptosOptions,
     pub db: Option<PgPool>,
@@ -38,6 +38,12 @@ pub struct AppState {
     pub neon_auth_jwks_url: Option<String>,
     pub jwks_cache: JwksCache,
     pub root_dir: PathBuf,
+}
+
+impl FromRef<AppState> for LeptosOptions {
+    fn from_ref(state: &AppState) -> Self {
+        state.leptos_options.clone()
+    }
 }
 
 #[tokio::main]

@@ -113,7 +113,7 @@ pub fn render_safe_gfm_html(markdown: &str) -> String {
     options.extension.autolink = true;
     options.extension.footnotes = true;
     options.extension.header_ids = Some(String::new());
-    options.render.r#unsafe = true;
+    options.render.unsafe_ = true;
 
     let raw_html = markdown_to_html(markdown, &options);
 
