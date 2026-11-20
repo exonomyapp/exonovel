@@ -1,0 +1,17 @@
+[package]
+name = "exonovel-frontend"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+exonovel-app = { path = "../app", features = ["hydrate"] }
+leptos = { workspace = true, features = ["hydrate"] }
+console_error_panic_hook = { workspace = true }
+wasm-bindgen = { workspace = true }
+
+[features]
+default = ["hydrate"]
+hydrate = []

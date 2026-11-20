@@ -421,7 +421,8 @@ async function resolveBrevoConfigFromEnvAndApi() {
   }
 
   const brevoApiKey = process.env.BREVO_API_KEY?.trim();
-  if (brevoApiKey) {
+  const needsBrevoLookup = !username || !senderEmail;
+  if (brevoApiKey && needsBrevoLookup) {
     try {
       const accountRes = await fetch('https://api.brevo.com/v3/account', {
         headers: { 'api-key': brevoApiKey, Accept: 'application/json' },
@@ -454,27 +455,31 @@ async function resolveBrevoConfigFromEnvAndApi() {
       neonEmailSyncStatus.brevoApiAuthorized = false;
     }
 
-    try {
-      const sendersRes = await fetch('https://api.brevo.com/v3/senders', {
-        headers: { 'api-key': brevoApiKey, Accept: 'application/json' },
-      });
-      if (sendersRes.ok) {
-        const sendersPayload = (await sendersRes.json()) as {
-          senders?: Array<{ email?: string; name?: string; active?: boolean }>;
-        };
-        const activeSender =
-          sendersPayload.senders?.find((s) => s.active && s.email) ||
-          sendersPayload.senders?.find((s) => s.email);
-        if (activeSender?.email) {
-          senderEmail = activeSender.email.trim();
-          if (activeSender.name?.trim()) {
-            senderName = activeSender.name.trim();
+    if (!senderEmail) {
+      try {
+        const sendersRes = await fetch('https://api.brevo.com/v3/senders', {
+          headers: { 'api-key': brevoApiKey, Accept: 'application/json' },
+        });
+        if (sendersRes.ok) {
+          const sendersPayload = (await sendersRes.json()) as {
+            senders?: Array<{ email?: string; name?: string; active?: boolean }>;
+          };
+          const activeSender =
+            sendersPayload.senders?.find((s) => s.active && s.email) ||
+            sendersPayload.senders?.find((s) => s.email);
+          if (activeSender?.email) {
+            senderEmail = activeSender.email.trim();
+            if (activeSender.name?.trim()) {
+              senderName = activeSender.name.trim();
+            }
           }
         }
+      } catch {
+        // Fallback to account email or env value
       }
-    } catch {
-      // Fallback to account email or env value
     }
+  } else if (!needsBrevoLookup) {
+    neonEmailSyncStatus.brevoApiAuthorized = null;
   }
 
   return {

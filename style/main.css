@@ -1,0 +1,481 @@
+:root {
+  --bg: #faf8f4;
+  --surface: #ffffff;
+  --surface-muted: #f3f0ea;
+  --border: #e5e0d5;
+  --text: #1c1917;
+  --text-muted: #57534e;
+  --accent: #1d4ed8;
+  --accent-hover: #1e40af;
+  --accent-soft: #eff6ff;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --danger-text: #b91c1c;
+}
+
+html.dark {
+  --bg: #111317;
+  --surface: #171a21;
+  --surface-muted: #1e232d;
+  --border: #262b36;
+  --text: #eceef2;
+  --text-muted: #9ca3af;
+  --accent: #60a5fa;
+  --accent-hover: #3b82f6;
+  --accent-soft: rgba(23, 37, 84, 0.45);
+  --danger-bg: rgba(127, 29, 29, 0.35);
+  --danger-border: rgba(185, 28, 28, 0.55);
+  --danger-text: #fca5a5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.exo-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.exo-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  height: 56px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.exo-header-left,
+.exo-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.exo-brand {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.exo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 13px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.exo-btn:hover {
+  background: var(--surface-muted);
+}
+
+.exo-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.exo-btn-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.exo-btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.exo-btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.exo-btn-google {
+  background: #ffffff;
+  color: #3c4043;
+  border-color: #dadce0;
+}
+
+html.dark .exo-btn-google {
+  background: #131314;
+  color: #e3e3e3;
+  border-color: #5f6368;
+}
+
+.exo-btn-github {
+  background: #24292f;
+  color: #ffffff;
+  border-color: #24292f;
+}
+
+.exo-auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg);
+}
+
+.exo-auth-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px;
+}
+
+.exo-eyebrow {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.exo-h1 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.exo-sub {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.exo-social-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.exo-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.exo-divider::before,
+.exo-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+}
+
+.exo-field {
+  margin-bottom: 14px;
+}
+
+.exo-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.exo-input {
+  width: 100%;
+  padding: 9px 12px;
+  font-size: 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.exo-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.exo-alert-error {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+
+.exo-workspace-body {
+  max-width: 980px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 36px 24px;
+}
+
+.exo-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 22px;
+  margin-top: 20px;
+}
+
+.exo-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.exo-docs-layout {
+  display: flex;
+  flex: 1;
+  min-height: calc(100vh - 56px);
+}
+
+.exo-sidebar {
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.exo-resizer {
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.exo-resizer:hover {
+  background: var(--accent);
+  opacity: 0.45;
+}
+
+.exo-tree-folder {
+  margin-top: 6px;
+}
+
+.exo-tree-folder-btn {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.exo-tree-file-btn {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  padding: 6px 10px;
+  display: block;
+}
+
+.exo-tree-file-btn:hover {
+  background: var(--surface-muted);
+}
+
+.exo-tree-file-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.exo-docs-main {
+  flex: 1;
+  min-width: 0;
+  padding: 32px 36px;
+  display: flex;
+  gap: 36px;
+  align-items: flex-start;
+}
+
+.exo-markdown {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.exo-markdown h1 {
+  font-size: 30px;
+  margin: 0 0 18px;
+  letter-spacing: -0.02em;
+}
+
+.exo-markdown h2 {
+  font-size: 21px;
+  margin: 28px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.exo-markdown h3 {
+  font-size: 17px;
+  margin: 22px 0 8px;
+}
+
+.exo-markdown p,
+.exo-markdown ul,
+.exo-markdown ol {
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.exo-markdown pre {
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  overflow-x: auto;
+  font-size: 13px;
+}
+
+.exo-markdown code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9em;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--surface-muted);
+}
+
+.exo-markdown pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.exo-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 18px 0;
+  font-size: 14px;
+}
+
+.exo-markdown th,
+.exo-markdown td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.exo-markdown th {
+  background: var(--surface-muted);
+}
+
+.exo-markdown blockquote {
+  margin: 16px 0;
+  padding: 8px 16px;
+  border-left: 3px solid var(--accent);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
+.exo-toc {
+  width: 220px;
+  position: sticky;
+  top: 76px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  padding-left: 14px;
+}
+
+.exo-toc-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.exo-toc-link {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 3px 0;
+}
+
+.exo-toc-link-h3 {
+  padding-left: 12px;
+}
+
+.exo-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.exo-table th,
+.exo-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 8px;
+  text-align: left;
+}
+
+@media (max-width: 960px) {
+  .exo-toc {
+    display: none;
+  }
+  .exo-docs-main {
+    padding: 20px;
+  }
+}
