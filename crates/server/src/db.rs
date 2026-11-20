@@ -85,21 +85,6 @@ pub async fn ensure_schema(pool: &PgPool) -> Result<(), sqlx::Error> {
     .execute(pool)
     .await?;
 
-    sqlx::query(
-        r#"
-        CREATE TABLE IF NOT EXISTS docs_storage_snapshots (
-            id SERIAL PRIMARY KEY,
-            doc_path TEXT NOT NULL,
-            object_key TEXT NOT NULL UNIQUE,
-            size_bytes INTEGER NOT NULL DEFAULT 0,
-            uploaded_by_did TEXT NOT NULL,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
-        "#,
-    )
-    .execute(pool)
-    .await?;
-
     let admin_email = get_admin_email();
     sqlx::query(
         r#"

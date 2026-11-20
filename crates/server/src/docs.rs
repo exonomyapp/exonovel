@@ -122,9 +122,9 @@ pub fn render_safe_gfm_html(markdown: &str) -> String {
     cleaner.add_tags(extra_tags);
     let input_attrs: HashSet<&str> = ["type", "checked", "disabled"].into_iter().collect();
     cleaner.add_tag_attributes("input", input_attrs);
-    for heading_tag in ["h1", "h2", "h3", "h4"] {
+    for tag in ["h1", "h2", "h3", "h4", "a"] {
         let attrs: HashSet<&str> = ["id"].into_iter().collect();
-        cleaner.add_tag_attributes(heading_tag, attrs);
+        cleaner.add_tag_attributes(tag, attrs);
     }
 
     cleaner.clean(&raw_html).to_string()

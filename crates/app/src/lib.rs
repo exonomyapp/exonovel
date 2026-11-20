@@ -295,6 +295,14 @@ fn HomeView() -> impl IntoView {
         if let Some(saved_w) = read_storage("mu_width") {
             set_wide_mode.set(saved_w == "wide");
         }
+        if web_sys::window()
+            .and_then(|w| w.location().search().ok())
+            .and_then(|s| web_sys::UrlSearchParams::new_with_str(&s).ok())
+            .and_then(|p| p.get("doc"))
+            .is_some_and(|d| !d.trim().is_empty())
+        {
+            set_active_tab.set(ActiveTab::Docs);
+        }
     });
 
     Effect::new(move |_| {
@@ -384,7 +392,7 @@ fn HomeView() -> impl IntoView {
         });
     });
 
-    let sign_out = move |_: web_sys::MouseEvent| {
+    let sign_out = move || {
         let auth_url = auth_config.get_untracked().and_then(|c| c.auth_url);
         leptos::task::spawn_local(async move {
             if let Some(url) = auth_url {
@@ -476,7 +484,7 @@ fn HomeView() -> impl IntoView {
                                     <button
                                         type="button"
                                         class="nav-link"
-                                        on:click=sign_out
+                                        on:click=move |_| sign_out()
                                     >
                                         "Sign out"
                                     </button>
@@ -619,7 +627,7 @@ fn HomeView() -> impl IntoView {
 fn AccessDeniedView(
     email: String,
     did_peer: Option<String>,
-    on_sign_out: impl Fn(web_sys::MouseEvent) + Copy + 'static,
+    on_sign_out: impl Fn() + Copy + Send + Sync + 'static,
 ) -> impl IntoView {
     view! {
         <main class="page-main">
@@ -644,7 +652,7 @@ fn AccessDeniedView(
                             type="button"
                             class="exo-btn"
                             style="width: 100%;"
-                            on:click=on_sign_out
+                            on:click=move |_| on_sign_out()
                         >
                             "Sign out"
                         </button>
@@ -658,7 +666,7 @@ fn AccessDeniedView(
 #[component]
 fn SignInView(
     auth_config: ReadSignal<Option<AuthConfigResponse>>,
-    on_signed_in: impl Fn() + Copy + 'static,
+    on_signed_in: impl Fn() + Copy + Send + Sync + 'static,
 ) -> impl IntoView {
     let (is_signup, set_is_signup) = signal(false);
     let (name, set_name) = signal(String::new());
@@ -935,6 +943,27 @@ fn DocsReaderView(
             return;
         }
         set_active_path.set(doc_path.clone());
+        if let Some(win) = web_sys::window() {
+            if let Ok(search) = win.location().search() {
+                if let Ok(params) = web_sys::UrlSearchParams::new_with_str(&search) {
+                    params.set("doc", &doc_path);
+                    let query = params.to_string().as_string().unwrap_or_default();
+                    let pathname = win.location().pathname().unwrap_or_else(|_| "/".to_string());
+                    let next_url = if query.is_empty() {
+                        pathname
+                    } else {
+                        format!("{pathname}?{query}")
+                    };
+                    if let Ok(history) = win.history() {
+                        let _ = history.replace_state_with_url(
+                            &wasm_bindgen::JsValue::NULL,
+                            "",
+                            Some(&next_url),
+                        );
+                    }
+                }
+            }
+        }
         leptos::task::spawn_local(async move {
             let Some(jwt) = resolve_token().await else {
                 return;
@@ -970,10 +999,21 @@ fn DocsReaderView(
                 if resp.ok() {
                     if let Ok(data) = resp.json::<DocsTreeResponse>().await {
                         let current = active_path.get_untracked();
-                        let initial = if current.is_empty() {
-                            first_doc_path(&data.tree)
+                        let from_url = if current.is_empty() {
+                            web_sys::window()
+                                .and_then(|w| w.location().search().ok())
+                                .and_then(|s| web_sys::UrlSearchParams::new_with_str(&s).ok())
+                                .and_then(|p| p.get("doc"))
+                                .filter(|d| flatten_files(&data.tree).iter().any(|n| n.path == *d))
                         } else {
+                            None
+                        };
+                        let initial = if !current.is_empty() {
                             Some(current)
+                        } else if from_url.is_some() {
+                            from_url
+                        } else {
+                            first_doc_path(&data.tree)
                         };
                         set_tree.set(data.tree);
                         if let Some(p) = initial {
@@ -1192,8 +1232,8 @@ fn render_tree_nodes(
     active_path: ReadSignal<String>,
     collapsed_folders: ReadSignal<HashSet<String>>,
     is_searching: bool,
-    on_toggle_folder: impl Fn(String) + Copy + 'static,
-    on_select: impl Fn(String) + Copy + 'static,
+    on_toggle_folder: impl Fn(String) + Copy + Send + Sync + 'static,
+    on_select: impl Fn(String) + Copy + Send + Sync + 'static,
 ) -> AnyView {
     nodes
         .iter()
@@ -1268,7 +1308,7 @@ fn AdminSettingsView(
     initial_jwt: ReadSignal<Option<String>>,
     current_user_email: String,
     current_user_did: String,
-    on_back_to_docs: impl Fn() + Copy + 'static,
+    on_back_to_docs: impl Fn() + Copy + Send + Sync + 'static,
 ) -> impl IntoView {
     let (entries, set_entries) = signal::<Vec<AllowlistEntry>>(Vec::new());
     let (identities, set_identities) = signal::<Vec<IdentityRecord>>(Vec::new());
@@ -1346,6 +1386,9 @@ fn AdminSettingsView(
                         set_new_note.set(String::new());
                         set_status_msg.set(Some("Reader access saved.".to_string()));
                         reload();
+                    } else {
+                        let msg = resp.text().await.unwrap_or_else(|_| "Failed to save reader access.".to_string());
+                        set_status_msg.set(Some(msg));
                     }
                 }
             }
@@ -1367,6 +1410,9 @@ fn AdminSettingsView(
                 if let Ok(resp) = req.send().await {
                     if resp.ok() {
                         reload();
+                    } else {
+                        let msg = resp.text().await.unwrap_or_else(|_| "Failed to update allowlist.".to_string());
+                        set_status_msg.set(Some(msg));
                     }
                 }
             }
@@ -1389,6 +1435,9 @@ fn AdminSettingsView(
             {
                 if resp.ok() {
                     reload();
+                } else {
+                    let msg = resp.text().await.unwrap_or_else(|_| "Failed to remove allowlist entry.".to_string());
+                    set_status_msg.set(Some(msg));
                 }
             }
         });
