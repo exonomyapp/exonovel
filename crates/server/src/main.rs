@@ -22,7 +22,7 @@ use crate::{
     auth::{AuthUser, JwksCache},
     db::{
         connect_pool, delete_allowlist_entry, ensure_schema, get_admin_email, list_allowlist,
-        upsert_allowlist_entry,
+        list_identities, upsert_allowlist_entry,
     },
     docs::{
         extract_title_and_headings, get_docs_tree, render_safe_gfm_html, resolve_safe_doc_path,
@@ -102,6 +102,7 @@ async fn main() {
                 .post(api_admin_upsert)
                 .delete(api_admin_delete),
         )
+        .route("/api/admin/identities", get(api_admin_identities))
         .leptos_routes(&state, routes, {
             let options = state.leptos_options.clone();
             move || shell(options.clone())
@@ -121,10 +122,14 @@ async fn main() {
 fn shell(options: LeptosOptions) -> impl IntoView {
     view! {
         <!DOCTYPE html>
-        <html lang="en">
+        <html lang="en" data-appearance="system" data-width="normal">
             <head>
                 <meta charset="utf-8"/>
                 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <link rel="preconnect" href="https://fonts.googleapis.com"/>
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet"/>
+                <script inner_html=r#"(function(){try{var a=localStorage.getItem('mu_appearance');if(a){document.documentElement.setAttribute('data-appearance',a);}var w=localStorage.getItem('mu_width');if(w){document.documentElement.setAttribute('data-width',w);}}catch(e){}})();"#></script>
                 <AutoReload options=options.clone() />
                 <HydrationScripts options=options.clone() />
                 <link rel="stylesheet" id="leptos" href="/pkg/exonovel.css" />
@@ -266,6 +271,31 @@ async fn api_admin_list(
         )
     })?;
     Ok(Json(serde_json::json!({ "entries": entries })))
+}
+
+async fn api_admin_identities(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    if !user.is_admin {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "Admin access required." })),
+        ));
+    }
+    let Some(pool) = &state.db else {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({ "error": "Database unavailable." })),
+        ));
+    };
+    let identities = list_identities(pool).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e })),
+        )
+    })?;
+    Ok(Json(serde_json::json!({ "identities": identities })))
 }
 
 #[derive(Deserialize)]

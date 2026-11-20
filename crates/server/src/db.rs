@@ -267,6 +267,33 @@ pub async fn is_email_authorized_for_docs(
     }
 }
 
+pub async fn list_identities(pool: &PgPool) -> Result<Vec<IdentityRecord>, String> {
+    let rows = sqlx::query(
+        r#"
+        SELECT did_peer, email, auth_user_id, provider,
+               to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
+        FROM user_identities
+        ORDER BY created_at DESC
+        LIMIT 100
+        "#,
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    rows.into_iter()
+        .map(|r| {
+            Ok(IdentityRecord {
+                did_peer: r.try_get("did_peer").map_err(|e| e.to_string())?,
+                email: r.try_get("email").unwrap_or(None),
+                auth_user_id: r.try_get("auth_user_id").map_err(|e| e.to_string())?,
+                provider: r.try_get("provider").map_err(|e| e.to_string())?,
+                created_at: r.try_get("created_at").map_err(|e| e.to_string())?,
+            })
+        })
+        .collect()
+}
+
 pub async fn list_allowlist(pool: &PgPool) -> Result<Vec<AllowlistEntry>, String> {
     let rows = sqlx::query(
         r#"
