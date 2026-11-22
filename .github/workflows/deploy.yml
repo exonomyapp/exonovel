@@ -67,7 +67,7 @@ jobs:
 
     steps:
       - name: Download finished package artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: exonovel-package
           path: deploy
