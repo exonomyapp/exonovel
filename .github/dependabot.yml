@@ -1,22 +1,52 @@
-# Dependabot configuration for ExoNovel maturity & release tracking
+# Dependabot configuration for ExoNovel installed dependency & security hygiene
+# Note: Uninstalled "on-hold" crates (willow25, iroh, loro, etc.) are tracked by ExoNovel's
+# deterministic crates.io scanner (ADR 005-003), NOT Dependabot.
 version: 2
 updates:
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
-      interval: "daily"
-    open-pull-requests-limit: 10
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    cooldown:
+      default-days: 7
+      semver-minor-days: 7
+      semver-patch-days: 3
+    open-pull-requests-limit: 3
+    # Breaking major upgrades (e.g., sqlx 0.9, ed25519-dalek 3, comrak 1) require deliberate code migration
+    # and are tracked intentionally in docs/adr/006-stack/001-releases.md. Security advisories still bypass this rule.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      cargo-compatible:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
     commit-message:
       prefix: "deps(cargo)"
     labels:
       - "dependencies"
-      - "maturity-watch"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 2
+    groups:
+      github-actions-all:
+        patterns:
+          - "*"
     commit-message:
       prefix: "deps(ci)"
     labels:

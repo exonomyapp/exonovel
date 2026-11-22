@@ -459,7 +459,7 @@ pub fn ProfileView(
         });
     };
 
-    let toggle_pin_code = move |list_sig: RwSignal<Vec<String>>, code: String| {
+    let toggle_pin_code = move |list_sig: WriteSignal<Vec<String>>, code: String| {
         list_sig.update(|vec| {
             if let Some(pos) = vec.iter().position(|x| *x == code) {
                 vec.remove(pos);

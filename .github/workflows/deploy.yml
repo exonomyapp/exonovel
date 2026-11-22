@@ -7,6 +7,11 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+concurrency:
+  # Supersede older runs on the same PR without ever cancelling an active push/deploy on main.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build & Package ExoNovel (Leptos 0.8)
@@ -16,7 +21,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install stable Rust toolchain with WASM target
         uses: dtolnay/rust-toolchain@stable
@@ -32,6 +37,9 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-leptos
+
+      - name: Type-check Rust workspace (all targets)
+        run: cargo check --workspace --all-targets
 
       - name: Run Rust workspace unit tests
         run: cargo test --workspace
@@ -53,7 +61,7 @@ jobs:
 
       - name: Upload finished package artifact
         if: github.ref == 'refs/heads/main' && github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: exonovel-package
           path: deploy
@@ -67,13 +75,13 @@ jobs:
 
     steps:
       - name: Download finished package artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: exonovel-package
           path: deploy
 
       - name: Upload finished package to Tencent server
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -84,7 +92,7 @@ jobs:
           overwrite: true
 
       - name: Install package and restart exonovel systemd service
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
