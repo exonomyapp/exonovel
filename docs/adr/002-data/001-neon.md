@@ -21,5 +21,5 @@ ExoNovel standardizes its cloud persistence, authentication backend, and file st
 4. **Managed Better Auth**:
    - Use `@neon/auth` client wrapper (`VITE_NEON_AUTH_URL`) for React UI and verify JWTs against `NEON_AUTH_JWKS_URL` on Express `/api/*` routes.
    - Register `https://exonovel.exosystems.net` as the production trusted origin (plus active preview origin when developing) and sync custom OAuth provider credentials (`GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`, `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET`) from server environment secrets to Neon Auth.
-   - Configure Neon Auth email delivery using **Brevo** custom SMTP (`smtp-relay.brevo.com:587`), resolving relay credentials and active verified sender metadata via `BREVO_API_KEY`, `BREVO_SMTP_KEY`, and SMTP login secrets on startup.
+   - Configure Neon Auth email delivery using **Brevo** custom SMTP (`smtp-relay.brevo.com:587`) sending from **`noreply@exosystems.net`** (`"Exosystems"` — general/auth emails outside the notification domain), resolving relay credentials via `BREVO_API_KEY`, `BREVO_SMTP_KEY`, and `BREVO_SENDER_NOREPLY_*` environment variables.
 

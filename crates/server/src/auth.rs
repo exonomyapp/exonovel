@@ -1,11 +1,16 @@
 use std::{
+    collections::HashMap,
     sync::Arc,
     time::{Duration, Instant},
 };
 
 use axum::{
     extract::FromRequestParts,
-    http::{header::AUTHORIZATION, request::Parts, StatusCode},
+    http::{
+        header::{ACCEPT_LANGUAGE, AUTHORIZATION, USER_AGENT},
+        request::Parts,
+        StatusCode,
+    },
     Json,
 };
 use jsonwebtoken::{decode, decode_header, jwk::JwkSet, DecodingKey, Validation};
@@ -13,7 +18,10 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 use crate::{
-    db::{is_email_authorized_for_docs, resolve_or_mint_did_peer},
+    db::{
+        is_authorized_for_docs, resolve_and_sync_identity, AuthCaptureContext, UserPersona,
+        UserProfile,
+    },
     AppState,
 };
 
@@ -24,8 +32,13 @@ pub struct VerifiedSessionUser {
     pub email: Option<String>,
     pub name: Option<String>,
     pub did_peer: Option<String>,
+    pub account_role: String,
+    pub account_status: String,
     pub authorized: bool,
     pub is_admin: bool,
+    pub profile: Option<UserProfile>,
+    pub personas: Vec<UserPersona>,
+    pub active_persona: Option<UserPersona>,
 }
 
 #[derive(Clone)]
@@ -74,12 +87,24 @@ impl JwksCache {
 struct TokenClaims {
     sub: String,
     email: Option<String>,
+    #[serde(alias = "emailVerified")]
+    email_verified: Option<bool>,
     name: Option<String>,
+    given_name: Option<String>,
+    family_name: Option<String>,
+    picture: Option<String>,
+    image: Option<String>,
+    locale: Option<String>,
+    #[serde(flatten)]
+    extra: HashMap<String, serde_json::Value>,
 }
 
 pub async fn verify_neon_auth_token(
     state: &AppState,
     token: &str,
+    ip_address: String,
+    user_agent: String,
+    accept_language: Option<String>,
 ) -> Result<VerifiedSessionUser, (StatusCode, Json<serde_json::Value>)> {
     let (Some(base_url), Some(jwks_url)) = (&state.neon_auth_base_url, &state.neon_auth_jwks_url)
     else {
@@ -152,39 +177,118 @@ pub async fn verify_neon_auth_token(
         )
     })?;
 
-    let email = decoded
-        .claims
+    let claims = decoded.claims;
+    let email = claims
         .email
         .as_deref()
         .map(|s| s.trim().to_lowercase())
         .filter(|s| !s.is_empty());
 
-    let did_peer = if let Some(pool) = &state.db {
-        match resolve_or_mint_did_peer(
-            pool,
-            &decoded.claims.sub,
-            email.as_deref(),
-            "neon-better-auth",
-        )
-        .await
-        {
-            Ok(identity) => Some(identity.did_peer),
-            Err(_) => None,
+    let locale = claims
+        .locale
+        .clone()
+        .or_else(|| {
+            accept_language
+                .as_deref()
+                .and_then(|s| s.split(',').next())
+                .map(|s| s.trim().to_string())
+        })
+        .filter(|s| !s.is_empty());
+
+    let mut raw_claims = serde_json::Map::new();
+    for (k, v) in claims.extra {
+        raw_claims.insert(k, v);
+    }
+    raw_claims.insert("sub".to_string(), serde_json::Value::String(claims.sub.clone()));
+    if let Some(em) = &email {
+        raw_claims.insert("email".to_string(), serde_json::Value::String(em.clone()));
+    }
+    if let Some(ev) = claims.email_verified {
+        raw_claims.insert("email_verified".to_string(), serde_json::Value::Bool(ev));
+    }
+    if let Some(nm) = &claims.name {
+        raw_claims.insert("name".to_string(), serde_json::Value::String(nm.clone()));
+    }
+    if let Some(gn) = &claims.given_name {
+        raw_claims.insert("given_name".to_string(), serde_json::Value::String(gn.clone()));
+    }
+    if let Some(fnm) = &claims.family_name {
+        raw_claims.insert("family_name".to_string(), serde_json::Value::String(fnm.clone()));
+    }
+    if let Some(loc) = &locale {
+        raw_claims.insert("locale".to_string(), serde_json::Value::String(loc.clone()));
+    }
+
+    let capture = AuthCaptureContext {
+        auth_user_id: claims.sub.clone(),
+        email: email.clone(),
+        email_verified: claims.email_verified,
+        name: claims.name.clone(),
+        given_name: claims.given_name.clone(),
+        family_name: claims.family_name.clone(),
+        picture: claims.picture.clone().or(claims.image.clone()),
+        locale,
+        ip_address,
+        user_agent,
+        raw_claims: serde_json::Value::Object(raw_claims),
+    };
+
+    let sync_out = if let Some(pool) = &state.db {
+        match resolve_and_sync_identity(pool, &capture).await {
+            Ok(out) => Some(out),
+            Err(err) => {
+                eprintln!("resolve_and_sync_identity warning: {err}");
+                None
+            }
         }
     } else {
         None
     };
 
+    let (did_peer, account_role, account_status, profile, personas, active_persona) =
+        match sync_out {
+            Some(out) => {
+                let active_did = out.profile.active_persona_did.clone();
+                let active_p = out
+                    .personas
+                    .iter()
+                    .find(|p| p.persona_did == active_did)
+                    .or_else(|| out.personas.first())
+                    .cloned();
+                (
+                    Some(out.did_peer),
+                    out.account_role,
+                    out.account_status,
+                    Some(out.profile),
+                    out.personas,
+                    active_p,
+                )
+            }
+            None => (
+                None,
+                "user".to_string(),
+                "active".to_string(),
+                None,
+                Vec::new(),
+                None,
+            ),
+        };
+
     let (authorized, is_admin) =
-        is_email_authorized_for_docs(state.db.as_ref(), email.as_deref()).await;
+        is_authorized_for_docs(state.db.as_ref(), did_peer.as_deref(), email.as_deref()).await;
 
     Ok(VerifiedSessionUser {
-        auth_user_id: decoded.claims.sub,
+        auth_user_id: claims.sub,
         email,
-        name: decoded.claims.name,
+        name: claims.name,
         did_peer,
+        account_role,
+        account_status,
         authorized,
         is_admin,
+        profile,
+        personas,
+        active_persona,
     })
 }
 
@@ -214,7 +318,31 @@ impl FromRequestParts<AppState> for AuthUser {
             ));
         }
 
-        let user = verify_neon_auth_token(state, token).await?;
+        let ip_address = parts
+            .headers
+            .get("x-forwarded-for")
+            .or_else(|| parts.headers.get("x-real-ip"))
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.split(',').next())
+            .map(str::trim)
+            .unwrap_or("")
+            .to_string();
+
+        let user_agent = parts
+            .headers
+            .get(USER_AGENT)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+
+        let accept_language = parts
+            .headers
+            .get(ACCEPT_LANGUAGE)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
+
+        let user =
+            verify_neon_auth_token(state, token, ip_address, user_agent, accept_language).await?;
         Ok(AuthUser(user))
     }
 }

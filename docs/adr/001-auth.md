@@ -25,7 +25,15 @@ Ownership must be cryptographically grounded, portable across platforms, and ind
    - Immediately upon SSO completion, the server looks up the user's `did:peer` in PostgreSQL—or automatically mints a new `did:peer` keypair on behalf of a newly registered user—and unlocks the **full capabilities of the primary path** automatically.
    - Users who start with SSO can later export/claim self-custody of their keypair without changing their `did:peer` or losing content ownership.
 
-4. **AOTA Wallet & Secrets Infrastructure (`All of the Above`)**:
+4. **Personas (Multiple Workspace Identities Under One Owner)**:
+   - Every user has a default Persona anchored on their primary `did:peer` and can create unlimited secondary Personas (`did:peer` keypairs scoped under the same `owner_did`).
+   - Switching active Persona switches workspace views and collaboration/chat attribution while preserving unified single-user ownership (`owner_did`) across all created content and chat histories.
+
+5. **Authorization Tiers & Group Roles**:
+   - Platform authorization uses discrete levels (`user` < `moderator` < `admin`) rather than a boolean gate, enabling moderators to review/comment on creative works they do not directly collaborate on.
+   - Collaboration **Groups** carry group-scoped roles (`member`, `manager`) where any user can create groups, invite collaborators, record referrals, and assign group managers.
+
+6. **AOTA Wallet & Secrets Infrastructure (`All of the Above`)**:
    - Under ExoNovel's **AOTA** principle, support **all** evaluated wallet and sign-in mechanisms—native `exo-wallet` (`did:peer`), **MetaMask** / 500+ Web3 wallets via **Reown AppKit (WalletConnect)** + **SIWE/SIWX**, embedded consumer wallets (**Privy** / **Dynamic**), **Passkeys (WebAuthn)**, and **Google / GitHub / Email** via **Neon Better Auth**—each resolving to the user's authoritative `did:peer` (see [003-wallets](001-auth/003-wallets.md) & [004-pay](../004-pay.md)).
    - Evaluate **HashiCorp Vault (Transit Secrets Engine)** for envelope-encrypting managed/custodial `did:peer` keys created during Convenience SSO, complementing Neon Better Auth.
 

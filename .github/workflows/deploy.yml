@@ -101,6 +101,34 @@ jobs:
             sudo cp /tmp/exonovel-incoming/AGENTS.md /opt/exonovel/AGENTS.md
             sudo rm -rf /tmp/exonovel-incoming
 
+            sudo touch /opt/exonovel/env
+            sudo chmod 600 /opt/exonovel/env
+            sudo sed -i '/^BREVO_SENDER_EMAIL=.*exonovel\.exosystems\.net/d' /opt/exonovel/env || true
+            sudo sed -i '/^BREVO_SENDER_EMAIL=.*note@/d' /opt/exonovel/env || true
+            ensure_env_default() {
+              local key="$1"
+              local val="$2"
+              if ! sudo grep -qE "^${key}=" /opt/exonovel/env; then
+                printf '%s="%s"\n' "$key" "$val" | sudo tee -a /opt/exonovel/env >/dev/null
+              fi
+            }
+            ensure_env_default "BREVO_SENDER_NOTES_EMAIL" "notes@exosystems.net"
+            ensure_env_default "BREVO_SENDER_NOTES_NAME" "Notes from ExoNovel"
+            ensure_env_default "BREVO_SENDER_NOREPLY_EMAIL" "noreply@exosystems.net"
+            ensure_env_default "BREVO_SENDER_NOREPLY_NAME" "Exosystems"
+            ensure_env_default "BREVO_SENDER_SUPPORT_EMAIL" "support@exosystems.net"
+            ensure_env_default "BREVO_SENDER_SUPPORT_NAME" "ExoSupport"
+
+            if [ ! -f /opt/exonovel/vapid_private.pem ]; then
+              sudo openssl ecparam -name prime256v1 -genkey -noout -out /opt/exonovel/vapid_private.pem
+              sudo chmod 600 /opt/exonovel/vapid_private.pem
+            fi
+            VAPID_PUB=$(sudo openssl ec -in /opt/exonovel/vapid_private.pem -pubout -outform DER 2>/dev/null | tail -c 65 | base64 -w0 | tr '/+' '_-' | tr -d '=')
+            ensure_env_default "VAPID_PRIVATE_KEY_PATH" "/opt/exonovel/vapid_private.pem"
+            if [ -n "$VAPID_PUB" ]; then
+              ensure_env_default "VAPID_PUBLIC_KEY" "$VAPID_PUB"
+            fi
+
             sudo tee /etc/systemd/system/exonovel.service >/dev/null <<'UNIT'
             [Unit]
             Description=ExoNovel Rust + Leptos SSR Server

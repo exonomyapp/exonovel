@@ -1,0 +1,164 @@
+use std::collections::HashMap;
+
+use gloo_net::http::Request;
+use leptos::prelude::*;
+
+use crate::models::{I18nCatalogResponse, LocaleDescriptor};
+
+#[derive(Clone, Copy)]
+pub struct I18nState {
+    pub catalog: RwSignal<Vec<LocaleDescriptor>>,
+    pub willow_namespace: RwSignal<String>,
+    pub ui_locale: RwSignal<String>,
+    pub input_locale: RwSignal<String>,
+    pub dict: RwSignal<HashMap<String, String>>,
+}
+
+impl I18nState {
+    pub fn new() -> Self {
+        Self {
+            catalog: RwSignal::new(Vec::new()),
+            willow_namespace: RwSignal::new(
+                "willow25://exonovel.exosystems.net/language-packs/v1".to_string(),
+            ),
+            ui_locale: RwSignal::new("en".to_string()),
+            input_locale: RwSignal::new("en".to_string()),
+            dict: RwSignal::new(HashMap::new()),
+        }
+    }
+
+    pub fn tr(&self, key: &str, fallback: &str) -> String {
+        self.dict
+            .get()
+            .get(key)
+            .cloned()
+            .unwrap_or_else(|| fallback.to_string())
+    }
+
+    pub fn ui_dir(&self) -> &'static str {
+        let code = self.ui_locale.get();
+        if code == "ar" || code == "he" {
+            "rtl"
+        } else {
+            "ltr"
+        }
+    }
+
+    pub fn input_dir(&self) -> &'static str {
+        let code = self.input_locale.get();
+        if code == "ar" || code == "he" {
+            "rtl"
+        } else {
+            "ltr"
+        }
+    }
+
+    pub fn locale_label(&self, code: &str) -> String {
+        let list = self.catalog.get();
+        if let Some(found) = list.iter().find(|l| l.code == code) {
+            format!("{} ({})", found.native_name, found.code)
+        } else {
+            code.to_string()
+        }
+    }
+}
+
+pub fn use_i18n() -> I18nState {
+    expect_context::<I18nState>()
+}
+
+pub fn parse_ftl(text: &str) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if let Some((k, v)) = trimmed.split_once('=') {
+            map.insert(k.trim().to_string(), v.trim().to_string());
+        }
+    }
+    map
+}
+
+pub async fn fetch_locale_catalog(i18n: I18nState) {
+    if let Ok(resp) = Request::get("/api/i18n/catalog").send().await {
+        if resp.ok() {
+            if let Ok(data) = resp.json::<I18nCatalogResponse>().await {
+                i18n.catalog.set(data.locales);
+                i18n.willow_namespace.set(data.public_willow_namespace);
+            }
+        }
+    }
+}
+
+pub async fn fetch_locale_pack(i18n: I18nState, code: &str) {
+    let clean = if code.trim().is_empty() { "en" } else { code.trim() };
+    let url = format!("/api/i18n/{clean}.ftl");
+    if let Ok(resp) = Request::get(&url).send().await {
+        if resp.ok() {
+            if let Ok(body) = resp.text().await {
+                i18n.dict.set(parse_ftl(&body));
+            }
+        }
+    }
+}
+
+/// Reusable composer bar allowing instant switching of Input Language independently of Output UI Language (ADR 007).
+#[component]
+pub fn InputLocaleBar(
+    #[prop(into)] context_label: String,
+    pinned_codes: Vec<String>,
+) -> impl IntoView {
+    let i18n = use_i18n();
+
+    view! {
+        <div class="exo-input-lang-bar">
+            <span class="exo-eyebrow" style="margin: 0;">
+                {context_label}
+                " · "
+                {move || i18n.tr("input_lang_label", "Writing Input")}
+                ": "
+                <strong>{move || i18n.locale_label(&i18n.input_locale.get())}</strong>
+                " ("
+                {move || i18n.input_dir().to_uppercase()}
+                ")"
+            </span>
+            <select
+                class="exo-input"
+                style="width: auto; min-width: 190px; padding: 6px 10px; font-size: 15px;"
+                aria-label="Writing Input Language"
+                prop:value=move || i18n.input_locale.get()
+                on:change=move |ev| {
+                    i18n.input_locale.set(event_target_value(&ev));
+                }
+            >
+                {move || {
+                    let catalog = i18n.catalog.get();
+                    let filtered: Vec<LocaleDescriptor> = if pinned_codes.is_empty() {
+                        catalog
+                    } else {
+                        let subset: Vec<LocaleDescriptor> = catalog
+                            .iter()
+                            .filter(|l| {
+                                pinned_codes.contains(&l.code)
+                                    || l.code == i18n.input_locale.get_untracked()
+                            })
+                            .cloned()
+                            .collect();
+                        if subset.is_empty() { catalog } else { subset }
+                    };
+                    filtered
+                        .into_iter()
+                        .map(|loc| {
+                            let label = format!("{} — {}", loc.native_name, loc.english_name);
+                            view! {
+                                <option value=loc.code>{label}</option>
+                            }
+                        })
+                        .collect_view()
+                }}
+            </select>
+        </div>
+    }
+}

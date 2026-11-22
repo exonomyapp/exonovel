@@ -37,4 +37,15 @@ During documentation interviews inside **Google AI Studio**, the AI Studio previ
 
 - `exosystems.net` stays completely untouched and decoupled from ExoNovel docs and ExoNovel releases.
 - `https://exonovel.exosystems.net` owns its own pure-Leptos **Docs Reader** gated behind Neon Better Auth and `docs_access_allowlist`, immediately visible upon signing in as `exonomyapp@gmail.com`.
-- Both this workspace and the Leptos production app read the same `docs/` directory, `AGENTS.md`, Neon PostgreSQL database, Neon Managed Better Auth instance, and `BREVO_SENDER_EMAIL` (`noreply@exosystems.net`) email setup.
+- Both this workspace and the Leptos production app read the same `docs/` directory, `AGENTS.md`, Neon PostgreSQL database, Neon Managed Better Auth instance, and root `exosystems.net` Brevo email identities (`BREVO_SENDER_NOTES_EMAIL="notes@exosystems.net"` / `"Notes from ExoNovel"`, `BREVO_SENDER_NOREPLY_EMAIL="noreply@exosystems.net"` / `"Exosystems"`, `BREVO_SENDER_SUPPORT_EMAIL="support@exosystems.net"` / `"ExoSupport"`).
+
+### 3. Mobile Distribution Order & Deferred App Store Compliance
+- **Live Testing Rollout Sequence**: Android testing begins on **F-Droid** (reproducible **`foss`** build flavor with **UnifiedPush** only, zero proprietary Google Play Services or Firebase SDK blobs) before submitting to **Google Play Store** and **Apple App Store**.
+- **Deferred Big-Brand Store & Legal Compliance (Held Until Store Submission)**:
+  - Publish public **Privacy Policy** and **Terms of Service** URLs on `exonovel.exosystems.net` matching Apple App Privacy Nutrition Labels and Google Play Data Safety declarations.
+  - Ensure **Account Deletion Parity**: provide an in-app **Delete Account & Personal Data** flow plus a public web deletion-request URL (Apple Guideline 5.1.1(v) and Google Play User Data Policy).
+  - Satisfy Apple and Google **external payment / anti-steering** program entitlements (Reader / External Link / User Choice Billing rules) before distributing builds that link to `exonovel.exosystems.net` subscriptions.
+
+## Sub-ADRs
+
+- [001-releases](006-stack/001-releases.md) — Dependency version tracker, upstream release watch & running upgrade log

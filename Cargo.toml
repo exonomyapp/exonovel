@@ -17,13 +17,17 @@ leptos_router = { version = "0.8" }
 leptos_axum = { version = "0.8" }
 axum = { version = "0.8" }
 tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+futures-util = "0.3"
+url = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "json"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 jsonwebtoken = "9"
 comrak = "0.35"
 ammonia = "4"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
 ed25519-dalek = { version = "2", features = ["rand_core", "pkcs8", "pem"] }
 aes-gcm = "0.10"
 sha2 = "0.10"
@@ -40,18 +44,28 @@ web-sys = { version = "0.3", features = [
   "Window",
   "Location",
   "History",
+  "Navigator",
   "Storage",
   "Document",
   "Element",
   "HtmlElement",
   "HtmlInputElement",
+  "HtmlSelectElement",
+  "HtmlTextAreaElement",
   "DomTokenList",
   "Event",
+  "EventSource",
+  "MessageEvent",
   "EventTarget",
   "SubmitEvent",
   "PointerEvent",
+  "File",
+  "FileList",
+  "FileReader",
   "RequestCredentials",
   "UrlSearchParams",
+  "Notification",
+  "NotificationPermission",
 ] }
 
 [profile.wasm-release]

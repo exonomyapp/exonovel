@@ -1,0 +1,17 @@
+# Exclude Google AI Studio's temporary Node/TypeScript preview wrapper from GitHub's language bar
+# so https://github.com/exonomyapp/exonovel accurately reflects the Rust + Leptos codebase.
+src/** linguist-generated=true
+server/** linguist-generated=true
+server.ts linguist-generated=true
+neon.ts linguist-generated=true
+vite.config.ts linguist-generated=true
+tsconfig.json linguist-generated=true
+index.html linguist-generated=true
+package.json linguist-generated=true
+bun.lock linguist-generated=true
+
+# Exclude generated/build artifacts
+target/** linguist-vendored
+dist/** linguist-vendored
+node_modules/** linguist-vendored
+public/assets/** linguist-vendored

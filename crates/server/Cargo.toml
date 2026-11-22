@@ -10,6 +10,9 @@ leptos_meta = { workspace = true, features = ["ssr"] }
 leptos_axum = { workspace = true }
 axum = { workspace = true }
 tokio = { workspace = true }
+tokio-stream = { workspace = true }
+futures-util = { workspace = true }
+url = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }
@@ -17,6 +20,7 @@ reqwest = { workspace = true }
 jsonwebtoken = { workspace = true }
 comrak = { workspace = true }
 ammonia = { workspace = true }
+image = { workspace = true }
 ed25519-dalek = { workspace = true }
 aes-gcm = { workspace = true }
 sha2 = { workspace = true }
