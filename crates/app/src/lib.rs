@@ -13,7 +13,6 @@ use leptos_router::{
     path,
 };
 use serde::Deserialize;
-use wasm_bindgen::JsCast;
 use web_sys::RequestCredentials;
 
 use crate::{
@@ -235,7 +234,7 @@ fn HomeView() -> impl IntoView {
     // Apply Output UI Locale (<html lang dir="ltr|rtl">) and download .ftl pack
     Effect::new(move |_| {
         let code = i18n.ui_locale.get();
-        let dir = if code == "ar" || code == "he" { "rtl" } else { "ltr" };
+        let dir = i18n.ui_dir();
         if let Some(root) = web_sys::window()
             .and_then(|w| w.document())
             .and_then(|d| d.document_element())

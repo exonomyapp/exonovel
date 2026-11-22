@@ -29,7 +29,7 @@ Notifications are generated once as structured events in Neon PostgreSQL / local
   - **iOS**: **APNs** via Rust **`a2` (`0.3.x`)** HTTP/2 client using `.p8` Token-Based Authentication.
 - **Transactional Email (`Brevo` — Active Now on `exosystems.net`)**:
   - Calls **Brevo Transactional Email API v3** (`POST https://api.brevo.com/v3/smtp/email`) using `BREVO_API_KEY` (subdomain sending path `exonovel.exosystems.net` dropped in favor of verified root `exosystems.net` DNS with DKIM `brevo1`/`brevo2`, DMARC, and branded tracking domain `exomail.exosystems.net`).
-  - Three functional sender identities configured in `/opt/exonovel/env`:
+  - Three functional non-secret sender identities (hardcoded as defaults in `crates/server/src/notify.rs` `BrevoSenderRole::resolve`, auto-seeded into `/opt/exonovel/env` on every deploy by `.github/workflows/deploy.yml`, and left commented in `.env.example` as optional overrides only — never required in AI Studio Secrets):
     - **Notifications (`BREVO_SENDER_NOTES_EMAIL` / `BREVO_SENDER_NOTES_NAME`)**: **`notes@exosystems.net`** (`"Notes from ExoNovel"`) — notification-domain alerts, digests, and maturity notices.
     - **General / Non-Notification (`BREVO_SENDER_NOREPLY_EMAIL` / `BREVO_SENDER_NOREPLY_NAME`)**: **`noreply@exosystems.net`** (`"Exosystems"`) — general automated/auth emails outside the notification domain.
     - **User Support (`BREVO_SENDER_SUPPORT_EMAIL` / `BREVO_SENDER_SUPPORT_NAME`)**: **`support@exosystems.net`** (`"ExoSupport"`) — user support inquiries and issue replies.

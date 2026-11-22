@@ -15,8 +15,10 @@ updates:
       semver-minor-days: 7
       semver-patch-days: 3
     open-pull-requests-limit: 3
-    # Breaking major upgrades (e.g., sqlx 0.9, ed25519-dalek 3, comrak 1) require deliberate code migration
-    # and are tracked intentionally in docs/adr/006-stack/001-releases.md. Security advisories still bypass this rule.
+    # Keep Cargo.toml manifests pinned to intentional SemVer ranges; only update Cargo.lock within compatible bounds.
+    # This prevents Dependabot from opening breaking pre-1.0 0.x -> 0.y bumps (e.g. comrak 0.35->0.59, gloo-net 0.6->0.7)
+    # that Dependabot's ignore filter misclassifies as semver-minor, as well as N.x -> N+1.0 major bumps (sqlx 0.9, ed25519-dalek 3).
+    versioning-strategy: "lockfile-only"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]

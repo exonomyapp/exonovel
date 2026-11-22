@@ -508,6 +508,13 @@ pub fn DocsCmsView(
                                 let path_click = adr.rel_path.clone();
                                 let id_str = adr.id.to_string();
                                 let status_str = adr.status.clone();
+                                let status_cls = if status_str == "on-hold" {
+                                    "exo-tag exo-tag-warn"
+                                } else if status_str == "accepted" || status_str == "ready-to-build" {
+                                    "exo-tag exo-tag-ok"
+                                } else {
+                                    "exo-tag"
+                                };
                                 view! {
                                     <button
                                         type="button"
@@ -527,13 +534,7 @@ pub fn DocsCmsView(
                                         <span style="overflow: hidden; text-overflow: ellipsis;">
                                             {adr.title.clone()}
                                         </span>
-                                        <span class=if status_str == "on-hold" {
-                                            "exo-tag exo-tag-warn"
-                                        } else if status_str == "accepted" || status_str == "ready-to-build" {
-                                            "exo-tag exo-tag-ok"
-                                        } else {
-                                            "exo-tag"
-                                        }>
+                                        <span class=status_cls>
                                             {status_str}
                                         </span>
                                     </button>
