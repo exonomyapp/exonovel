@@ -234,6 +234,7 @@ pub async fn get_or_init_preferences(
     })
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BrevoSenderRole {
     /// Notification-domain emails ("Notes from ExoNovel" <notes@exosystems.net>)

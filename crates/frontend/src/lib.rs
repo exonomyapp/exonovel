@@ -1,3 +1,5 @@
+#![recursion_limit = "512"]
+
 use exonovel_app::App;
 use wasm_bindgen::prelude::wasm_bindgen;
 

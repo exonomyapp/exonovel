@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 
-use gloo_net::http::Request;
 use leptos::prelude::*;
-use serde::Deserialize;
 
-use crate::models::{sleep_ms, AuthConfigResponse, LivePatchEvent, resolve_fresh_jwt};
+use crate::models::{AuthConfigResponse, LivePatchEvent};
 
 /// Global App-Wide Live UI Subscription & Arrival Motion Registry (ADR 009).
 /// Supports store-agnostic "neon" (SSE/PgListener) and "willow" (local store) origins.
@@ -12,6 +10,7 @@ use crate::models::{sleep_ms, AuthConfigResponse, LivePatchEvent, resolve_fresh_
 pub struct LiveSyncState {
     pub connected: RwSignal<bool>,
     pub last_event: RwSignal<Option<LivePatchEvent>>,
+    #[cfg_attr(feature = "ssr", allow(dead_code))]
     pub last_origin: RwSignal<String>,
     pub pulse_seq: RwSignal<u64>,
     pub active_animations: RwSignal<HashMap<String, (&'static str, u64)>>,
@@ -28,6 +27,7 @@ impl LiveSyncState {
         }
     }
 
+    #[cfg_attr(feature = "ssr", allow(dead_code))]
     pub fn record_event(&self, ev: LivePatchEvent) {
         let key = format!("{}:{}", ev.entity_kind, ev.entity_id);
         let cls = if ev.op == "insert" {
@@ -46,7 +46,7 @@ impl LiveSyncState {
 
         let anim_map = self.active_animations;
         leptos::task::spawn_local(async move {
-            sleep_ms(1100).await;
+            crate::models::sleep_ms(1100).await;
             anim_map.update(|map| {
                 if let Some((_, seq)) = map.get(&key) {
                     if *seq == next_seq {
@@ -85,6 +85,9 @@ pub fn spawn_live_sse_connector(
     initial_jwt: ReadSignal<Option<String>>,
     active: ReadSignal<bool>,
 ) {
+    use crate::models::{resolve_fresh_jwt, sleep_ms};
+    use gloo_net::http::Request;
+    use serde::Deserialize;
     use wasm_bindgen::{closure::Closure, JsCast};
     use web_sys::{EventSource, MessageEvent};
 

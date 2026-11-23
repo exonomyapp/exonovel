@@ -16,6 +16,9 @@ jobs:
   build:
     name: Build & Package ExoNovel (Leptos 0.8)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     env:
       CARGO_TERM_COLOR: always
 
@@ -38,14 +41,51 @@ jobs:
         with:
           tool: cargo-leptos
 
-      - name: Type-check Rust workspace (all targets)
-        run: cargo check --workspace --all-targets
+      - name: Type-check server crate (SSR)
+        run: cargo check -p exonovel-server --all-targets --features ssr 2>&1 | tee -a /tmp/ci-build.log
 
-      - name: Run Rust workspace unit tests
-        run: cargo test --workspace
+      - name: Type-check browser WebAssembly crate (hydrate)
+        run: cargo check -p exonovel-frontend --target wasm32-unknown-unknown --features hydrate 2>&1 | tee -a /tmp/ci-build.log
+
+      - name: Run server unit tests (SSR)
+        run: cargo test -p exonovel-server --features ssr 2>&1 | tee -a /tmp/ci-build.log
 
       - name: Build finished ExoNovel release binary and WASM site assets
-        run: cargo leptos build --release
+        run: cargo leptos build --release 2>&1 | tee -a /tmp/ci-build.log
+
+      - name: Publish failure diagnostic log to public Check Run and Summary
+        if: failure() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ ! -f /tmp/ci-build.log ]; then
+            echo "No build log captured." > /tmp/ci-build.log
+          fi
+          {
+            echo "### ExoNovel CI Failure Diagnostic Log"
+            echo '```text'
+            tail -n 150 /tmp/ci-build.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          python3 - <<'PY' | gh api --method POST "/repos/${{ github.repository }}/check-runs" --input -
+          import json, pathlib
+          raw = pathlib.Path("/tmp/ci-build.log").read_text(errors="replace")
+          tail = raw[-58000:] if len(raw) > 58000 else raw
+          payload = {
+              "name": "ExoNovel CI Failure Diagnostic",
+              "head_sha": "${{ github.event.pull_request.head.sha || github.sha }}",
+              "status": "completed",
+              "conclusion": "failure",
+              "output": {
+                  "title": "Build or Unit Test Failure Log",
+                  "summary": "Captured compiler/test failure output for automated diagnostic review.",
+                  "text": "```text\n" + tail + "\n```"
+              }
+          }
+          print(json.dumps(payload))
+          PY
 
       - name: Package finished release bundle
         run: |

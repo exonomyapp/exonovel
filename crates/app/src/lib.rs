@@ -1,3 +1,5 @@
+#![recursion_limit = "512"]
+
 mod cms;
 mod i18n;
 mod live;
