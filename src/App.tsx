@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  HardDrive,
   LogOut,
   Menu,
   Moon,
@@ -14,12 +15,18 @@ import {
   Settings,
   Sun,
 } from 'lucide-react';
-import { AdminSettings } from './components/AdminSettings';
+import { AdminSettings, type LinkedProviderSummary } from './components/AdminSettings';
 import { AuthGate } from './components/AuthGate';
 import { DocsSidebar } from './components/DocsSidebar';
+import { DriveWorkspace } from './components/DriveWorkspace';
 import { MarkdownReader } from './components/MarkdownReader';
 import { TableOfContents } from './components/TableOfContents';
 import { getAuthInstance } from './lib/authClient';
+import {
+  getDriveAccessToken,
+  googleDriveSignIn,
+  initDriveAuth,
+} from './lib/driveAuth';
 import type { DocNode, DocPayload } from './types/docs';
 
 interface AuthConfigResponse {
@@ -59,7 +66,10 @@ export default function App() {
   const [authConfig, setAuthConfig] = useState<AuthConfigResponse | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<VerifiedUser | null>(null);
-  const [viewMode, setViewMode] = useState<'docs' | 'settings'>('docs');
+  const [linkedProviders, setLinkedProviders] = useState<LinkedProviderSummary[]>([]);
+  const [driveConnected, setDriveConnected] = useState<boolean>(() => Boolean(getDriveAccessToken()));
+  const [driveAutoError, setDriveAutoError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'docs' | 'settings' | 'drive'>('docs');
 
   const [tree, setTree] = useState<DocNode[]>([]);
   const [activePath, setActivePath] = useState<string>(getInitialDocFromUrl);
@@ -170,16 +180,38 @@ export default function App() {
 
       if (!meRes.ok) {
         setCurrentUser(null);
+        setLinkedProviders([]);
       } else {
         const meData = (await meRes.json()) as { user: VerifiedUser };
         setCurrentUser(meData.user);
+        try {
+          const accountsRes = await instance.adapter.listAccounts();
+          const list = Array.isArray(accountsRes?.data) ? accountsRes.data : [];
+          setLinkedProviders(
+            list.map((acc) => ({
+              providerId: String(acc.providerId || 'unknown'),
+              scopes: Array.isArray(acc.scopes) ? acc.scopes.map(String) : [],
+            }))
+          );
+        } catch {
+          setLinkedProviders([]);
+        }
       }
     } catch {
       setCurrentUser(null);
+      setLinkedProviders([]);
     } finally {
       setAuthLoading(false);
     }
   }, [resolveJwt]);
+
+  useEffect(() => {
+    const unsubscribe = initDriveAuth(
+      () => setDriveConnected(true),
+      () => setDriveConnected(false)
+    );
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -232,6 +264,7 @@ export default function App() {
       }
     }
     setCurrentUser(null);
+    setLinkedProviders([]);
     setTree([]);
     setDoc(null);
     setViewMode('docs');
@@ -408,12 +441,41 @@ export default function App() {
       ? flatFiles[currentIndex + 1]
       : null;
 
+  const googleSsoLinked = linkedProviders.some((p) => p.providerId === 'google');
+
+  const handleOpenDriveClick = async () => {
+    if (viewMode === 'drive') {
+      setViewMode('docs');
+      return;
+    }
+
+    setDriveAutoError(null);
+    setViewMode('drive');
+
+    if (!getDriveAccessToken() && googleSsoLinked) {
+      try {
+        await googleDriveSignIn({
+          loginHint: currentUser.email ?? undefined,
+        });
+        setDriveConnected(true);
+      } catch (err) {
+        setDriveAutoError(
+          err instanceof Error
+            ? err.message
+            : 'Google Drive authorization was cancelled or blocked.'
+        );
+      }
+    }
+  };
+
   const breadcrumbs =
     viewMode === 'settings'
-      ? ['Admin Settings']
-      : activePath
-        ? activePath.split('/')
-        : [];
+      ? [currentUser.isAdmin ? 'Admin & Connected Apps Settings' : 'Settings']
+      : viewMode === 'drive'
+        ? ['Google Drive']
+        : activePath
+          ? activePath.split('/')
+          : [];
 
   return (
     <div className="min-h-screen flex bg-[#FAF8F4] dark:bg-[#111317] text-[#1C1917] dark:text-[#ECEEF2]">
@@ -495,22 +557,34 @@ export default function App() {
               </button>
             )}
 
-            {currentUser.isAdmin && (
-              <button
-                type="button"
-                onClick={() =>
-                  setViewMode((prev) => (prev === 'settings' ? 'docs' : 'settings'))
-                }
-                className={`inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md border transition-colors whitespace-nowrap shrink-0 min-h-[40px] ${
-                  viewMode === 'settings'
-                    ? 'border-[#1D4ED8] text-[#1D4ED8] dark:border-[#60A5FA] dark:text-[#60A5FA] bg-[#EFF6FF] dark:bg-[#172554]/40'
-                    : 'border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] text-[#1C1917] dark:text-[#ECEEF2] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D]'
-                }`}
-              >
-                <Settings className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Settings</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleOpenDriveClick}
+              className={`inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md border transition-colors whitespace-nowrap shrink-0 min-h-[40px] ${
+                viewMode === 'drive'
+                  ? 'border-[#1D4ED8] text-[#1D4ED8] dark:border-[#60A5FA] dark:text-[#60A5FA] bg-[#EFF6FF] dark:bg-[#172554]/40'
+                  : 'border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] text-[#1C1917] dark:text-[#ECEEF2] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D]'
+              }`}
+              aria-label="Open Google Drive Workspace"
+            >
+              <HardDrive className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Google Drive</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setViewMode((prev) => (prev === 'settings' ? 'docs' : 'settings'))
+              }
+              className={`inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md border transition-colors whitespace-nowrap shrink-0 min-h-[40px] ${
+                viewMode === 'settings'
+                  ? 'border-[#1D4ED8] text-[#1D4ED8] dark:border-[#60A5FA] dark:text-[#60A5FA] bg-[#EFF6FF] dark:bg-[#172554]/40'
+                  : 'border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] text-[#1C1917] dark:text-[#ECEEF2] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D]'
+              }`}
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Settings</span>
+            </button>
 
             <button
               type="button"
@@ -535,12 +609,29 @@ export default function App() {
         </header>
 
         <main className="flex-1 px-5 sm:px-8 lg:px-10 py-8 sm:py-10">
-          {viewMode === 'settings' && currentUser.isAdmin ? (
+          {viewMode === 'drive' ? (
+            <DriveWorkspace
+              activeDoc={doc}
+              allDocs={flatFiles}
+              getToken={getToken}
+              googleSsoLinked={googleSsoLinked}
+              googleSsoEmail={currentUser.email}
+              initialAuthError={driveAutoError}
+              onDriveAuthChange={setDriveConnected}
+              onOpenSettings={() => setViewMode('settings')}
+              onBackToDocs={() => setViewMode('docs')}
+            />
+          ) : viewMode === 'settings' ? (
             <AdminSettings
               getToken={getToken}
               activeDocPath={activePath}
               currentUserDid={currentUser.didPeer}
               currentUserEmail={currentUser.email}
+              isAdmin={currentUser.isAdmin}
+              linkedProviders={linkedProviders}
+              driveConnected={driveConnected}
+              onDriveAuthChange={setDriveConnected}
+              onOpenDrive={handleOpenDriveClick}
               onBackToDocs={() => setViewMode('docs')}
             />
           ) : error ? (

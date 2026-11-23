@@ -657,6 +657,46 @@ async function startServer() {
     });
   });
 
+  app.post(
+    '/api/oauth/google/revoke',
+    requireAuthenticatedUser,
+    requireDocsAccess,
+    async (req, res) => {
+      const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+      if (!token) {
+        res.status(400).json({ error: 'OAuth token is required.' });
+        return;
+      }
+
+      try {
+        const googleRes = await fetch('https://oauth2.googleapis.com/revoke', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({ token }).toString(),
+        });
+
+        if (googleRes.ok) {
+          res.json({ revoked: true });
+          return;
+        }
+
+        const detail = (await googleRes.text().catch(() => '')).slice(0, 200);
+        res.status(googleRes.status).json({
+          revoked: false,
+          error: detail || 'Google token revocation returned an error.',
+        });
+      } catch (err) {
+        console.error('Google OAuth token revocation failed:', err);
+        res.status(502).json({
+          revoked: false,
+          error: 'Unable to reach Google OAuth revocation endpoint.',
+        });
+      }
+    }
+  );
+
   app.get(
     '/api/docs',
     requireAuthenticatedUser,

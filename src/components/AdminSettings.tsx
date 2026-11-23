@@ -1,5 +1,20 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { ArrowLeft, Archive, ExternalLink, Plus, Trash2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Archive,
+  CheckCircle2,
+  ExternalLink,
+  HardDrive,
+  Plus,
+  ShieldOff,
+  Trash2,
+} from 'lucide-react';
+import {
+  getDriveAccessToken,
+  getDriveUserEmail,
+  googleDriveSignIn,
+  revokeGoogleDriveAccess,
+} from '../lib/driveAuth';
 
 interface AllowlistEntry {
   email: string;
@@ -28,11 +43,21 @@ interface SnapshotRow {
   downloadUrl: string;
 }
 
+export interface LinkedProviderSummary {
+  providerId: string;
+  scopes: string[];
+}
+
 interface AdminSettingsProps {
   getToken: () => Promise<string | null>;
   activeDocPath: string;
   currentUserDid: string | null;
   currentUserEmail: string | null;
+  isAdmin: boolean;
+  linkedProviders: LinkedProviderSummary[];
+  driveConnected: boolean;
+  onDriveAuthChange: (connected: boolean) => void;
+  onOpenDrive: () => void;
   onBackToDocs: () => void;
 }
 
@@ -41,6 +66,11 @@ export function AdminSettings({
   activeDocPath,
   currentUserDid,
   currentUserEmail,
+  isAdmin,
+  linkedProviders,
+  driveConnected,
+  onDriveAuthChange,
+  onOpenDrive,
   onBackToDocs,
 }: AdminSettingsProps) {
   const [entries, setEntries] = useState<AllowlistEntry[]>([]);
@@ -49,9 +79,12 @@ export function AdminSettings({
   const [storageReady, setStorageReady] = useState(true);
   const [newEmail, setNewEmail] = useState('');
   const [newNote, setNewNote] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isAdmin);
   const [saving, setSaving] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [driveActionLoading, setDriveActionLoading] = useState(false);
+  const [confirmRevokeDrive, setConfirmRevokeDrive] = useState(false);
+  const [driveNotice, setDriveNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const authFetch = useCallback(
@@ -70,6 +103,10 @@ export function AdminSettings({
   );
 
   const loadData = useCallback(async () => {
+    if (!isAdmin) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -104,11 +141,52 @@ export function AdminSettings({
     } finally {
       setLoading(false);
     }
-  }, [authFetch]);
+  }, [authFetch, isAdmin]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const googleProvider = linkedProviders.find((p) => p.providerId === 'google');
+  const isDriveActive = driveConnected || Boolean(getDriveAccessToken());
+  const activeDriveEmail = getDriveUserEmail();
+
+  const handleConnectDrive = async () => {
+    setDriveActionLoading(true);
+    setError(null);
+    setDriveNotice(null);
+    try {
+      const { user } = await googleDriveSignIn({
+        loginHint: googleProvider && currentUserEmail ? currentUserEmail : undefined,
+      });
+      onDriveAuthChange(true);
+      setDriveNotice(
+        `Connected Google Drive as ${user.email || currentUserEmail || 'Google User'}.`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not connect Google Drive.');
+    } finally {
+      setDriveActionLoading(false);
+    }
+  };
+
+  const handleConfirmRevokeDrive = async () => {
+    setDriveActionLoading(true);
+    setError(null);
+    setDriveNotice(null);
+    try {
+      await revokeGoogleDriveAccess(getToken);
+      onDriveAuthChange(false);
+      setConfirmRevokeDrive(false);
+      setDriveNotice(
+        'Google Drive access token was revoked and disconnected. Your ExoNovel sign-in remains active.'
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to revoke Google Drive access.');
+    } finally {
+      setDriveActionLoading(false);
+    }
+  };
 
   const handleAddUser = async (e: FormEvent) => {
     e.preventDefault();
@@ -203,11 +281,12 @@ export function AdminSettings({
       <div className="flex items-center justify-between gap-4 pb-6 border-b border-[#E5E0D5] dark:border-[#262B36]">
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">
-            Admin Settings
+            {isAdmin ? 'Settings & Admin Controls' : 'Account & Connected Apps Settings'}
           </h1>
           <p className="mt-1.5 text-sm text-[#57534E] dark:text-[#9CA3AF]">
-            Manage private documentation access, inspect resolved{' '}
-            <span className="font-mono text-xs">did:peer</span> identities, and archive snapshots to Neon Object Storage.
+            {isAdmin
+              ? 'Manage connected external apps, private documentation access, resolved did:peer identities, and Neon Object Storage snapshots.'
+              : 'Manage your linked sign-in providers and connected external apps.'}
           </p>
         </div>
 
@@ -238,10 +317,125 @@ export function AdminSettings({
         </div>
       )}
 
+      {driveNotice && (
+        <div className="mt-6 p-3.5 rounded-lg border border-emerald-300 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/30 text-xs text-emerald-800 dark:text-emerald-200">
+          {driveNotice}
+        </div>
+      )}
+
       <section className="mt-8">
         <h2 className="font-display text-xl font-semibold">
-          Documentation Access Allowlist
+          Connected Apps & SSO Permissions
         </h2>
+        <p className="mt-1 text-sm text-[#57534E] dark:text-[#9CA3AF]">
+          Your ExoNovel sign-in only requests basic identity (
+          <code className="font-mono text-xs">email</code>,{' '}
+          <code className="font-mono text-xs">profile</code>). External apps below are strictly
+          optional and can be connected or revoked here without affecting your ExoNovel account.
+        </p>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="rounded-lg border border-[#E5E0D5] dark:border-[#262B36] bg-[#F3F0EA]/40 dark:bg-[#171A21] p-5 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-medium text-sm">ExoNovel Sign-In Providers (Neon Auth)</div>
+              <span className="text-xs px-2 py-0.5 rounded bg-[#EAE5DB] dark:bg-[#232834] text-[#44403C] dark:text-[#D1D5DB]">
+                {linkedProviders.length > 0 ? `${linkedProviders.length} linked` : 'Session active'}
+              </span>
+            </div>
+            {linkedProviders.length === 0 ? (
+              <p className="text-xs text-[#57534E] dark:text-[#9CA3AF]">
+                Signed in via session ({currentUserEmail || 'verified user'}).
+              </p>
+            ) : (
+              <ul className="space-y-2 text-xs">
+                {linkedProviders.map((prov) => (
+                  <li
+                    key={prov.providerId}
+                    className="rounded border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] px-3 py-2"
+                  >
+                    <div className="font-medium capitalize">{prov.providerId}</div>
+                    <div className="mt-0.5 text-[#57534E] dark:text-[#9CA3AF]">
+                      Login scopes:{' '}
+                      {prov.scopes.length > 0
+                        ? prov.scopes
+                            .map((s) => s.replace('https://www.googleapis.com/auth/', ''))
+                            .join(', ')
+                        : 'identity only'}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-[#E5E0D5] dark:border-[#262B36] bg-[#F3F0EA]/40 dark:bg-[#171A21] p-5 flex flex-col justify-between gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="inline-flex items-center gap-2 font-medium text-sm">
+                  <HardDrive className="w-4 h-4 text-[#1D4ED8] dark:text-[#60A5FA]" />
+                  <span>Google Drive</span>
+                </div>
+                <span
+                  className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded ${
+                    isDriveActive
+                      ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300'
+                      : 'bg-[#EAE5DB] dark:bg-[#232834] text-[#57534E] dark:text-[#9CA3AF]'
+                  }`}
+                >
+                  {isDriveActive && <CheckCircle2 className="w-3 h-3" />}
+                  {isDriveActive ? 'Connected (Session)' : 'Not Connected'}
+                </span>
+              </div>
+              <p className="text-xs text-[#57534E] dark:text-[#9CA3AF] leading-relaxed">
+                {isDriveActive
+                  ? `Connected as ${activeDriveEmail || currentUserEmail || 'Google User'}. Tokens remain in active browser memory for security in this preview environment.`
+                  : 'Connect Google Drive to back up docs and save chat transcripts directly to Drive. When deployed to production exonovel.exosystems.net, encrypted offline grants stay connected across reloads until revoked here.'}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {isDriveActive ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={onOpenDrive}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] hover:bg-[#EAE5DB] dark:hover:bg-[#1E232D] min-h-[38px]"
+                  >
+                    <HardDrive className="w-3.5 h-3.5" />
+                    Open Google Drive
+                  </button>
+                  <button
+                    type="button"
+                    disabled={driveActionLoading}
+                    onClick={() => setConfirmRevokeDrive(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md border border-red-300 dark:border-red-900/60 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30 min-h-[38px] disabled:opacity-50"
+                  >
+                    <ShieldOff className="w-3.5 h-3.5" />
+                    Disconnect & Revoke
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  disabled={driveActionLoading}
+                  onClick={handleConnectDrive}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-md bg-[#1D4ED8] text-white hover:bg-[#1E40AF] transition-colors min-h-[38px] disabled:opacity-50"
+                >
+                  <HardDrive className="w-3.5 h-3.5" />
+                  {driveActionLoading ? 'Connecting...' : 'Connect Google Drive'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {isAdmin && (
+        <>
+          <section className="mt-10">
+            <h2 className="font-display text-xl font-semibold">
+              Documentation Access Allowlist
+            </h2>
         <p className="mt-1 text-sm text-[#57534E] dark:text-[#9CA3AF]">
           Only email addresses enabled below can read ExoNovel documentation.
         </p>
@@ -447,6 +641,44 @@ export function AdminSettings({
           </div>
         )}
       </section>
+        </>
+      )}
+
+      {confirmRevokeDrive && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-lg border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] p-6 space-y-4 shadow-lg">
+            <h3 className="font-display text-lg font-semibold">
+              Disconnect & revoke Google Drive access?
+            </h3>
+            <p className="text-sm text-[#57534E] dark:text-[#9CA3AF]">
+              This revokes ExoNovel&apos;s Google Drive access token with Google and disconnects
+              Google Drive from this session. Your ExoNovel sign-in remains active.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={driveActionLoading}
+                onClick={() => setConfirmRevokeDrive(false)}
+                className="px-4 py-2 text-xs font-medium rounded-md border border-[#E5E0D5] dark:border-[#262B36] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D] min-h-[38px]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={driveActionLoading}
+                onClick={handleConfirmRevokeDrive}
+                className="px-4 py-2 text-xs font-medium rounded-md bg-red-600 hover:bg-red-700 text-white min-h-[38px] disabled:opacity-60"
+              >
+                {driveActionLoading ? 'Revoking...' : 'Revoke Access'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
