@@ -61,8 +61,18 @@ jobs:
           {
             rm -rf deploy
             mkdir -p deploy
-            BIN_PATH=$(find target/release target/server -maxdepth 4 -type f -name exonovel-server 2>/dev/null | head -n 1)
+            BIN_PATH=""
+            for candidate in target/server/release/exonovel-server target/release/exonovel-server; do
+              if [ -x "$candidate" ]; then
+                BIN_PATH="$candidate"
+                break
+              fi
+            done
+            if [ -z "$BIN_PATH" ]; then
+              BIN_PATH=$(find target -maxdepth 4 -type f -name exonovel-server -print -quit)
+            fi
             test -n "$BIN_PATH"
+            echo "Packaging server binary: $BIN_PATH"
             cp "$BIN_PATH" deploy/exonovel-server
             chmod +x deploy/exonovel-server
             cp -r target/site deploy/site
