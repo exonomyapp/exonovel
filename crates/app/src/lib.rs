@@ -474,8 +474,8 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                     class="navbar-brand-link"
                     on:click=move |_| set_show_signin.set(false)
                 >
-                    <img src="/exonovel-symbol.png" alt="ExoNovel" class="navbar-logo" />
-                    <span class="navbar-brand-wordmark">"ExoNovel"</span>
+                    <img src="/exonovel-logo.png" alt="ExoNovel" class="navbar-logo navbar-logo-light" />
+                    <img src="/exonovel-logo-dark.png" alt="ExoNovel" class="navbar-logo navbar-logo-dark" />
                 </a>
 
                 <div class="navbar-menu">
@@ -999,7 +999,11 @@ fn PublicLandingView(
                         "ExoNovel — Collaborative Creative Writing Where Authors Own Their Work"
                     </h1>
                     <p class="exo-landing-lead">
-                        "ExoNovel (https://exonovel.exosystems.net) is a collaborative creative writing and local-first publishing platform built for authors, co-writers, and literary teams. Draft novels, essays, short stories, screenplays, and poetry together in real time while keeping cryptographic ownership of your own characters, scenes, and manuscripts."
+                        "ExoNovel (https://exonovel.exosystems.net) is a text-based collaborative creative writing and local-first publishing platform built for authors, co-writers, and literary teams. Draft novels, essays, short stories, screenplays, and poetry together while keeping cryptographic ownership of your manuscripts."
+                    </p>
+                    <p class="exo-hero-compliance">
+                        <strong>"Google APIs & Safety Compliance: "</strong>
+                        "Google Sign-In (openid, email, profile) is used strictly for authentication, and optional Google Drive access is used solely when you choose to back up your own Markdown documents. ExoNovel provides text authoring tools only—it does not generate images, video, or audio, does not train AI models on Google user data, and strictly prohibits using ExoNovel or connected Google APIs for AI-generated Non-Consensual Intimate Imagery (AI NCII)."
                     </p>
                     <div class="exo-landing-actions">
                         <button
@@ -1337,8 +1341,8 @@ fn PrivacyPolicyView() -> impl IntoView {
             <Title text="Privacy Policy — ExoNovel" />
             <nav class="navbar-solid">
                 <a href="/" title="ExoNovel" class="navbar-brand-link">
-                    <img src="/exonovel-symbol.png" alt="ExoNovel" class="navbar-logo" />
-                    <span class="navbar-brand-wordmark">"ExoNovel"</span>
+                    <img src="/exonovel-logo.png" alt="ExoNovel" class="navbar-logo navbar-logo-light" />
+                    <img src="/exonovel-logo-dark.png" alt="ExoNovel" class="navbar-logo navbar-logo-dark" />
                 </a>
                 <div class="navbar-menu">
                     <a href="/" class="nav-link">"Home"</a>
@@ -1462,8 +1466,8 @@ fn TermsOfServiceView() -> impl IntoView {
             <Title text="Terms of Service — ExoNovel" />
             <nav class="navbar-solid">
                 <a href="/" title="ExoNovel" class="navbar-brand-link">
-                    <img src="/exonovel-symbol.png" alt="ExoNovel" class="navbar-logo" />
-                    <span class="navbar-brand-wordmark">"ExoNovel"</span>
+                    <img src="/exonovel-logo.png" alt="ExoNovel" class="navbar-logo navbar-logo-light" />
+                    <img src="/exonovel-logo-dark.png" alt="ExoNovel" class="navbar-logo navbar-logo-dark" />
                 </a>
                 <div class="navbar-menu">
                     <a href="/" class="nav-link">"Home"</a>

@@ -214,9 +214,10 @@ fn shell(options: LeptosOptions) -> impl IntoView {
                 <meta property="og:title" content="ExoNovel — Collaborative Creative Writing & Sovereign Publishing"/>
                 <meta property="og:description" content="Collaborative creative writing and local-first publishing platform operated by Exosystems. Draft novels, scripts, articles, short stories, and poetry with verifiable author ownership."/>
                 <meta property="og:type" content="website"/>
+                <meta property="og:image" content="https://exonovel.exosystems.net/exonovel-google-logo.png"/>
                 <link rel="preconnect" href="https://fonts.googleapis.com"/>
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
-                <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..600&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet"/>
+                <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..600&family=Fraunces:opsz,wght@9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet"/>
                 <AutoReload options=options.clone() />
                 <HydrationScripts options=options.clone() />
                 <link rel="icon" type="image/png" href="/exonovel-symbol.png" />
