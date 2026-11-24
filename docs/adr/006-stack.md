@@ -21,7 +21,7 @@ During documentation interviews inside **Google AI Studio**, the AI Studio previ
   - **Workspace Layout**: `crates/app` (shared Leptos UI + router), `crates/frontend` (WASM client hydration), and `crates/server` (Axum native server binary).
   - **Build & Packaging Pipeline**: GitHub Actions compiles, tests, and bundles a finished release package (`exonovel-server` + `site/` + `docs/` + `AGENTS.md`) on GitHub-hosted `ubuntu-latest` machines and deploys only that finished package to `/opt/exonovel` on Tencent Cloud (`127.0.0.1:3001`, separate from `exosystems_net` on `127.0.0.1:3000`). No Rust build tools are required on the Tencent server.
   - **Built-In Leptos Docs Reader**: Implemented natively inside ExoNovel using Leptos components and Rust Markdown rendering (`comrak` with GitHub Flavored Markdown extensions plus `ammonia` HTML sanitization).
-  - **Immediate Admin & Reader Visibility**: As soon as `exonomyapp@gmail.com` (or any email allowlisted in `docs_access_allowlist`) signs in to ExoNovel (`https://exonovel.exosystems.net`), the **Docs Reader** option is visible in ExoNovel's Leptos navigation, alongside **Settings** for the admin account.
+  - **Immediate Admin & Reader Visibility**: As soon as `exonomyapp@gmail.com` (or any email allowlisted in `docs_access_allowlist`) signs in to ExoNovel (`https://exonovel.exosystems.net`), the **Docs Reader** option is visible in ExoNovel's Leptos navigation; **Settings** is accessible to all signed-in accounts (including **Connected External Apps** lifecycle), with site-admin panels restricted to the admin account.
 - **Native Rust Connections to Neon Services**:
   - **Neon PostgreSQL**: Connected directly via `sqlx` (or `tokio-postgres`) with `?sslmode=require` using `DATABASE_URL` / `DATABASE_URL_UNPOOLED`.
   - **Neon Object Storage**: Connected directly via `aws-sdk-s3` (or `object_store`) using `AWS_ENDPOINT_URL_S3`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`.
@@ -30,7 +30,7 @@ During documentation interviews inside **Google AI Studio**, the AI Studio previ
 
 ### 2. Google AI Studio Preview Reader Scope
 
-- The Node.js files (`server.ts`, `src/`, `package.json`) exist solely so Google AI Studio can render a live preview inside its Node-only container while editing documentation and synced GitHub files (`https://github.com/exonomyapp/exonovel`).
+- The Node.js files (`server.ts`, `src/`, `package.json`) exist solely so Google AI Studio can render a live preview inside its Node-only container while editing documentation and synced GitHub files (`https://github.com/exonomyapp/exonovel`), including the temporary preview-only Google Drive workspace and same-origin token revocation proxy (`POST /api/oauth/google/revoke`).
 - Production deployment at `https://exonovel.exosystems.net` runs the compiled **Rust + Leptos** ExoNovel application—not Node.js.
 
 ## Consequences

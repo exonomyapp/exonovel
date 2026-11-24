@@ -47,6 +47,16 @@ Even where implementation is still staged across upcoming milestones, the archit
 - Added **Rule 14 (Respond First, Never Freeze User Flow)** and **Rule 15 (Evidence-Only Reporting — Zero Guesswork)**.
 - Documented all verified updates in **[ADR 006-001 (`006-stack/001-releases.md`)](adr/006-stack/001-releases.md)**.
 
+### E. Google Drive Archive, Chat Transcript Saving & Multi-Provider Connected Apps Design (`2026-11-23` – `2026-11-24`)
+- **Google Drive Workspace & Docs/Transcript Archive**:
+  - Added full **Google Drive** integration inside the Docs preview workspace (`src/components/DriveWorkspace.tsx`, `src/lib/driveAuth.ts`, `src/lib/driveApi.ts`): browse/search/preview/rename/trash/restore files, save individual docs, archive the entire **`ExoNovel Docs`** hierarchy in one confirmed backup batch, and convert exported AI Studio chat histories (`.txt`, `.md`, `.json`) into formatted Markdown transcripts inside Drive.
+- **Smart SSO Detection & Connected Apps Lifecycle in Settings**:
+  - Connected Neon Auth (`listAccounts()`) to automatically detect Google sign-in, pass `login_hint` for seamless account selection, and trigger Drive authorization directly on single header click.
+  - Added **Connected Apps & SSO Permissions** to **Settings** (accessible to all authorized users, while admin panels remain admin-only), with live connect status and confirmed **Disconnect & Revoke** routed through ExoNovel's server proxy (`POST /api/oauth/google/revoke` -> `oauth2.googleapis.com/revoke`).
+- **Verified Neon Auth Protocol Limits & Consolidated ADR Update**:
+  - Live protocol verification confirmed hosted Neon Auth rewrites Google sign-in to `email profile openid` without `access_type=offline` (`has_refresh: false`) and treats `unlinkAccount` as deleting the entire Google login link rather than selective app revocation.
+  - Consolidated the multi-provider **Connected External Apps (`connected_apps` keyed to `did:peer`)** production design inside existing **[ADR 001 (`001-auth.md` Section 7)](adr/001-auth.md)**, **[ADR 001-004 (`001-auth/004-vault-kms.md`)](adr/001-auth/004-vault-kms.md)**, **[ADR 005 (`005-docs-ui.md`)](adr/005-docs-ui.md)**, **[ADR 005-001 (`005-docs-ui/001-reader.md`)](adr/005-docs-ui/001-reader.md)**, **[ADR 005-002 (`005-docs-ui/002-gate.md` Sections 2 & 4)](adr/005-docs-ui/002-gate.md)**, and **[ADR 006 (`006-stack.md`)](adr/006-stack.md)** without creating extra ADR files.
+
 ---
 
 ## 3. Deep-Dive Explanations Requested by the Owner

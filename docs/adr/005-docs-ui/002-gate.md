@@ -6,10 +6,11 @@ Parent: [005-docs-ui](../005-docs-ui.md)
 
 ## Decision
 
-1. **Sign-In Gate & Welcoming Default Routing (Neon Better Auth)**:
+1. **Public Unauthenticated Landing Page, Sign-In Route & Auth Gate (Neon Better Auth)**:
    - Docs are strictly private and belong exclusively to the independent **ExoNovel** app (`https://exonovel.exosystems.net`), never `exosystems.net`; docs endpoints reject unauthenticated or unauthorized requests with `401`/`403`.
-   - Unauthenticated users see a Sign-In page supporting Neon Better Auth with branded **Google** and **GitHub** buttons plus Email/Password sign-in/sign-up.
-   - Non-allowlisted signed-in users land cleanly on a welcoming **ExoNovel** Home view without exposing private documentation controls.
+   - Unauthenticated visitors and crawlers arriving at `/` immediately receive a server-side-rendered public **ExoNovel** homepage (never behind a login wall or session-loading blocker) explaining the platform's creative writing purpose, five authoring formats, Google Sign-In / optional Drive usage, and explicit Google APIs Terms of Service & anti-AI-NCII compliance, with direct links to `/privacy`, `/terms`, and `/signin`.
+   - Clicking **Sign in** (or visiting `/signin` or an `?invite=` URL) opens the Sign-In view supporting Neon Better Auth with branded **Google** and **GitHub** buttons plus Email/Password sign-in/sign-up.
+   - Non-allowlisted signed-in users land cleanly on a welcoming **ExoNovel** Workspace Home view without exposing private documentation controls.
    - As soon as `exonomyapp@gmail.com` or an enabled `did:peer` allowlist entry signs in, **Docs Reader** is visible in ExoNovel's navbar.
 2. **Navbar User Chip, Profile Hub & Settings Split**:
    - Signed-in users see a navbar user chip showing their 64px avatar thumbnail on the left and active persona display name on the right.

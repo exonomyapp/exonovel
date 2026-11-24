@@ -95,10 +95,11 @@ pub fn App() -> impl IntoView {
     provide_meta_context();
 
     view! {
-        <Title text="ExoNovel · ExoSystems" />
+        <Title text="ExoNovel — Collaborative Creative Writing & Sovereign Publishing" />
         <Router>
-            <Routes fallback=|| view! { <HomeView /> }>
-                <Route path=path!("/") view=HomeView />
+            <Routes fallback=|| view! { <HomeView initial_show_signin=false /> }>
+                <Route path=path!("/") view=|| view! { <HomeView initial_show_signin=false /> } />
+                <Route path=path!("/signin") view=|| view! { <HomeView initial_show_signin=true /> } />
                 <Route path=path!("/privacy") view=PrivacyPolicyView />
                 <Route path=path!("/terms") view=TermsOfServiceView />
             </Routes>
@@ -107,7 +108,7 @@ pub fn App() -> impl IntoView {
 }
 
 #[component]
-fn HomeView() -> impl IntoView {
+fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView {
     let live = LiveSyncState::new();
     let i18n = I18nState::new();
     provide_context(live);
@@ -115,6 +116,7 @@ fn HomeView() -> impl IntoView {
 
     let (auth_config, set_auth_config) = signal::<Option<AuthConfigResponse>>(None);
     let (loading_session, set_loading_session) = signal(true);
+    let (show_signin, set_show_signin) = signal(initial_show_signin);
     let (current_user, set_current_user) = signal::<Option<VerifiedUser>>(None);
     let (session_jwt, set_session_jwt) = signal::<Option<String>>(None);
     let (active_tab, set_active_tab) = signal(ActiveTab::Workspace);
@@ -209,6 +211,7 @@ fn HomeView() -> impl IntoView {
                     if let Some(inv_param) = params.get("invite").filter(|i| !i.trim().is_empty()) {
                         write_session_storage("exo_pending_invite", &inv_param);
                         set_pending_invite.set(Some(inv_param));
+                        set_show_signin.set(true);
                     }
                 }
             }
@@ -217,6 +220,7 @@ fn HomeView() -> impl IntoView {
             if let Some(saved_inv) = read_session_storage("exo_pending_invite") {
                 if !saved_inv.trim().is_empty() {
                     set_pending_invite.set(Some(saved_inv));
+                    set_show_signin.set(true);
                 }
             }
         }
@@ -456,6 +460,7 @@ fn HomeView() -> impl IntoView {
             set_current_user.set(None);
             set_session_jwt.set(None);
             set_sse_started.set(false);
+            set_show_signin.set(false);
             set_active_tab.set(ActiveTab::Workspace);
         });
     };
@@ -463,28 +468,17 @@ fn HomeView() -> impl IntoView {
     view! {
         <div class="exo-shell">
             <nav class="navbar-solid">
-                <a href="/" title="ExoNovel" class="navbar-brand-link">
-                    <img src="/exonovel-logo.png" alt="ExoNovel" class="navbar-logo" />
+                <a
+                    href="/"
+                    title="ExoNovel"
+                    class="navbar-brand-link"
+                    on:click=move |_| set_show_signin.set(false)
+                >
+                    <img src="/exonovel-symbol.png" alt="ExoNovel" class="navbar-logo" />
+                    <span class="navbar-brand-wordmark">"ExoNovel"</span>
                 </a>
 
                 <div class="navbar-menu">
-                    <a href="https://exosystems.net/" class="nav-link">
-                        {move || i18n.tr("nav_home", "Home")}
-                    </a>
-
-                    <button
-                        type="button"
-                        class=move || if active_tab.get() == ActiveTab::Workspace { "nav-link nav-link-active" } else { "nav-link" }
-                        on:click=move |_| {
-                            set_chip_open.set(false);
-                            set_bell_open.set(false);
-                            set_active_tab.set(ActiveTab::Workspace);
-                            persist_profile_patch(serde_json::json!({ "lastActiveTab": "workspace" }));
-                        }
-                    >
-                        {move || i18n.tr("nav_workspace", "ExoNovel")}
-                    </button>
-
                     {move || match current_user.get() {
                         Some(user) => {
                             let can_read_docs = user.authorized;
@@ -506,6 +500,23 @@ fn HomeView() -> impl IntoView {
 
                             view! {
                                 <>
+                                    <a href="https://exosystems.net/" class="nav-link">
+                                        {move || i18n.tr("nav_home", "Home")}
+                                    </a>
+
+                                    <button
+                                        type="button"
+                                        class=move || if active_tab.get() == ActiveTab::Workspace { "nav-link nav-link-active" } else { "nav-link" }
+                                        on:click=move |_| {
+                                            set_chip_open.set(false);
+                                            set_bell_open.set(false);
+                                            set_active_tab.set(ActiveTab::Workspace);
+                                            persist_profile_patch(serde_json::json!({ "lastActiveTab": "workspace" }));
+                                        }
+                                    >
+                                        {move || i18n.tr("nav_workspace", "ExoNovel")}
+                                    </button>
+
                                     {if can_read_docs {
                                         view! {
                                             <button
@@ -704,7 +715,26 @@ fn HomeView() -> impl IntoView {
                             }.into_any()
                         }
                         None => view! {
-                            <span class="nav-link nav-link-active">"Sign in"</span>
+                            <>
+                                <a href="/#overview" class="nav-link" on:click=move |_| set_show_signin.set(false)>
+                                    "Overview"
+                                </a>
+                                <a href="/#formats" class="nav-link" on:click=move |_| set_show_signin.set(false)>
+                                    "Formats"
+                                </a>
+                                <a href="/#compliance" class="nav-link" on:click=move |_| set_show_signin.set(false)>
+                                    "API Use"
+                                </a>
+                                <a href="/privacy" class="nav-link">"Privacy"</a>
+                                <a href="/terms" class="nav-link">"Terms"</a>
+                                <button
+                                    type="button"
+                                    class="exo-btn exo-btn-primary"
+                                    on:click=move |_| set_show_signin.set(true)
+                                >
+                                    "Sign in"
+                                </button>
+                            </>
                         }.into_any(),
                     }}
 
@@ -730,33 +760,33 @@ fn HomeView() -> impl IntoView {
                 </div>
             </nav>
 
-            <Show
-                when=move || !loading_session.get()
-                fallback=|| view! {
-                    <main class="page-main">
-                        <div class="exo-auth-wrap">
-                            <div class="exo-card">
-                                <p class="exo-sub">"Loading ExoNovel session..."</p>
-                            </div>
-                        </div>
-                    </main>
-                }
-            >
-                {
-                    let session_view_key = Memo::new(move |_| {
-                        current_user
-                            .get()
-                            .map(|u| (u.auth_user_id, u.authorized, u.is_admin))
-                    });
-                    move || match session_view_key.get() {
-                        None => view! {
-                            <SignInView
-                                auth_config=auth_config
-                                pending_invite=pending_invite
-                                on_signed_in=refresh_session
-                            />
-                        }.into_any(),
-                        Some((_uid, authorized, _is_admin)) => {
+            {
+                let session_view_key = Memo::new(move |_| {
+                    current_user
+                        .get()
+                        .map(|u| (u.auth_user_id, u.authorized, u.is_admin))
+                });
+                move || match session_view_key.get() {
+                    None => {
+                        if show_signin.get() {
+                            view! {
+                                <SignInView
+                                    auth_config=auth_config
+                                    pending_invite=pending_invite
+                                    loading_session=loading_session
+                                    on_back_home=move || set_show_signin.set(false)
+                                    on_signed_in=refresh_session
+                                />
+                            }.into_any()
+                        } else {
+                            view! {
+                                <PublicLandingView
+                                    on_open_signin=move || set_show_signin.set(true)
+                                />
+                            }.into_any()
+                        }
+                    }
+                    Some((_uid, authorized, _is_admin)) => {
                             let tab = active_tab.get();
                             match tab {
                                 ActiveTab::Docs if authorized => view! {
@@ -842,7 +872,7 @@ fn HomeView() -> impl IntoView {
                         }
                     }
                 }
-            </Show>
+            }
 
             <Show when=move || toast_msg.get().is_some()>
                 <div class="exo-toast" role="status" aria-live="polite">
@@ -956,9 +986,125 @@ fn WorkspaceHomeView(
 }
 
 #[component]
+fn PublicLandingView(
+    on_open_signin: impl Fn() + Copy + Send + Sync + 'static,
+) -> impl IntoView {
+    view! {
+        <main class="page-main">
+            <div class="exo-landing-stack">
+                <section id="overview" class="exo-landing-hero">
+                    <div class="exo-eyebrow">
+                        "ExoNovel · Operated by Exosystems (exosystems.net) · Web, Desktop & Mobile"
+                    </div>
+                    <h1 class="exo-landing-title">
+                        "ExoNovel — Collaborative Creative Writing Where Authors Own Their Work"
+                    </h1>
+                    <p class="exo-landing-lead">
+                        "ExoNovel (https://exonovel.exosystems.net) is a collaborative creative writing and local-first publishing platform built for authors, co-writers, and literary teams. Draft novels, essays, short stories, screenplays, and poetry together in real time while keeping cryptographic ownership of your own characters, scenes, and manuscripts."
+                    </p>
+                    <div class="exo-landing-actions">
+                        <button
+                            type="button"
+                            class="exo-btn exo-btn-primary"
+                            on:click=move |_| on_open_signin()
+                        >
+                            "Sign in to ExoNovel"
+                        </button>
+                        <a href="/privacy" class="exo-landing-text-link">"Privacy Policy"</a>
+                        <a href="/terms" class="exo-landing-text-link">"Terms of Service"</a>
+                    </div>
+                </section>
+
+                <section id="compliance" class="exo-compliance-panel">
+                    <h2 class="exo-h2">"Application Purpose, Google API Usage & Safety Compliance"</h2>
+                    <div class="exo-compliance-grid">
+                        <div class="exo-compliance-item">
+                            <h3>"01. Purpose of ExoNovel"</h3>
+                            <p>
+                                "ExoNovel is a text-based writing, story-planning, and publishing workspace. Authors organize character biographies, worldbuilding bibles, outlines, and chapters, collaborate with invited co-authors, and publish finished works."
+                            </p>
+                        </div>
+                        <div class="exo-compliance-item">
+                            <h3>"02. Google Sign-In & Optional Drive Use"</h3>
+                            <p>
+                                "Google Sign-In (openid, email, and profile scopes) is used strictly to authenticate your ExoNovel account and resolve your portable did:peer identity. Optional Google Drive integration is requested only when you explicitly choose to back up or export your own Markdown documents to your Drive."
+                            </p>
+                        </div>
+                        <div class="exo-compliance-item">
+                            <h3>"03. Google APIs Terms & Zero AI NCII"</h3>
+                            <p>
+                                "ExoNovel complies with the Google APIs Terms of Service and the Google API Services User Data Policy (Limited Use). ExoNovel does not generate images, video, or audio, does not train AI models on Google user data, and strictly prohibits using ExoNovel or connected Google APIs for AI-generated Non-Consensual Intimate Imagery (AI NCII)."
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="exo-bento-grid">
+                    <article class="exo-bento-card exo-bento-wide">
+                        <h3>"01. Individual Ownership in Shared Story Worlds"</h3>
+                        <p>
+                            "Every creative unit—character profiles, lore notes, plot beats, scenes, and chapters—is anchored to the author's cryptographic did:peer identity. Contributors can collaborate inside shared projects and permissioned forks without surrendering authorship or attribution."
+                        </p>
+                    </article>
+                    <article class="exo-bento-card">
+                        <h3>"02. Multi-Persona Pen Names"</h3>
+                        <p>
+                            "Writers manage distinct pen names and avatars under one verified account, switching active personas seamlessly across collaborative manuscripts and publishing channels."
+                        </p>
+                    </article>
+                    <article class="exo-bento-card">
+                        <h3>"03. Web & Local-First Sync"</h3>
+                        <p>
+                            "Work online in the browser backed by Neon PostgreSQL or synchronize end-to-end encrypted local workspaces across Linux, macOS, Windows, Android, and iOS."
+                        </p>
+                    </article>
+                    <article class="exo-bento-card exo-bento-wide">
+                        <h3>"04. User-Controlled Connected Apps & Revocation"</h3>
+                        <p>
+                            "External integrations such as Google Drive remain strictly optional and separated from primary sign-in. Users can inspect active permissions or disconnect and revoke provider tokens anytime from Settings without losing access to ExoNovel."
+                        </p>
+                    </article>
+                </section>
+
+                <section id="formats" class="exo-card">
+                    <h2 class="exo-h2">"Supported Authoring & Publication Formats"</h2>
+                    <p class="exo-sub">
+                        "Structured planning dimensions and publication layouts tailored to five core writing disciplines."
+                    </p>
+                    <div class="exo-format-grid">
+                        <div class="exo-format-tile">
+                            <h3>"Novels"</h3>
+                            <p>"Story bibles, character arcs, worldbuilding rules, parts, chapters, and scenes."</p>
+                        </div>
+                        <div class="exo-format-tile">
+                            <h3>"Articles & Nonfiction"</h3>
+                            <p>"Thesis angles, structured section outlines, citations, and editorial drafts."</p>
+                        </div>
+                        <div class="exo-format-tile">
+                            <h3>"Short Stories"</h3>
+                            <p>"Compact single-conflict fiction, flash prose, and themed anthology sequencing."</p>
+                        </div>
+                        <div class="exo-format-tile">
+                            <h3>"Screenplays & Scripts"</h3>
+                            <p>"Loglines, treatments, beat cards, sluglines, action lines, and dialogue blocks."</p>
+                        </div>
+                        <div class="exo-format-tile">
+                            <h3>"Poetry"</h3>
+                            <p>"Lineation-preserving verse, stanza craft, chapbooks, and full collections."</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    }
+}
+
+#[component]
 fn SignInView(
     auth_config: ReadSignal<Option<AuthConfigResponse>>,
     pending_invite: ReadSignal<Option<String>>,
+    loading_session: ReadSignal<bool>,
+    on_back_home: impl Fn() + Copy + Send + Sync + 'static,
     on_signed_in: impl Fn() + Copy + Send + Sync + 'static,
 ) -> impl IntoView {
     let (is_signup, set_is_signup) = signal(false);
@@ -1076,8 +1222,20 @@ fn SignInView(
     view! {
         <main class="page-main">
             <header class="page-head">
-                <h1>"Sign in."</h1>
-                <p>"Resolve your authoritative did:peer identity and open ExoNovel."</p>
+                <div style="margin-bottom: 14px;">
+                    <button
+                        type="button"
+                        class="exo-btn"
+                        on:click=move |_| on_back_home()
+                    >
+                        "← Back to ExoNovel overview"
+                    </button>
+                </div>
+                <h1>"Sign in to ExoNovel"</h1>
+                <p>"Authenticate to resolve your authoritative did:peer identity and open your workspace."</p>
+                <Show when=move || loading_session.get()>
+                    <p class="exo-sub">"Checking existing session..."</p>
+                </Show>
             </header>
 
             <div class="exo-auth-wrap">
@@ -1177,54 +1335,118 @@ fn PublicFooter() -> impl IntoView {
 fn PrivacyPolicyView() -> impl IntoView {
     view! {
         <div class="exo-shell">
-            <Title text="Privacy Policy · ExoNovel" />
+            <Title text="Privacy Policy — ExoNovel" />
             <nav class="navbar-solid">
                 <a href="/" title="ExoNovel" class="navbar-brand-link">
-                    <img src="/exonovel-logo.png" alt="ExoNovel" class="navbar-logo" />
+                    <img src="/exonovel-symbol.png" alt="ExoNovel" class="navbar-logo" />
+                    <span class="navbar-brand-wordmark">"ExoNovel"</span>
                 </a>
                 <div class="navbar-menu">
                     <a href="/" class="nav-link">"Home"</a>
                     <a href="/privacy" class="nav-link nav-link-active">"Privacy Policy"</a>
                     <a href="/terms" class="nav-link">"Terms of Service"</a>
+                    <a href="/signin" class="exo-btn exo-btn-primary">"Sign in"</a>
                 </div>
             </nav>
 
-            <main class="page-main" style="max-width: 860px; margin: 0 auto;">
+            <main class="page-main" style="max-width: 900px; margin: 0 auto;">
                 <div class="exo-card">
-                    <div class="exo-eyebrow">"Last Updated: November 21, 2026"</div>
+                    <div class="exo-eyebrow">"Effective Date & Last Updated: November 24, 2026"</div>
                     <h1 class="exo-h1" style="margin-top: 6px;">"ExoNovel Privacy Policy"</h1>
-                    <p class="exo-sub" style="color: var(--text); line-height: 1.65;">
-                        "ExoNovel (https://exonovel.exosystems.net) is a collaborative creative writing and local-first publishing platform operated by Exosystems (https://exosystems.net). This Privacy Policy explains what information ExoNovel collects, how Google user data and account credentials are used, how we protect your information, and how you can export or delete your data."
+                    <p class="exo-legal-body">
+                        "ExoNovel (https://exonovel.exosystems.net) is a collaborative creative writing and local-first publishing platform operated by Exosystems (https://exosystems.net). This Privacy Policy describes how Exosystems collects, uses, stores, protects, and deletes personal data and Google user data when you use ExoNovel across the web application and companion client builds."
                     </p>
 
-                    <h2 class="exo-h2" style="margin-top: 22px;">"1. Information We Collect & Google User Data"</h2>
-                    <p class="exo-sub" style="color: var(--text); line-height: 1.65;">
-                        "When you sign in to ExoNovel using Google OAuth (scopes: openid, email, and profile), we receive and store only your verified email address, display name, and profile picture URL. If you sign in with GitHub or email/password, or create author personas and creative works, we store your display name, pen name/handle, avatar image variants, language and notification preferences, and the cryptographic public identity (did:peer) associated with your workspace."
+                    <h2 class="exo-h2" style="margin-top: 24px;">"1. Information We Collect"</h2>
+                    <p class="exo-legal-body">
+                        "We collect only the information needed to authenticate your account, operate your collaborative writing workspace, and deliver features you explicitly enable:"
+                    </p>
+                    <ul class="exo-legal-list">
+                        <li>
+                            <strong>"Google Sign-In Account Data (openid, email, profile): "</strong>
+                            "When you sign in with Google, we receive your verified email address, email verification status, display name, given and family name, profile picture URL, locale, and Google provider account identifier."
+                        </li>
+                        <li>
+                            <strong>"Optional Connected Google Drive Data: "</strong>
+                            "Primary sign-in never requests Google Drive permissions. Only if you explicitly connect Google Drive inside ExoNovel's Workspace or Settings does ExoNovel request Google Drive authorization to list folders, create or rename backup folders, upload your exported Markdown documentation/manuscript archives or session transcripts, and restore or trash files you select inside the Drive Workspace."
+                        </li>
+                        <li>
+                            <strong>"Other Sign-In & Author Profile Information: "</strong>
+                            "If you sign in with GitHub or email/password, or customize your workspace, we store your display name, pen name/handle, biography, website, location, preferred publication format, output and input language preferences, timezone, notification preferences, uploaded avatar images (processed server-side into 64px, 256px, and 1024px WebP/JPEG variants), and your cryptographic public key / did:peer identity."
+                        </li>
+                        <li>
+                            <strong>"Manuscripts & Collaboration Records: "</strong>
+                            "Creative works, story bibles, personas, collaboration group memberships, referrals, and invitations that you choose to create or share inside ExoNovel."
+                        </li>
+                        <li>
+                            <strong>"Security & Technical Diagnostics: "</strong>
+                            "Sign-in timestamps, IP address, browser User-Agent string, and application health/error logs used strictly to protect accounts against unauthorized access and keep the service reliable."
+                        </li>
+                    </ul>
+
+                    <h2 class="exo-h2" style="margin-top: 24px;">"2. Cookies & Browser Storage"</h2>
+                    <p class="exo-legal-body">
+                        "ExoNovel uses strictly necessary authentication cookies (HttpOnly session cookies managed through Neon Auth) to maintain your signed-in session, and temporary browser sessionStorage strictly to preserve pending collaboration invite codes across OAuth redirects. ExoNovel does not use third-party advertising cookies, behavioral tracking pixels, or cross-site ad networks."
                     </p>
 
-                    <h2 class="exo-h2" style="margin-top: 22px;">"2. How We Use Your Information"</h2>
-                    <p class="exo-sub" style="color: var(--text); line-height: 1.65;">
-                        "ExoNovel uses your account information strictly to authenticate your session, display your author or reader profile and personas, enable collaborative story groups and invitations you choose to join, and deliver transactional or notification emails you enable (sent via Brevo from notes@exosystems.net, noreply@exosystems.net, or support@exosystems.net). We do not use your Google profile data or creative writing content for advertising, behavioral profiling, or training third-party AI models."
+                    <h2 class="exo-h2" style="margin-top: 24px;">"3. How We Use Your Information"</h2>
+                    <ul class="exo-legal-list">
+                        <li>"Authenticate your session and resolve your authoritative did:peer identity across Web, Desktop, and Mobile modes."</li>
+                        <li>"Display your chosen author persona, pen name, avatar, and language settings (including right-to-left layout preferences)."</li>
+                        <li>"Operate collaborative story groups, contributor attribution, and group/referral invitations you initiate."</li>
+                        <li>"Execute user-initiated backups or exports to your connected Google Drive workspace when you explicitly trigger them."</li>
+                        <li>"Deliver transactional, security, and notification emails you enable via Brevo (sent from notes@exosystems.net, noreply@exosystems.net, or support@exosystems.net)."</li>
+                        <li>"Prevent fraud, abuse, unauthorized access, and violations of our Terms of Service."</li>
+                    </ul>
+
+                    <h2 class="exo-h2" style="margin-top: 24px;">"4. Google API Services User Data Policy (Limited Use) & AI / Content Restrictions"</h2>
+                    <p class="exo-legal-body">
+                        "ExoNovel's use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements."
+                    </p>
+                    <ul class="exo-legal-list">
+                        <li>
+                            <strong>"No Advertising or Data Brokerage: "</strong>
+                            "We never sell, rent, or transfer Google user data or your writing content to data brokers, advertisers, or third-party marketing platforms."
+                        </li>
+                        <li>
+                            <strong>"No Generalized AI Model Training: "</strong>
+                            "ExoNovel does not use Google user data, Google Drive files, or your private manuscripts to train generalized artificial intelligence or machine learning models."
+                        </li>
+                        <li>
+                            <strong>"No Image Generation & Zero Tolerance for AI NCII: "</strong>
+                            "ExoNovel is a text-based writing and publishing platform. It does not generate images, video, or audio, and strictly prohibits using ExoNovel or any connected Google APIs for AI-generated Non-Consensual Intimate Imagery (AI NCII)."
+                        </li>
+                        <li>
+                            <strong>"Human Access Restrictions: "</strong>
+                            "Exosystems personnel do not read your private Google Drive files or private manuscripts unless (a) you explicitly grant consent for support debugging, (b) it is necessary for security or abuse investigation, or (c) it is required to comply with applicable law."
+                        </li>
+                    </ul>
+
+                    <h2 class="exo-h2" style="margin-top: 24px;">"5. Data Storage, Subprocessors & Cryptographic Protection"</h2>
+                    <p class="exo-legal-body">
+                        "All traffic to ExoNovel is encrypted in transit using HTTPS/TLS. Hosted web records and account state are stored in Neon PostgreSQL and Neon Managed Auth, hosted on Tencent Cloud application infrastructure, with email delivery handled by Brevo. When optional Connected External App offline tokens are stored server-side, they are envelope-encrypted via HashiCorp Vault Transit KMS and isolated from primary login credentials. On device-native installations using peer-to-peer Willow and iroh relay synchronization, payloads are end-to-end encrypted on your device so relay servers remain cryptographically blind to relayed content."
                     </p>
 
-                    <h2 class="exo-h2" style="margin-top: 22px;">"3. Google API Services User Data Policy (Limited Use)"</h2>
-                    <p class="exo-sub" style="color: var(--text); line-height: 1.65;">
-                        "ExoNovel's use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements. We do not sell, rent, or transfer Google user data to data brokers or third parties for marketing."
+                    <h2 class="exo-h2" style="margin-top: 24px;">"6. How to Revoke Access, Export & Delete Your Data"</h2>
+                    <ul class="exo-legal-list">
+                        <li>
+                            <strong>"Disconnect & Revoke Google Access Anytime: "</strong>
+                            "You can disconnect Google Drive or other optional Connected Apps inside ExoNovel Settings -> Connected Apps (which revokes active tokens directly through https://oauth2.googleapis.com/revoke without closing your primary ExoNovel account), or revoke access anytime in your Google Account Permissions at https://myaccount.google.com/permissions."
+                        </li>
+                        <li>
+                            <strong>"Export & Account Deletion Requests: "</strong>
+                            "You may request a complete export or permanent deletion of your ExoNovel account, Google OAuth profile metadata, personas, avatar assets, and hosted workspace records by emailing support@exosystems.net or exonomyapp@gmail.com. Verified deletion requests are completed within 30 days and remove active personal data from our hosted database and OAuth token store."
+                        </li>
+                    </ul>
+
+                    <h2 class="exo-h2" style="margin-top: 24px;">"7. Data Retention, Children's Privacy & Policy Updates"</h2>
+                    <p class="exo-legal-body">
+                        "We retain personal account data only as long as your account remains active or as necessary to fulfill security, billing, or legal obligations. ExoNovel is not directed to children under 13 (or under 16 where required by applicable regional data protection law), and we do not knowingly collect personal data from minors below the applicable age threshold. If we make material changes to this Privacy Policy, we will update the Effective Date above and notify active account holders where appropriate."
                     </p>
 
-                    <h2 class="exo-h2" style="margin-top: 22px;">"4. Data Storage, Infrastructure & Cryptographic Blindness"</h2>
-                    <p class="exo-sub" style="color: var(--text); line-height: 1.65;">
-                        "All network traffic to ExoNovel is encrypted via HTTPS/TLS. Hosted account records and Web Mode workspaces are persisted in Neon PostgreSQL and Neon Managed Auth. On device-native installs using peer-to-peer Willow and iroh relay synchronization, payloads are end-to-end encrypted on your device so ExoNovel's relay infrastructure remains cryptographically blind to relayed content."
-                    </p>
-
-                    <h2 class="exo-h2" style="margin-top: 22px;">"5. Data Retention, Export & Account Deletion"</h2>
-                    <p class="exo-sub" style="color: var(--text); line-height: 1.65;">
-                        "We retain your account information only while your account remains active or as required to resolve support requests and legal obligations. You may request full deletion or export of your account, Google OAuth profile metadata, and associated workspace records at any time from your ExoNovel account settings or by emailing support@exosystems.net (or exonomyapp@gmail.com). Verified deletion requests are processed promptly and remove active personal records from our hosted database."
-                    </p>
-
-                    <h2 class="exo-h2" style="margin-top: 22px;">"6. Contact Us"</h2>
-                    <p class="exo-sub" style="color: var(--text); line-height: 1.65;">
-                        "If you have privacy questions or data deletion requests, contact Exosystems Support at support@exosystems.net or exonomyapp@gmail.com."
+                    <h2 class="exo-h2" style="margin-top: 24px;">"8. Contact Information"</h2>
+                    <p class="exo-legal-body">
+                        "For privacy questions, Google user data inquiries, or deletion requests, contact Exosystems Support at support@exosystems.net or exonomyapp@gmail.com."
                     </p>
                 </div>
             </main>
@@ -1238,39 +1460,61 @@ fn PrivacyPolicyView() -> impl IntoView {
 fn TermsOfServiceView() -> impl IntoView {
     view! {
         <div class="exo-shell">
-            <Title text="Terms of Service · ExoNovel" />
+            <Title text="Terms of Service — ExoNovel" />
             <nav class="navbar-solid">
                 <a href="/" title="ExoNovel" class="navbar-brand-link">
-                    <img src="/exonovel-logo.png" alt="ExoNovel" class="navbar-logo" />
+                    <img src="/exonovel-symbol.png" alt="ExoNovel" class="navbar-logo" />
+                    <span class="navbar-brand-wordmark">"ExoNovel"</span>
                 </a>
                 <div class="navbar-menu">
                     <a href="/" class="nav-link">"Home"</a>
                     <a href="/privacy" class="nav-link">"Privacy Policy"</a>
                     <a href="/terms" class="nav-link nav-link-active">"Terms of Service"</a>
+                    <a href="/signin" class="exo-btn exo-btn-primary">"Sign in"</a>
                 </div>
             </nav>
 
-            <main class="page-main" style="max-width: 860px; margin: 0 auto;">
+            <main class="page-main" style="max-width: 900px; margin: 0 auto;">
                 <div class="exo-card">
-                    <div class="exo-eyebrow">"Last Updated: November 21, 2026"</div>
+                    <div class="exo-eyebrow">"Effective Date & Last Updated: November 24, 2026"</div>
                     <h1 class="exo-h1" style="margin-top: 6px;">"ExoNovel Terms of Service"</h1>
-                    <p class="exo-sub" style="color: var(--text); line-height: 1.65;">
-                        "By accessing or using ExoNovel (https://exonovel.exosystems.net), operated by Exosystems, you agree to these Terms of Service."
+                    <p class="exo-legal-body">
+                        "By accessing or using ExoNovel (https://exonovel.exosystems.net), operated by Exosystems (https://exosystems.net), you agree to be bound by these Terms of Service and our Privacy Policy (/privacy)."
                     </p>
 
-                    <h2 class="exo-h2" style="margin-top: 22px;">"1. Ownership of Your Creative Works"</h2>
-                    <p class="exo-sub" style="color: var(--text); line-height: 1.65;">
-                        "You retain full ownership and copyright of all manuscripts, stories, characters, annotations, and creative assets you write or publish on ExoNovel. You grant ExoNovel only the limited technical license needed to store, display, synchronize, and transmit your content as directed by your workspace and sharing settings."
+                    <h2 class="exo-h2" style="margin-top: 24px;">"1. Ownership of Your Creative Works"</h2>
+                    <p class="exo-legal-body">
+                        "You retain full ownership and copyright of all manuscripts, stories, characters, worldbuilding notes, scripts, poetry, annotations, and creative assets you write or publish on ExoNovel. You grant ExoNovel only the limited technical license necessary to store, render, synchronize, back up (when directed by you), and transmit your content according to your workspace and collaboration settings."
                     </p>
 
-                    <h2 class="exo-h2" style="margin-top: 22px;">"2. Accounts, Keys & Acceptable Use"</h2>
-                    <p class="exo-sub" style="color: var(--text); line-height: 1.65;">
-                        "You are responsible for safeguarding your login credentials and sovereign did:peer device keys. You agree not to misuse ExoNovel for unlawful content, automated abuse, spam, or unauthorized access to other users' workspaces."
+                    <h2 class="exo-h2" style="margin-top: 24px;">"2. Accounts, Keys & Acceptable Use"</h2>
+                    <p class="exo-legal-body">
+                        "You are responsible for safeguarding your login credentials and sovereign did:peer device keys. You must be at least 13 years old (or the minimum legal age in your jurisdiction) to create an account. You agree not to interfere with platform security, attempt unauthorized access to other users' workspaces, distribute malware, or send automated spam."
                     </p>
 
-                    <h2 class="exo-h2" style="margin-top: 22px;">"3. Service Modes & Availability"</h2>
-                    <p class="exo-sub" style="color: var(--text); line-height: 1.65;">
-                        "ExoNovel provides hosted web collaboration, free local device storage, and optional paid cloud-relay backup plans. Features are provided on an 'as available' basis while the platform continues active development. For support or billing inquiries, contact support@exosystems.net."
+                    <h2 class="exo-h2" style="margin-top: 24px;">"3. Prohibited Content & Google APIs Terms of Service Compliance"</h2>
+                    <p class="exo-legal-body">
+                        "ExoNovel is a text-focused collaborative creative writing platform and does not provide image, video, or audio generation tools. ExoNovel strictly complies with the Google APIs Terms of Service and enforces zero tolerance for harmful or unlawful content:"
+                    </p>
+                    <ul class="exo-legal-list">
+                        <li>
+                            <strong>"Strict Prohibition on AI NCII: "</strong>
+                            "You may not use ExoNovel or any connected Google APIs (including Google Sign-In or Google Drive integrations) to create, host, upload, synchronize, distribute, or facilitate AI-generated Non-Consensual Intimate Imagery (AI NCII), non-consensual sexualized depictions, or deepfakes."
+                        </li>
+                        <li>
+                            <strong>"Unlawful & Abusive Material: "</strong>
+                            "Child sexual abuse material (CSAM), non-consensual intimate imagery, harassment, hate incitement, and copyright infringement are strictly prohibited and result in immediate account suspension and termination."
+                        </li>
+                    </ul>
+
+                    <h2 class="exo-h2" style="margin-top: 24px;">"4. Connected External Apps (Google Drive & Third-Party Services)"</h2>
+                    <p class="exo-legal-body">
+                        "Optional integrations such as Google Drive backup are activated only upon your explicit authorization and may be disconnected or revoked at any time in ExoNovel Settings -> Connected Apps or via your third-party provider's account security page. Your use of third-party services remains subject to their respective terms."
+                    </p>
+
+                    <h2 class="exo-h2" style="margin-top: 24px;">"5. Service Modes, Availability & Contact"</h2>
+                    <p class="exo-legal-body">
+                        "ExoNovel provides hosted web collaboration, local-first device storage, and optional cloud-relay sync plans. Features are provided on an 'as available' basis as the platform evolves. For legal, safety, billing, or support inquiries, contact support@exosystems.net or exonomyapp@gmail.com."
                     </p>
                 </div>
             </main>
