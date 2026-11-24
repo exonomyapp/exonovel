@@ -19,6 +19,9 @@ jobs:
     permissions:
       contents: read
       checks: write
+    defaults:
+      run:
+        shell: bash -eo pipefail {0}
     env:
       CARGO_TERM_COLOR: always
 
@@ -53,6 +56,20 @@ jobs:
       - name: Build finished ExoNovel release binary and WASM site assets
         run: cargo leptos build --release 2>&1 | tee -a /tmp/ci-build.log
 
+      - name: Package finished release bundle
+        run: |
+          {
+            rm -rf deploy
+            mkdir -p deploy
+            BIN_PATH=$(find target/release target/server -maxdepth 4 -type f -name exonovel-server 2>/dev/null | head -n 1)
+            test -n "$BIN_PATH"
+            cp "$BIN_PATH" deploy/exonovel-server
+            chmod +x deploy/exonovel-server
+            cp -r target/site deploy/site
+            cp -r docs deploy/docs
+            cp AGENTS.md deploy/AGENTS.md
+          } 2>&1 | tee -a /tmp/ci-build.log
+
       - name: Publish failure diagnostic log to public Check Run and Summary
         if: failure() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         continue-on-error: true
@@ -86,18 +103,6 @@ jobs:
           }
           print(json.dumps(payload))
           PY
-
-      - name: Package finished release bundle
-        run: |
-          rm -rf deploy
-          mkdir -p deploy
-          BIN_PATH=$(find target/release target/server -maxdepth 4 -type f -name exonovel-server | head -n 1)
-          test -n "$BIN_PATH"
-          cp "$BIN_PATH" deploy/exonovel-server
-          chmod +x deploy/exonovel-server
-          cp -r target/site deploy/site
-          cp -r docs deploy/docs
-          cp AGENTS.md deploy/AGENTS.md
 
       - name: Upload finished package artifact
         if: github.ref == 'refs/heads/main' && github.event_name == 'push' || github.event_name == 'workflow_dispatch'

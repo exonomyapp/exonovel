@@ -787,88 +787,87 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                         }
                     }
                     Some((_uid, authorized, _is_admin)) => {
-                            let tab = active_tab.get();
-                            match tab {
-                                ActiveTab::Docs if authorized => view! {
-                                    <DocsCmsView
-                                        auth_config=auth_config
-                                        initial_jwt=session_jwt
-                                        current_user=current_user
-                                        active_doc_path=active_doc_path
-                                        set_active_doc_path=set_active_doc_path
-                                        on_toast=show_toast
-                                    />
-                                }.into_any(),
-                                ActiveTab::Profile => view! {
-                                    <ProfileView
-                                        auth_config=auth_config
-                                        initial_jwt=session_jwt
-                                        current_user=current_user
-                                        set_current_user=set_current_user
-                                        return_tab=return_tab
-                                        on_copy_did=show_did_copied_toast
-                                        on_toast=show_toast
-                                        on_back=move || {
-                                            let dest = return_tab.get_untracked();
-                                            let is_auth = current_user.get_untracked().is_some_and(|u| u.authorized);
-                                            if dest == ActiveTab::Docs && is_auth {
-                                                set_active_tab.set(ActiveTab::Docs);
-                                            } else {
-                                                set_active_tab.set(ActiveTab::Workspace);
-                                            }
-                                        }
-                                    />
-                                }.into_any(),
-                                ActiveTab::Settings => {
-                                    if let Some(user) = current_user.get_untracked() {
-                                        view! {
-                                            <SettingsView
-                                                auth_config=auth_config
-                                                initial_jwt=session_jwt
-                                                user=user
-                                                return_tab=return_tab
-                                                appearance=appearance
-                                                set_appearance=set_appearance
-                                                on_copy_did=show_did_copied_toast
-                                                on_toast=show_toast
-                                                on_open_profile_billing=move || navigate_to_subpage(ActiveTab::Profile)
-                                                on_profile_updated=move |updated: ProfilePatchResponse| {
-                                                    set_current_user.update(|u_opt| {
-                                                        if let Some(u) = u_opt {
-                                                            u.profile = Some(updated.profile);
-                                                            u.personas = updated.personas;
-                                                            u.active_persona = updated.active_persona;
-                                                        }
-                                                    });
-                                                }
-                                                on_back=move || {
-                                                    let dest = return_tab.get_untracked();
-                                                    let is_auth = current_user.get_untracked().is_some_and(|u| u.authorized);
-                                                    if dest == ActiveTab::Docs && is_auth {
-                                                        set_active_tab.set(ActiveTab::Docs);
-                                                    } else {
-                                                        set_active_tab.set(ActiveTab::Workspace);
-                                                    }
-                                                }
-                                            />
-                                        }.into_any()
-                                    } else {
-                                        view! { <div /> }.into_any()
-                                    }
-                                }
-                                _ => view! {
-                                    <WorkspaceHomeView
-                                        current_user=current_user
-                                        on_open_docs=move || {
+                        let tab = active_tab.get();
+                        match tab {
+                            ActiveTab::Docs if authorized => view! {
+                                <DocsCmsView
+                                    auth_config=auth_config
+                                    initial_jwt=session_jwt
+                                    current_user=current_user
+                                    active_doc_path=active_doc_path
+                                    set_active_doc_path=set_active_doc_path
+                                    on_toast=show_toast
+                                />
+                            }.into_any(),
+                            ActiveTab::Profile => view! {
+                                <ProfileView
+                                    auth_config=auth_config
+                                    initial_jwt=session_jwt
+                                    current_user=current_user
+                                    set_current_user=set_current_user
+                                    return_tab=return_tab
+                                    on_copy_did=show_did_copied_toast
+                                    on_toast=show_toast
+                                    on_back=move || {
+                                        let dest = return_tab.get_untracked();
+                                        let is_auth = current_user.get_untracked().is_some_and(|u| u.authorized);
+                                        if dest == ActiveTab::Docs && is_auth {
                                             set_active_tab.set(ActiveTab::Docs);
-                                            persist_profile_patch(serde_json::json!({ "lastActiveTab": "docs" }));
+                                        } else {
+                                            set_active_tab.set(ActiveTab::Workspace);
                                         }
-                                        on_open_profile=move || navigate_to_subpage(ActiveTab::Profile)
-                                        on_open_settings=move || navigate_to_subpage(ActiveTab::Settings)
-                                        on_copy_did=show_did_copied_toast
-                                    />
-                                }.into_any(),
+                                    }
+                                />
+                            }.into_any(),
+                            ActiveTab::Settings => {
+                                if let Some(user) = current_user.get_untracked() {
+                                    view! {
+                                        <SettingsView
+                                            auth_config=auth_config
+                                            initial_jwt=session_jwt
+                                            user=user
+                                            return_tab=return_tab
+                                            appearance=appearance
+                                            set_appearance=set_appearance
+                                            on_copy_did=show_did_copied_toast
+                                            on_toast=show_toast
+                                            on_open_profile_billing=move || navigate_to_subpage(ActiveTab::Profile)
+                                            on_profile_updated=move |updated: ProfilePatchResponse| {
+                                                set_current_user.update(|u_opt| {
+                                                    if let Some(u) = u_opt {
+                                                        u.profile = Some(updated.profile);
+                                                        u.personas = updated.personas;
+                                                        u.active_persona = updated.active_persona;
+                                                    }
+                                                });
+                                            }
+                                            on_back=move || {
+                                                let dest = return_tab.get_untracked();
+                                                let is_auth = current_user.get_untracked().is_some_and(|u| u.authorized);
+                                                if dest == ActiveTab::Docs && is_auth {
+                                                    set_active_tab.set(ActiveTab::Docs);
+                                                } else {
+                                                    set_active_tab.set(ActiveTab::Workspace);
+                                                }
+                                            }
+                                        />
+                                    }.into_any()
+                                } else {
+                                    view! { <div /> }.into_any()
+                                }
                             }
+                            _ => view! {
+                                <WorkspaceHomeView
+                                    current_user=current_user
+                                    on_open_docs=move || {
+                                        set_active_tab.set(ActiveTab::Docs);
+                                        persist_profile_patch(serde_json::json!({ "lastActiveTab": "docs" }));
+                                    }
+                                    on_open_profile=move || navigate_to_subpage(ActiveTab::Profile)
+                                    on_open_settings=move || navigate_to_subpage(ActiveTab::Settings)
+                                    on_copy_did=show_did_copied_toast
+                                />
+                            }.into_any(),
                         }
                     }
                 }
