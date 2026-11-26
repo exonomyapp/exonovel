@@ -8,7 +8,7 @@ Parent: [002-data](../002-data.md)
 
 ExoNovel already authenticates users via Neon Managed Better Auth and stores preferences in **Neon PostgreSQL (`user_profiles`)** (`appearance_mode`, `preferred_format`, `locale`, `timezone`, `active_persona_did`, `last_active_tab`, `last_doc_path`, and upcoming notification checkboxes). Yet the frontend currently still writes `mu_appearance` (and docs sidebar collapse/width/folder state) to browser `localStorage`.
 
-> **Design question**: *"If we're already storing preferences and settings in the Neon PostgreSQL user profile, do we really need browser storage if it is so efficient to just make a DB call for them?"*
+> **Design question**: *"If we're already storing preferences in the Neon PostgreSQL user profile, do we really need browser storage if it is so efficient to just make a DB call for them?"*
 
 ## Answer & Architectural Decision
 
@@ -32,5 +32,5 @@ Do **not** store durable preferences in `localStorage`. The only transient brows
 
 ## Consequences
 
-- **Zero cross-device divergence**: Switching language, theme, persona, or notification settings in Chrome on Linux takes effect immediately on iOS, Android, macOS, and Windows.
+- **Zero cross-device divergence**: Switching language, theme, persona, or notification preferences in Chrome on Linux takes effect immediately on iOS, Android, macOS, and Windows.
 - **Cleaner privacy & simpler codebase**: Removes redundant `localStorage` read/write synchronization helpers (`mu_appearance`, sidebar `localStorage` keys) from the signed-in lifecycle.

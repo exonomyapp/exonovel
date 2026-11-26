@@ -686,33 +686,33 @@ pub async fn seed_cms_from_disk(pool: &PgPool, root_dir: &Path) {
     let _ = sqlx::query(
         r#"
         UPDATE owner_external_tasks
-        SET completed_by = 'Production Server + Gmail Verified'
+        SET completed_by = 'Production Server Verified'
         WHERE task_key = 'postfix-dkim-or-brevo-relay'
-          AND completed_by <> 'Production Server + Gmail Verified'
+          AND completed_by <> 'Production Server Verified'
         "#,
     )
     .execute(pool)
     .await;
 
-    // Seed external tasks only reachable outside AI Studio (preserves owner's is_done checkbox state)
+    // Seed external tasks only reachable in production consoles (preserves owner's is_done checkbox state)
     let external_tasks = [
         (
             "postfix-dkim-or-brevo-relay",
-            "Mail Server (43.157.89.31)",
+            "Production Mail Server",
             "Production Server",
-            "Verified: Roundcube & Postfix outbound mail both relay via Brevo SMTP (Gmail Inbox & DMARC pass)",
-            "Verified 2026-11-21: Roundcube submits directly to smtp-relay.brevo.com:587, and Postfix on 43.157.89.31 now also relays all outbound mail via [smtp-relay.brevo.com]:587 (SASL plain/login from /opt/exosystems_net/env, TLS encrypt). Live test from root@exosystems.net to Gmail landed in Inbox with mailed-by exomail.exosystems.net and signed-by exosystems.net.",
+            "Verified: Production webmail and outbound mail relay deliver cleanly (DMARC pass)",
+            "Verified 2026-11-21: Outbound transactional and webmail delivery routes over TLS SMTP port 587 with DKIM and DMARC passing for exosystems.net.",
             "",
             20_i32,
             true,
-            "Production Server + Gmail Verified",
+            "Production Server Verified",
         ),
         (
             "brevo-verify-senders",
-            "Brevo Dashboard",
+            "Transactional Email",
             "Owner",
-            "Confirm all 3 exosystems.net senders are active in Brevo",
-            "Open Brevo -> Settings (bottom left) -> Senders, Domains & IPs -> Senders tab, and confirm notes@exosystems.net (Notes from ExoNovel), noreply@exosystems.net (Exosystems), and support@exosystems.net (ExoSupport) are all green/verified.",
+            "Confirm all 3 exosystems.net sender identities are active in email delivery settings",
+            "Confirm notes@exosystems.net (Notes from ExoNovel), noreply@exosystems.net (Exosystems), and support@exosystems.net (ExoSupport) are verified and active in your transactional email provider dashboard.",
             "",
             30_i32,
             false,
@@ -720,10 +720,10 @@ pub async fn seed_cms_from_disk(pool: &PgPool, root_dir: &Path) {
         ),
         (
             "opencode-ai-keys",
-            "Production Server (/opt/exonovel/env)",
+            "Production Server Config",
             "Owner",
-            "Verify OpenCode CLI binary & NVIDIA NIM key in /opt/exonovel/env",
-            "Ensure opencode is executable by the server process (OPENCODE_BIN=/root/.opencode/bin/opencode or symlinked in /usr/local/bin/opencode) and set NVIDIA_NIM_API_KEY (or NVIDIA_API_KEY) in /opt/exonovel/env for Maturity Proposal generation.",
+            "Verify local CLI inference runtime and provider API keys in server configuration",
+            "Ensure the local inference CLI executable is available to the server process and configure remote failover inference API keys in production server config for Maturity Proposal generation.",
             "",
             40_i32,
             false,
@@ -745,18 +745,18 @@ pub async fn seed_cms_from_disk(pool: &PgPool, root_dir: &Path) {
             "Auth (Deferred)",
             "Owner",
             "Register GitHub OAuth app after Google OAuth wrap-up",
-            "In GitHub Settings -> Developer settings -> OAuth Apps -> New OAuth App, set Authorization callback URL to https://ep-wispy-wave-bgqyejp5.neonauth.c-9.eu-central-1.aws.neon.tech/exonovel/auth/callback/github and add Client ID/Secret in Neon Console -> Auth.",
-            "https://ep-wispy-wave-bgqyejp5.neonauth.c-9.eu-central-1.aws.neon.tech/exonovel/auth/callback/github",
+            "In GitHub Settings -> Developer settings -> OAuth Apps -> New OAuth App, set the Authorization callback URL to your authentication service's GitHub callback endpoint and store the Client ID and Secret in your authentication provider configuration.",
+            "",
             60_i32,
             false,
             "",
         ),
         (
             "google-custom-brand",
-            "Google Cloud Branding",
+            "Google OAuth Branding",
             "Owner",
             "Re-submit Google Brand Verification after pushing /privacy so login displays 'ExoNovel'",
-            "Neon Auth is already verified using your custom Google Cloud Client ID & Secret (902812495809-...). Right now Google falls back to displaying 'neon.tech' only because Brand Verification failed on the missing /privacy page. After pushing to main so https://exonovel.exosystems.net/privacy goes live, open Google Auth Platform -> Branding verification issues, select 'I have fixed the issues', and click Proceed.",
+            "Primary Google Sign-In credentials are active. After pushing https://exonovel.exosystems.net/privacy live, open Google Auth Platform branding verification issues, select 'I have fixed the issues', and submit.",
             "https://exonovel.exosystems.net/privacy",
             70_i32,
             false,
@@ -767,7 +767,7 @@ pub async fn seed_cms_from_disk(pool: &PgPool, root_dir: &Path) {
             "Mode 3 Payments",
             "Owner",
             "Complete payment gateway KYC/webhooks & set crypto wallet receive addresses",
-            "Complete merchant verification and copy webhook signing secrets into /opt/exonovel/env for your active AOTA payment processors (dLocal / Stripe / Razorpay / Flutterwave / Lightning / TON / USDC) before turning on live $9/mo ($90/yr) Mode 3 sync plans.",
+            "Complete merchant verification and configure webhook signing secrets in production server configuration for your active AOTA payment processors before turning on live $9/mo ($90/yr) Mode 3 sync plans.",
             "",
             80_i32,
             false,
@@ -1344,9 +1344,9 @@ pub async fn api_cms_tooling_and_notes(
     let mut models: Vec<ProviderModelInfo> = Vec::new();
     if resolve_opencode_bin().is_some() {
         models.push(ProviderModelInfo {
-            provider: "opencode".to_string(),
+            provider: "local_cli".to_string(),
             model_id: "headless-cli".to_string(),
-            display_name: "OpenCode CLI (Headless)".to_string(),
+            display_name: "Local CLI Inference Runtime".to_string(),
             is_free: true,
             supports_tools: true,
             is_active: true,
@@ -1984,7 +1984,7 @@ pub async fn api_cms_generate_proposal(
     let mut generated_text: Option<String> = None;
     let mut diag_notes: Vec<String> = Vec::new();
 
-    // 1. Try installed headless OpenCode CLI if present on host
+    // 1. Try installed local CLI inference runtime if present on host
     if let Some(opencode_bin) = resolve_opencode_bin() {
         let mut cmd = tokio::process::Command::new(&opencode_bin);
         cmd.args(["run", "--standalone", "--auto", "--format", "json", &prompt]);
@@ -1992,11 +1992,11 @@ pub async fn api_cms_generate_proposal(
             Ok(Ok(output)) if output.status.success() => {
                 let raw_out = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 if let Some(parsed_txt) = parse_opencode_jsonl_output(&raw_out) {
-                    chosen_provider = "opencode".to_string();
+                    chosen_provider = "local_cli".to_string();
                     chosen_model = "headless-cli".to_string();
                     generated_text = Some(parsed_txt);
                 } else {
-                    diag_notes.push("OpenCode exited 0 but returned empty output.".to_string());
+                    diag_notes.push("Local CLI runtime exited 0 but returned empty output.".to_string());
                 }
             }
             Ok(Ok(output)) => {
@@ -2006,17 +2006,17 @@ pub async fn api_cms_generate_proposal(
                     .chars()
                     .take(180)
                     .collect();
-                diag_notes.push(format!("OpenCode exit {code}: {err_snippet}"));
+                diag_notes.push(format!("Local CLI exit {code}: {err_snippet}"));
             }
             Ok(Err(e)) => {
-                diag_notes.push(format!("OpenCode spawn error: {e}"));
+                diag_notes.push(format!("Local CLI spawn error: {e}"));
             }
             Err(_) => {
-                diag_notes.push("OpenCode CLI timed out after 40s.".to_string());
+                diag_notes.push("Local CLI timed out after 40s.".to_string());
             }
         }
     } else {
-        diag_notes.push("OpenCode CLI binary not found on host.".to_string());
+        diag_notes.push("Local CLI binary not found on host.".to_string());
     }
 
     // 2. Direct OpenAI-compatible & Gemini HTTP inference failover across configured providers
@@ -2175,15 +2175,15 @@ pub async fn api_cms_generate_proposal(
                         }
                     }
                     Ok(resp) => {
-                        diag_notes.push(format!("nvidia_nim fallback ({nim_model}) HTTP {}", resp.status().as_u16()));
+                        diag_notes.push(format!("remote fallback ({nim_model}) HTTP {}", resp.status().as_u16()));
                     }
                     Err(e) => {
-                        diag_notes.push(format!("nvidia_nim fallback ({nim_model}) error: {e}"));
+                        diag_notes.push(format!("remote fallback ({nim_model}) error: {e}"));
                     }
                 }
             }
         } else {
-            diag_notes.push("NVIDIA_NIM_API_KEY / NVIDIA_API_KEY is not set.".to_string());
+            diag_notes.push("Remote inference fallback key is not configured.".to_string());
         }
     }
 
@@ -2195,7 +2195,7 @@ pub async fn api_cms_generate_proposal(
             "No active inference runtime answered ({diag_summary}). Deterministic summary: audit {tool_name} changelog between {inst_v} and {lat_v}, verify tests on an upgrade branch, and review linked ADRs."
         )
     });
-    let rationale_text = if diag_summary.is_empty() || chosen_provider == "opencode" {
+    let rationale_text = if diag_summary.is_empty() || chosen_provider == "local_cli" {
         format!("Generated via {chosen_provider} ({chosen_model}).")
     } else {
         format!("Generated via {chosen_provider} ({chosen_model}). Diagnostics: {diag_summary}")

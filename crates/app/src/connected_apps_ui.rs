@@ -29,7 +29,7 @@ fn is_https_url(raw: &str) -> bool {
 }
 
 #[component]
-pub fn ConnectedAppsSettingsPanel(
+pub fn ConnectedAppsPreferencesPanel(
     auth_config: ReadSignal<Option<AuthConfigResponse>>,
     initial_jwt: ReadSignal<Option<String>>,
     on_toast: impl Fn(String) + Copy + Send + Sync + 'static,
@@ -183,7 +183,7 @@ pub fn ConnectedAppsSettingsPanel(
         )));
         leptos::task::spawn_local(async move {
             if let Err(err) =
-                start_google_connect_flow(auth_config, initial_jwt, "settings", None).await
+                start_google_connect_flow(auth_config, initial_jwt, "preferences", None).await
             {
                 set_connecting.set(false);
                 set_status_msg.set(None);
@@ -631,9 +631,9 @@ pub fn ConnectedAppsSettingsPanel(
                             <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
                                 <span class="exo-label" style="margin: 0;">
                                     {move || if configured {
-                                        i18n.tr("conn_redirect_configured", "OAuth Redirect URI (Registered with Google Cloud)")
+                                        i18n.tr("conn_redirect_configured", "OAuth Redirect URI (Configured with Provider)")
                                     } else {
-                                        i18n.tr("conn_redirect_missing", "Server OAuth Credentials Required (GOOGLE_OAUTH_CLIENT_ID / SECRET)")
+                                        i18n.tr("conn_redirect_missing", "Server Google OAuth Credentials Required")
                                     }}
                                 </span>
                                 <button

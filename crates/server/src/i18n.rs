@@ -28,14 +28,13 @@ struct LocaleSeed {
     nav_workspace: &'static str,
     nav_docs: &'static str,
     nav_profile: &'static str,
-    nav_settings: &'static str,
+    nav_preferences: &'static str,
     nav_sign_out: &'static str,
-    welcome_prefix: &'static str,
     ui_lang_label: &'static str,
     input_lang_label: &'static str,
     live_sync_label: &'static str,
     profile_title: &'static str,
-    settings_title: &'static str,
+    preferences_title: &'static str,
     notifications_title: &'static str,
     save_label: &'static str,
 }
@@ -51,14 +50,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Docs & ADRs",
         nav_profile: "Profile",
-        nav_settings: "Settings",
+        nav_preferences: "Preferences",
         nav_sign_out: "Sign out",
-        welcome_prefix: "Welcome,",
         ui_lang_label: "App Language",
         input_lang_label: "Writing Input",
         live_sync_label: "Live",
         profile_title: "Profile",
-        settings_title: "Settings",
+        preferences_title: "Preferences",
         notifications_title: "Notifications",
         save_label: "Save changes",
     },
@@ -72,14 +70,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Doku & ADRs",
         nav_profile: "Profil",
-        nav_settings: "Einstellungen",
+        nav_preferences: "Präferenzen",
         nav_sign_out: "Abmelden",
-        welcome_prefix: "Willkommen,",
         ui_lang_label: "App-Sprache",
         input_lang_label: "Eingabesprache",
         live_sync_label: "Echtzeit",
         profile_title: "Profil",
-        settings_title: "Einstellungen",
+        preferences_title: "Präferenzen",
         notifications_title: "Benachrichtigungen",
         save_label: "Änderungen speichern",
     },
@@ -93,14 +90,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Dokumentacja i ADR",
         nav_profile: "Profil",
-        nav_settings: "Ustawienia",
+        nav_preferences: "Preferencje",
         nav_sign_out: "Wyloguj się",
-        welcome_prefix: "Witaj,",
         ui_lang_label: "Język aplikacji",
         input_lang_label: "Język pisania",
         live_sync_label: "Na żywo",
         profile_title: "Profil",
-        settings_title: "Ustawienia",
+        preferences_title: "Preferencje",
         notifications_title: "Powiadomienia",
         save_label: "Zapisz zmiany",
     },
@@ -114,14 +110,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Docs et ADR",
         nav_profile: "Profil",
-        nav_settings: "Paramètres",
+        nav_preferences: "Préférences",
         nav_sign_out: "Se déconnecter",
-        welcome_prefix: "Bienvenue,",
         ui_lang_label: "Langue de l'interface",
         input_lang_label: "Langue de saisie",
         live_sync_label: "En direct",
         profile_title: "Profil",
-        settings_title: "Paramètres",
+        preferences_title: "Préférences",
         notifications_title: "Notifications",
         save_label: "Enregistrer",
     },
@@ -135,14 +130,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Docs y ADRs",
         nav_profile: "Perfil",
-        nav_settings: "Configuración",
+        nav_preferences: "Preferencias",
         nav_sign_out: "Cerrar sesión",
-        welcome_prefix: "Bienvenido,",
         ui_lang_label: "Idioma de la app",
         input_lang_label: "Idioma de escritura",
         live_sync_label: "En vivo",
         profile_title: "Perfil",
-        settings_title: "Configuración",
+        preferences_title: "Preferencias",
         notifications_title: "Notificaciones",
         save_label: "Guardar cambios",
     },
@@ -156,14 +150,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Docs e ADR",
         nav_profile: "Profilo",
-        nav_settings: "Impostazioni",
+        nav_preferences: "Preferenze",
         nav_sign_out: "Esci",
-        welcome_prefix: "Benvenuto,",
         ui_lang_label: "Lingua app",
         input_lang_label: "Lingua di scrittura",
         live_sync_label: "Dal vivo",
         profile_title: "Profilo",
-        settings_title: "Impostazioni",
+        preferences_title: "Preferenze",
         notifications_title: "Notifiche",
         save_label: "Salva modifiche",
     },
@@ -177,14 +170,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Docs & ADR's",
         nav_profile: "Profiel",
-        nav_settings: "Instellingen",
+        nav_preferences: "Voorkeuren",
         nav_sign_out: "Uitloggen",
-        welcome_prefix: "Welkom,",
         ui_lang_label: "App-taal",
         input_lang_label: "Invoertaal",
         live_sync_label: "Live",
         profile_title: "Profiel",
-        settings_title: "Instellingen",
+        preferences_title: "Voorkeuren",
         notifications_title: "Meldingen",
         save_label: "Wijzigingen opslaan",
     },
@@ -198,14 +190,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Docs e ADRs",
         nav_profile: "Perfil",
-        nav_settings: "Configurações",
+        nav_preferences: "Preferências",
         nav_sign_out: "Sair",
-        welcome_prefix: "Bem-vindo,",
         ui_lang_label: "Idioma do app",
         input_lang_label: "Idioma de escrita",
         live_sync_label: "Ao vivo",
         profile_title: "Perfil",
-        settings_title: "Configurações",
+        preferences_title: "Preferências",
         notifications_title: "Notificações",
         save_label: "Salvar alterações",
     },
@@ -219,14 +210,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Doksi és ADR-ek",
         nav_profile: "Profil",
-        nav_settings: "Beállítások",
+        nav_preferences: "Preferenciák",
         nav_sign_out: "Kijelentkezés",
-        welcome_prefix: "Üdvözöljük,",
         ui_lang_label: "Alkalmazás nyelve",
         input_lang_label: "Beviteli nyelv",
         live_sync_label: "Élő",
         profile_title: "Profil",
-        settings_title: "Beállítások",
+        preferences_title: "Preferenciák",
         notifications_title: "Értesítések",
         save_label: "Módosítások mentése",
     },
@@ -240,14 +230,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Documente și ADR",
         nav_profile: "Profil",
-        nav_settings: "Setări",
+        nav_preferences: "Preferințe",
         nav_sign_out: "Deconectare",
-        welcome_prefix: "Bun venit,",
         ui_lang_label: "Limba aplicației",
         input_lang_label: "Limba de scriere",
         live_sync_label: "În direct",
         profile_title: "Profil",
-        settings_title: "Setări",
+        preferences_title: "Preferințe",
         notifications_title: "Notificări",
         save_label: "Salvează modificările",
     },
@@ -261,14 +250,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Документація і ADR",
         nav_profile: "Профіль",
-        nav_settings: "Налаштування",
+        nav_preferences: "Вподобання",
         nav_sign_out: "Вийти",
-        welcome_prefix: "Вітаємо,",
         ui_lang_label: "Мова інтерфейсу",
         input_lang_label: "Мова введення",
         live_sync_label: "Наживо",
         profile_title: "Профіль",
-        settings_title: "Налаштування",
+        preferences_title: "Вподобання",
         notifications_title: "Сповіщення",
         save_label: "Зберегти зміни",
     },
@@ -282,14 +270,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Документация и ADR",
         nav_profile: "Профиль",
-        nav_settings: "Настройки",
+        nav_preferences: "Предпочтения",
         nav_sign_out: "Выйти",
-        welcome_prefix: "Добро пожаловать,",
         ui_lang_label: "Язык интерфейса",
         input_lang_label: "Язык ввода",
         live_sync_label: "В реальном времени",
         profile_title: "Профиль",
-        settings_title: "Настройки",
+        preferences_title: "Предпочтения",
         notifications_title: "Уведомления",
         save_label: "Сохранить изменения",
     },
@@ -303,14 +290,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Документација и ADR",
         nav_profile: "Профил",
-        nav_settings: "Подешавања",
+        nav_preferences: "Преференције",
         nav_sign_out: "Одјави се",
-        welcome_prefix: "Добро дошли,",
         ui_lang_label: "Језик апликације",
         input_lang_label: "Језик писања",
         live_sync_label: "Уживо",
         profile_title: "Профил",
-        settings_title: "Подешавања",
+        preferences_title: "Преференције",
         notifications_title: "Обавештења",
         save_label: "Сачувај измене",
     },
@@ -324,14 +310,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Έγγραφα & ADR",
         nav_profile: "Προφίλ",
-        nav_settings: "Ρυθμίσεις",
+        nav_preferences: "Προτιμήσεις",
         nav_sign_out: "Αποσύνδεση",
-        welcome_prefix: "Καλώς ήρθατε,",
         ui_lang_label: "Γλώσσα εφαρμογής",
         input_lang_label: "Γλώσσα γραφής",
         live_sync_label: "Ζωντανά",
         profile_title: "Προφίλ",
-        settings_title: "Ρυθμίσεις",
+        preferences_title: "Προτιμήσεις",
         notifications_title: "Ειδοποιήσεις",
         save_label: "Αποθήκευση αλλαγών",
     },
@@ -345,14 +330,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "الوثائق و ADRs",
         nav_profile: "الملف الشخصي",
-        nav_settings: "الإعدادات",
+        nav_preferences: "التفضيلات",
         nav_sign_out: "تسجيل الخروج",
-        welcome_prefix: "مرحباً،",
         ui_lang_label: "لغة التطبيق",
         input_lang_label: "لغة الكتابة",
         live_sync_label: "مباشر",
         profile_title: "الملف الشخصي",
-        settings_title: "الإعدادات",
+        preferences_title: "التفضيلات",
         notifications_title: "الإشعارات",
         save_label: "حفظ التغييرات",
     },
@@ -366,14 +350,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "מסמכים ו-ADR",
         nav_profile: "פרופיל",
-        nav_settings: "הגדרות",
+        nav_preferences: "העדפות",
         nav_sign_out: "התנתקות",
-        welcome_prefix: "ברוך הבא,",
         ui_lang_label: "שפת הממשק",
         input_lang_label: "שפת כתיבה",
         live_sync_label: "חי",
         profile_title: "פרופיל",
-        settings_title: "הגדרות",
+        preferences_title: "העדפות",
         notifications_title: "התראות",
         save_label: "שמור שינויים",
     },
@@ -387,14 +370,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "文档与架构决策",
         nav_profile: "个人资料",
-        nav_settings: "设置",
+        nav_preferences: "偏好设置",
         nav_sign_out: "退出登录",
-        welcome_prefix: "欢迎，",
         ui_lang_label: "界面语言",
         input_lang_label: "输入语言",
         live_sync_label: "实时",
         profile_title: "个人资料",
-        settings_title: "设置",
+        preferences_title: "偏好设置",
         notifications_title: "通知",
         save_label: "保存更改",
     },
@@ -408,14 +390,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "文件與架構決策",
         nav_profile: "個人檔案",
-        nav_settings: "設定",
+        nav_preferences: "偏好設定",
         nav_sign_out: "登出",
-        welcome_prefix: "歡迎，",
         ui_lang_label: "介面語言",
         input_lang_label: "輸入語言",
         live_sync_label: "即時",
         profile_title: "個人檔案",
-        settings_title: "設定",
+        preferences_title: "偏好設定",
         notifications_title: "通知",
         save_label: "儲存變更",
     },
@@ -429,14 +410,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "दस्तावेज़ और ADR",
         nav_profile: "प्रोफ़ाइल",
-        nav_settings: "सेटिंग्स",
+        nav_preferences: "प्राथमिकताएँ",
         nav_sign_out: "साइन आउट",
-        welcome_prefix: "स्वागत है,",
         ui_lang_label: "ऐप भाषा",
         input_lang_label: "लेखन भाषा",
         live_sync_label: "लाइव",
         profile_title: "प्रोफ़ाइल",
-        settings_title: "सेटिंग्स",
+        preferences_title: "प्राथमिकताएँ",
         notifications_title: "सूचनाएँ",
         save_label: "बदलाव सहेजें",
     },
@@ -450,14 +430,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "ডক্স ও ADR",
         nav_profile: "প্রোফাইল",
-        nav_settings: "সেটিংস",
+        nav_preferences: "পছন্দসমূহ",
         nav_sign_out: "সাইন আউট",
-        welcome_prefix: "স্বাগতম,",
         ui_lang_label: "অ্যাপের ভাষা",
         input_lang_label: "লেখার ভাষা",
         live_sync_label: "লাইভ",
         profile_title: "প্রোফাইল",
-        settings_title: "সেটিংস",
+        preferences_title: "পছন্দসমূহ",
         notifications_title: "বিজ্ঞপ্তি",
         save_label: "পরিবর্তন সংরক্ষণ",
     },
@@ -471,14 +450,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "दस्तऐवज आणि ADR",
         nav_profile: "प्रोफाइल",
-        nav_settings: "सेटिंग्ज",
+        nav_preferences: "प्राधान्ये",
         nav_sign_out: "साइन आउट",
-        welcome_prefix: "स्वागत आहे,",
         ui_lang_label: "अॅप भाषा",
         input_lang_label: "लेखन भाषा",
         live_sync_label: "लाइव्ह",
         profile_title: "प्रोफाइल",
-        settings_title: "सेटिंग्ज",
+        preferences_title: "प्राधान्ये",
         notifications_title: "सूचना",
         save_label: "बदल जतन करा",
     },
@@ -492,14 +470,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "డాక్స్ & ADRలు",
         nav_profile: "ప్రొఫైల్",
-        nav_settings: "సెట్టింగ్‌లు",
+        nav_preferences: "ప్రాధాన్యతలు",
         nav_sign_out: "సైన్ అవుట్",
-        welcome_prefix: "స్వాగతం,",
         ui_lang_label: "యాప్ భాష",
         input_lang_label: "రచన భాష",
         live_sync_label: "లైవ్",
         profile_title: "ప్రొఫైల్",
-        settings_title: "సెట్టింగ్‌లు",
+        preferences_title: "ప్రాధాన్యతలు",
         notifications_title: "నోటిఫికేషన్లు",
         save_label: "మార్పులను సేవ్ చేయండి",
     },
@@ -513,14 +490,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "ஆவணங்கள் & ADR",
         nav_profile: "சுயவிவரம்",
-        nav_settings: "அமைப்புகள்",
+        nav_preferences: "விருப்பத்தேர்வுகள்",
         nav_sign_out: "வெளியேறு",
-        welcome_prefix: "நல்வரவு,",
         ui_lang_label: "பயன்பாட்டு மொழி",
         input_lang_label: "எழுத்து மொழி",
         live_sync_label: "நேரலை",
         profile_title: "சுயவிவரம்",
-        settings_title: "அமைப்புகள்",
+        preferences_title: "விருப்பத்தேர்வுகள்",
         notifications_title: "அறிவிப்புகள்",
         save_label: "மாற்றங்களைச் சேமி",
     },
@@ -534,14 +510,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Nyaraka na ADR",
         nav_profile: "Wasifu",
-        nav_settings: "Mipangilio",
+        nav_preferences: "Mapendeleo",
         nav_sign_out: "Toka",
-        welcome_prefix: "Karibu,",
         ui_lang_label: "Lugha ya Programu",
         input_lang_label: "Lugha ya Kuandika",
         live_sync_label: "Moja kwa moja",
         profile_title: "Wasifu",
-        settings_title: "Mipangilio",
+        preferences_title: "Mapendeleo",
         notifications_title: "Arifa",
         save_label: "Hifadhi mabadiliko",
     },
@@ -555,14 +530,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Takardu da ADR",
         nav_profile: "Bayanan Kaina",
-        nav_settings: "Saituna",
+        nav_preferences: "Abubuwan da aka fi so",
         nav_sign_out: "Fita",
-        welcome_prefix: "Barka da zuwa,",
         ui_lang_label: "Harshen Manhaja",
         input_lang_label: "Harshen Rubutu",
         live_sync_label: "Kai tsaye",
         profile_title: "Bayanan Kaina",
-        settings_title: "Saituna",
+        preferences_title: "Abubuwan da aka fi so",
         notifications_title: "Sanarwa",
         save_label: "Ajiye sauye-sauye",
     },
@@ -576,14 +550,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Àwọn Ìwé àti ADR",
         nav_profile: "Àpèjúwe Mi",
-        nav_settings: "Àtúnṣe",
+        nav_preferences: "Àwọn ohun ààyò",
         nav_sign_out: "Jáde",
-        welcome_prefix: "Káàbọ̀,",
         ui_lang_label: "Èdè Àpù",
         input_lang_label: "Èdè Ìkọ̀wé",
         live_sync_label: "Lẹ́sẹ̀kẹsẹ̀",
         profile_title: "Àpèjúwe Mi",
-        settings_title: "Àtúnṣe",
+        preferences_title: "Àwọn ohun ààyò",
         notifications_title: "Àwọn Ìfitónilétí",
         save_label: "Fipamọ́",
     },
@@ -597,14 +570,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Akwụkwọ na ADR",
         nav_profile: "Profaịlụ",
-        nav_settings: "Ntọala",
+        nav_preferences: "Mmasị",
         nav_sign_out: "Pụọ",
-        welcome_prefix: "Nnọọ,",
         ui_lang_label: "Asụsụ Ngwa",
         input_lang_label: "Asụsụ Ndetu",
         live_sync_label: "Ndụ",
         profile_title: "Profaịlụ",
-        settings_title: "Ntọala",
+        preferences_title: "Mmasị",
         notifications_title: "Ọkwa",
         save_label: "Chekwaa mgbanwe",
     },
@@ -618,14 +590,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "ሰነዶች እና ADR",
         nav_profile: "መገለጫ",
-        nav_settings: "ቅንብሮች",
+        nav_preferences: "ምርጫዎች",
         nav_sign_out: "ውጣ",
-        welcome_prefix: "እንኳን ደህና መጡ፣",
         ui_lang_label: "የመተግበሪያ ቋንቋ",
         input_lang_label: "የጽሑፍ ቋንቋ",
         live_sync_label: "ቀጥታ",
         profile_title: "መገለጫ",
-        settings_title: "ቅንብሮች",
+        preferences_title: "ምርጫዎች",
         notifications_title: "ማሳወቂያዎች",
         save_label: "ለውጦችን አስቀምጥ",
     },
@@ -639,14 +610,13 @@ const LOCALES: &[LocaleSeed] = &[
         nav_workspace: "ExoNovel",
         nav_docs: "Amadokhumenti ne-ADR",
         nav_profile: "Iphrofayela",
-        nav_settings: "Izilungiselelo",
+        nav_preferences: "Okuncamelayo",
         nav_sign_out: "Phuma",
-        welcome_prefix: "Siyakwamukela,",
         ui_lang_label: "Ulimi Lohlelo",
         input_lang_label: "Ulimi Lokubhala",
         live_sync_label: "Bukhoma",
         profile_title: "Iphrofayela",
-        settings_title: "Izilungiselelo",
+        preferences_title: "Okuncamelayo",
         notifications_title: "Izaziso",
         save_label: "Londoloza izshintsho",
     },
@@ -690,11 +660,12 @@ nav-sign-in = Zaloguj się\n\
 nav-toggle-menu = Przełącz menu nawigacji\n\
 nav-privacy = Polityka prywatności\n\
 nav-terms = Warunki korzystania z usługi\n\
-live-connection-title = Globalne połączenie czasu rzeczywistego Neon SSE\n\
+live-connection-title = Globalne połączenie strumienia czasu rzeczywistego\n\
 ui-lang-aria = Język interfejsu aplikacji\n\
 input-lang-aria = Język wprowadzania tekstu\n\
 notifications-aria = Powiadomienia\n\
 switch-persona = Zmień personę\n\
+create-personas-prompt = Utwórz persony w swoim profilu\n\
 default-persona-label = Domyślna persona\n\
 active-badge = Aktywna\n\
 mark-all-read = Oznacz wszystkie jako przeczytane\n\
@@ -742,9 +713,9 @@ slide-1-body = Każda jednostka twórcza — profile postaci, notatki o świecie
 slide-2-title = Wiele pseudonimów i person\n\
 slide-2-body = Pisarze zarządzają różnymi pseudonimami i awatarami na jednym zweryfikowanym koncie, płynnie przełączając aktywną personę między wspólnymi manuskryptami i kanałami publikacji.\n\
 slide-3-title = Synchronizacja Web i Local-First\n\
-slide-3-body = Pracuj online w przeglądarce z bazą Neon PostgreSQL lub synchronizuj szyfrowane lokalne przestrzenie robocze między Linuxem, macOS, Windows, Androidem i iOS.\n\
+slide-3-body = Pracuj online w przeglądarce z zarządzaną bazą PostgreSQL lub synchronizuj szyfrowane lokalne przestrzenie robocze między Linuxem, macOS, Windows, Androidem i iOS.\n\
 slide-4-title = Kontrolowane przez użytkownika aplikacje i cofanie dostępu\n\
-slide-4-body = Zewnętrzne integracje, takie jak Dysk Google, pozostają opcjonalne i oddzielone od głównego logowania. W Ustawieniach możesz w każdej chwili sprawdzić uprawnienia lub odłączyć i cofnąć tokeny dostawcy.\n\
+slide-4-body = Zewnętrzne integracje, takie jak Dysk Google, pozostają opcjonalne i oddzielone od głównego logowania. W Preferencjach możesz w każdej chwili sprawdzić uprawnienia lub odłączyć i cofnąć tokeny dostawcy.\n\
 landing-formats-title = Obsługiwane formaty twórcze i wydawnicze\n\
 landing-formats-sub = Ustrukturyzowane wymiary planowania i układy publikacji dla pięciu głównych dziedzin pisarstwa.\n\
 format-novel-title = Powieści\n\
@@ -786,21 +757,21 @@ privacy-s1-intro = Zbieramy wyłącznie dane niezbędne do uwierzytelniania kont
 privacy-s1-google-label = Dane konta logowania Google (openid, email, profile): \n\
 privacy-s1-google-body = Podczas logowania przez Google otrzymujemy zweryfikowany adres e-mail, status weryfikacji, nazwę wyświetlaną, imię i nazwisko, URL zdjęcia profilowego, język oraz identyfikator konta Google.\n\
 privacy-s1-drive-label = Opcjonalne dane połączonego Dysku Google: \n\
-privacy-s1-drive-body = Podstawowe logowanie nigdy nie żąda uprawnień Dysku Google. Dopiero po wyraźnym połączeniu Dysku Google w Ustawieniach lub Dokumentacji ExoNovel uzyskuje dostęp do wyliczania folderów, tworzenia kopii zapasowych Markdown/ADR i przywracania lub usuwania plików wybranych w obszarze roboczym.\n\
+privacy-s1-drive-body = Podstawowe logowanie nigdy nie żąda uprawnień Dysku Google. Dopiero po wyraźnym połączeniu Dysku Google w Preferencjach lub Dokumentacji ExoNovel uzyskuje dostęp do wyliczania folderów, tworzenia kopii zapasowych Markdown/ADR i przywracania lub usuwania plików wybranych w obszarze roboczym.\n\
 privacy-s1-profile-label = Inne dane logowania i profilu autora: \n\
-privacy-s1-profile-body = Przy logowaniu przez GitHub lub e-mail przechowujemy nazwę wyświetlaną, pseudonim, biogram, stronę WWW, lokalizację, preferowany format, ustawienia języków interfejsu i pisania, strefę czasową, preferencje powiadomień, awatary (64px, 256px, 1024px) oraz klucz publiczny / did:peer.\n\
+privacy-s1-profile-body = Przy logowaniu przez GitHub lub e-mail przechowujemy nazwę wyświetlaną, pseudonim, biogram, stronę WWW, lokalizację, preferowany format, preferencje języków interfejsu i pisania, strefę czasową, preferencje powiadomień, awatary (64px, 256px, 1024px) oraz klucz publiczny / did:peer.\n\
 privacy-s1-works-label = Manuskrypty i zapisy współpracy: \n\
 privacy-s1-works-body = Dzieła twórcze, biblie opowieści, persony, członkostwa w grupach współpracy, polecenia oraz zaproszenia utworzone lub udostępnione w ExoNovel.\n\
 privacy-s1-sec-label = Bezpieczeństwo i diagnostyka techniczna: \n\
 privacy-s1-sec-body = Znaczniki czasu logowania, adres IP, nagłówek User-Agent przeglądarki oraz logi błędów używane wyłącznie do ochrony kont i stabilności usługi.\n\
 privacy-s2-title = 2. Pliki cookie i pamięć przeglądarki\n\
-privacy-s2-body = ExoNovel używa wyłącznie niezbędnych plików cookie uwierzytelniania (HttpOnly przez Neon Auth) oraz tymczasowego sessionStorage do zachowania kodów zaproszeń podczas przekierowań OAuth. Nie stosujemy zewnętrznych plików cookie reklamowych ani śledzących.\n\
+privacy-s2-body = ExoNovel używa wyłącznie niezbędnych plików cookie sesji uwierzytelniania (HttpOnly) oraz tymczasowej pamięci sesji przeglądarki do zachowania oczekujących kodów zaproszeń podczas przekierowań logowania. Nie stosujemy zewnętrznych plików cookie reklamowych ani śledzących.\n\
 privacy-s3-title = 3. Sposób wykorzystania danych\n\
 privacy-s3-li1 = Uwierzytelnianie sesji i rozwiązywanie tożsamości did:peer w trybach Web, Desktop i Mobile.\n\
 privacy-s3-li2 = Wyświetlanie wybranej persony, pseudonimu, awatara i preferencji językowych (w tym układu RTL).\n\
 privacy-s3-li3 = Obsługa wspólnych grup literackich, atrybucji współautorów i zaproszeń inicjowanych przez użytkownika.\n\
 privacy-s3-li4 = Wykonywanie inicjowanych przez użytkownika kopii zapasowych na połączonym Dysku Google.\n\
-privacy-s3-li5 = Wysyłka transakcyjnych i powiadomieniowych wiadomości e-mail przez Brevo (z notes@exosystems.net, noreply@exosystems.net lub support@exosystems.net).\n\
+privacy-s3-li5 = Wysyłka włączonych przez użytkownika wiadomości e-mail transakcyjnych, bezpieczeństwa i powiadomień (z notes@exosystems.net, noreply@exosystems.net lub support@exosystems.net).\n\
 privacy-s3-li6 = Zapobieganie nadużyciom, nieautoryzowanemu dostępowi i naruszeniom Regulaminu.\n\
 privacy-s4-title = 4. Zasady danych użytkowników Google API (Limited Use) i zakaz AI NCII\n\
 privacy-s4-intro = Wykorzystanie i przekazywanie informacji otrzymanych z interfejsów Google API jest w pełni zgodne z polityką Google API Services User Data Policy, w tym wymaganiami Limited Use.\n\
@@ -812,11 +783,11 @@ privacy-s4-li3-label = Brak generowania obrazów i zero tolerancji dla AI NCII: 
 privacy-s4-li3-body = ExoNovel jest platformą tekstową. Nie generuje obrazów, wideo ani dźwięku i bezwzględnie zakazuje używania ExoNovel lub Google API do tworzenia lub dystrybucji AI NCII.\n\
 privacy-s4-li4-label = Ograniczenia dostępu personelu: \n\
 privacy-s4-li4-body = Personel Exosystems nie czyta prywatnych plików na Dysku Google ani manuskryptów, chyba że wyrazisz wyraźną zgodę na wsparcie techniczne, wymaga tego bezpieczeństwo lub prawo.\n\
-privacy-s5-title = 5. Przechowywanie danych, podwykonawcy i kryptografia\n\
-privacy-s5-body = Cały ruch jest szyfrowany przez HTTPS/TLS. Dane webowe przechowywane są w Neon PostgreSQL i Neon Managed Auth na infrastrukturze chmurowej klasy korporacyjnej, a poczta obsługiwana jest przez Brevo. Tokeny połączonych aplikacji szyfrowane są kopertowo w HashiCorp Vault Transit KMS, a synchronizacja peer-to-peer Willow/iroh jest szyfrowana end-to-end po stronie urządzenia.\n\
+privacy-s5-title = 5. Przechowywanie danych, bezpieczeństwo i ochrona kryptograficzna\n\
+privacy-s5-body = Cały ruch do ExoNovel jest szyfrowany przez HTTPS/TLS. Dane webowe i stan konta przechowywane są w zarządzanych bazach danych PostgreSQL i zarządzanych usługach uwierzytelniania na infrastrukturze chmurowej klasy korporacyjnej wraz z dostarczaniem poczty transakcyjnej. Opcjonalne tokeny połączonych aplikacji zewnętrznych przechowywane po stronie serwera są szyfrowane kopertowo przez dedykowane zarządzanie kluczami i odizolowane od głównych danych logowania. W natywnych instalacjach wykorzystujących synchronizację peer-to-peer Willow i iroh dane są szyfrowane end-to-end na urządzeniu.\n\
 privacy-s6-title = 6. Cofanie dostępu, eksport i usuwanie danych\n\
 privacy-s6-li1-label = Odłącz i cofnij dostęp Google w dowolnym momencie: \n\
-privacy-s6-li1-body = Możesz odłączyć Dysk Google w Ustawieniach -> Połączone aplikacje (co natychmiast unieważnia tokeny przez https://oauth2.googleapis.com/revoke bez usuwania konta ExoNovel) lub w ustawieniach konta Google: https://myaccount.google.com/permissions.\n\
+privacy-s6-li1-body = Możesz odłączyć Dysk Google w Preferencjach -> Połączone aplikacje (co natychmiast unieważnia tokeny przez https://oauth2.googleapis.com/revoke bez usuwania konta ExoNovel) lub w ustawieniach konta Google: https://myaccount.google.com/permissions.\n\
 privacy-s6-li2-label = Wnioski o eksport i usunięcie konta: \n\
 privacy-s6-li2-body = Możesz zażądać pełnego eksportu lub trwałego usunięcia konta, pisząc na support@exosystems.net lub exonomyapp@gmail.com. Zweryfikowane zgłoszenia realizujemy w ciągu 30 dni.\n\
 privacy-s7-title = 7. Retencja danych, prywatność dzieci i aktualizacje\n\
@@ -828,7 +799,7 @@ terms-effective = Data wejścia w życie i ostatnia aktualizacja: 24 listopada 2
 terms-heading = Warunki korzystania z usługi ExoNovel\n\
 terms-intro = Korzystając z ExoNovel (https://exonovel.exosystems.net), prowadzonego przez Exosystems (https://exosystems.net), akceptujesz niniejsze Warunki korzystania z usługi oraz Politykę prywatności (/privacy).\n\
 terms-s1-title = 1. Własność Twoich dzieł twórczych\n\
-terms-s1-body = Zachowujesz pełną własność i prawa autorskie do wszystkich manuskryptów, opowieści, postaci, notatek, scenariuszy i wierszy publikowanych w ExoNovel. Udzielasz platformie wyłącznie ograniczonej licencji technicznej na przechowywanie, renderowanie i synchronizację zgodnie z Twoimi ustawieniami.\n\
+terms-s1-body = Zachowujesz pełną własność i prawa autorskie do wszystkich manuskryptów, opowieści, postaci, notatek, scenariuszy i wierszy publikowanych w ExoNovel. Udzielasz platformie wyłącznie ograniczonej licencji technicznej na przechowywanie, renderowanie i synchronizację zgodnie z Twoimi preferencjami.\n\
 terms-s2-title = 2. Konta, klucze i dozwolone użytkowanie\n\
 terms-s2-body = Odpowiadasz za bezpieczeństwo danych logowania i kluczy urządzenia did:peer. Musisz mieć ukończone 13 lat (lub wymagany wiek minimalny w Twojej jurysdykcji). Zabrania się naruszania bezpieczeństwa platformy i rozsyłania spamu.\n\
 terms-s3-title = 3. Zabronione treści i zgodność z Google APIs ToS\n\
@@ -838,11 +809,11 @@ terms-s3-li1-body = Zabrania się używania ExoNovel lub połączonych interfejs
 terms-s3-li2-label = Materiały nielegalne i naruszenia: \n\
 terms-s3-li2-body = CSAM, treści bez zgody, nękanie, mowa nienawiści oraz naruszenia praw autorskich są surowo zabronione i skutkują natychmiastowym zablokowaniem konta.\n\
 terms-s4-title = 4. Połączone aplikacje zewnętrzne\n\
-terms-s4-body = Opcjonalne integracje, takie jak Dysk Google, uruchamiane są wyłącznie po wyraźnej zgodzie użytkownika i mogą zostać cofnięte w dowolnej chwili w Ustawieniach -> Połączone aplikacje.\n\
+terms-s4-body = Opcjonalne integracje, takie jak Dysk Google, uruchamiane są wyłącznie po wyraźnej zgodzie użytkownika i mogą zostać cofnięte w dowolnej chwili w Preferencjach -> Połączone aplikacje.\n\
 terms-s5-title = 5. Tryby usługi, dostępność i kontakt\n\
 terms-s5-body = ExoNovel oferuje współpracę webową, lokalne przechowywanie na urządzeniu oraz opcjonalne plany synchronizacji. W sprawach prawnych i wsparcia napisz na support@exosystems.net lub exonomyapp@gmail.com.\n\
-settings-subtitle = Preferencje techniczne, języki, tryby pracy i kanały powiadomień (wszystkie zakupy i subskrypcje pozostają w Profilu).\n\
-settings-nav-aria = Sekcje ustawień\n\
+preferences-subtitle = Preferencje konta, języki, tryby pracy i kanały powiadomień (wszystkie zakupy i subskrypcje pozostają w Profilu).\n\
+preferences-nav-aria = Sekcje preferencji\n\
 sec-account = Konto i bezpieczeństwo\n\
 sec-connected-apps = Połączone aplikacje i Dokumenty Google\n\
 sec-appearance-langs = Wygląd i języki (29)\n\
@@ -850,7 +821,7 @@ sec-sync-storage = Synchronizacja i pamięć (3 tryby)\n\
 sec-notifications = Kanały powiadomień\n\
 sec-admin-allowlist = Lista dostępu i konta\n\
 account-title = Konto i suwerenna tożsamość\n\
-save-account-btn = Zapisz ustawienia konta\n\
+save-account-btn = Zapisz preferencje konta\n\
 upload-avatar-label = Prześlij zdjęcie profilowe (WebP 64px / 256px / 1024px)\n\
 root-identity-label = Główna tożsamość (did:peer)\n\
 display-name-label = Nazwa wyświetlana\n\
@@ -866,7 +837,7 @@ format-opt-short = Opowiadania\n\
 format-opt-screenplay = Scenariusze\n\
 format-opt-poetry = Poezja\n\
 appearance-title = Motyw i architektura dwóch języków\n\
-appearance-desc = Język interfejsu steruje menu i kierunkiem układu (automatyczne RTL dla arabskiego i hebrajskiego). Domyślny język pisania steruje edytorami niezależnie. Wszystkie preferencje zapisują się w bazie Neon (zero localStorage).\n\
+appearance-desc = Język interfejsu steruje menu i kierunkiem układu (automatyczne RTL dla arabskiego i hebrajskiego). Domyślny język pisania steruje edytorami niezależnie i zapisuje się bezpośrednio na koncie.\n\
 theme-label = Wygląd motywu\n\
 theme-opt-system = Systemowy\n\
 theme-opt-light = Jasny\n\
@@ -877,7 +848,7 @@ save-theme-lang-btn = Zapisz domyślny motyw i języki\n\
 sync-title = Trzy tryby działania i kryptograficzna ślepota\n\
 sync-sub = Wybierz sposób przechowywania i synchronizacji tekstów między przeglądarką a aplikacjami na urządzeniach.\n\
 sync-m1-title = Tryb 1 · ExoNovel w sieci (Darmowy)\n\
-sync-m1-desc = Obszar roboczy w chmurze oparty na Neon Postgres z natychmiastowymi aktualizacjami między kartami.\n\
+sync-m1-desc = Obszar roboczy w chmurze oparty na zarządzanej bazie PostgreSQL z natychmiastowymi aktualizacjami między kartami.\n\
 sync-m2-title = Tryb 2 · Suwerenne urządzenie (Darmowy)\n\
 sync-m2-desc = W 100% lokalny magazyn Willow na Windows, macOS, Linux, Android i iOS. Zawiera darmowe odkrywanie iroh i ślepy przekaźnik ExoNovel.\n\
 sync-m3-title = Tryb 3 · Zarządzana synchronizacja Web + Urządzenie\n\
@@ -890,16 +861,16 @@ sync-requires-sub = Zarządzana synchronizacja Trybu 3 wymaga aktywnej subskrypc
 sync-manage-in-profile = Zarządzaj subskrypcją w Profilu →\n\
 sync-save-toggle = Zapisz przełącznik synchronizacji\n\
 notif-channels-title = Wieloplatformowe kanały dostarczania\n\
-notif-brevo-prefix = Transakcyjny e-mail Brevo (notes@exosystems.net)\n\
-notif-brevo-active = · Klucz API Brevo aktywny\n\
-notif-brevo-unset = · Skonfiguruj BREVO_API_KEY w środowisku serwera\n\
-notif-send-test = Wyślij powiadomienie testowe i e-mail Brevo\n\
+notif-email-prefix = Transakcyjna usługa e-mail (notes@exosystems.net)\n\
+notif-email-active = · Dostarczanie e-mail aktywne\n\
+notif-email-unset = · Poświadczenia poczty transakcyjnej nie są skonfigurowane\n\
+notif-send-test = Wyślij powiadomienie testowe i e-mail\n\
 notif-in-app-title = Strumień na żywo i dzwonek w aplikacji\n\
-notif-in-app-desc = Natychmiastowe dostarczanie przez stały strumień SSE.\n\
+notif-in-app-desc = Natychmiastowe dostarczanie przez stały strumień czasu rzeczywistego.\n\
 notif-web-push-title = Powiadomienia przeglądarki WWW\n\
 notif-web-push-desc = Natywne banery systemowe przez Notification API przeglądarki.\n\
 notif-native-push-title = Natywne powiadomienia urządzeń (Android UnifiedPush + FCM, iOS/macOS APNs, Windows WNS, Linux)\n\
-notif-email-title = Transakcyjny e-mail Brevo (Notatki z ExoNovel)\n\
+notif-email-title = Transakcyjny e-mail (Notatki z ExoNovel)\n\
 notif-digest-label = Tryb podsumowań e-mail\n\
 notif-digest-instant = Natychmiastowy e-mail\n\
 notif-digest-daily = Dzienny raport\n\
@@ -915,7 +886,7 @@ device-platform-label = Platforma\n\
 device-transport-label = Transport powiadomień\n\
 device-label-field = Etykieta urządzenia\n\
 device-token-label = Adres URL punktu końcowego lub token urządzenia\n\
-device-token-ph = https://ntfy.sh/... lub token FCM/APNs\n\
+device-token-ph = https://push.example.org/... lub token FCM/APNs\n\
 device-register-btn = Zarejestruj punkt końcowy Push\n\
 device-th-label = Etykieta\n\
 device-th-platform = Platforma\n\
@@ -927,7 +898,7 @@ device-plat-linux = Linux\n\
 device-plat-macos = macOS\n\
 device-plat-windows = Windows\n\
 device-plat-web = Przeglądarka WWW\n\
-device-tr-unifiedpush = UnifiedPush (Otwarty standard / ntfy)\n\
+device-tr-unifiedpush = UnifiedPush (Otwarty standard)\n\
 device-tr-fcm = FCM (Firebase Cloud Messaging)\n\
 device-tr-apns = APNs (Apple Push Notification service)\n\
 device-tr-wns = WNS (Windows Push Notification Services)\n\
@@ -950,19 +921,19 @@ admin-th-provider = Dostawca\n\
 admin-display-name-ph = Nazwa wyświetlana\n\
 admin-pen-name-ph = Pseudonim\n\
 admin-save-account-btn = Zapisz zmiany konta\n\
-settings-msg-avatar-size = Plik awatara musi mieć maksymalnie 2 MB.\n\
-settings-msg-avatar-processing = Przetwarzanie wariantów awatara...\n\
-settings-msg-avatar-saved = Awatar zapisany.\n\
-settings-msg-saved = Ustawienia zapisane w bazie Neon.\n\
-settings-toast-saved = Zapisano ustawienia\n\
-settings-toast-notif-saved = Zaktualizowano kanały powiadomień\n\
-settings-toast-device-reg = Zarejestrowano urządzenie Push\n\
-settings-toast-test-sent = Wysłano powiadomienie testowe i e-mail Brevo\n\
-settings-msg-allowlist-updated = Zaktualizowano listę dostępu.\n\
-settings-toast-tier-updated = Zaktualizowano poziom dostępu\n\
-settings-toast-entry-removed = Usunięto wpis z listy dostępu\n\
-settings-msg-account-updated = Zaktualizowano konto.\n\
-settings-toast-perm = Uprawnienia powiadomień przeglądarki:\n\
+preferences-msg-avatar-size = Plik awatara musi mieć maksymalnie 2 MB.\n\
+preferences-msg-avatar-processing = Przetwarzanie wariantów awatara...\n\
+preferences-msg-avatar-saved = Awatar zapisany.\n\
+preferences-msg-saved = Preferencje zapisane.\n\
+preferences-toast-saved = Zapisano preferencje\n\
+preferences-toast-notif-saved = Zaktualizowano kanały powiadomień\n\
+preferences-toast-device-reg = Zarejestrowano urządzenie Push\n\
+preferences-toast-test-sent = Wysłano powiadomienie testowe i e-mail\n\
+preferences-msg-allowlist-updated = Zaktualizowano listę dostępu.\n\
+preferences-toast-tier-updated = Zaktualizowano poziom dostępu\n\
+preferences-toast-entry-removed = Usunięto wpis z listy dostępu\n\
+preferences-msg-account-updated = Zaktualizowano konto.\n\
+preferences-toast-perm = Uprawnienia powiadomień przeglądarki:\n\
 connected-apps-title = Połączone aplikacje i Dokumenty Google\n\
 connected-apps-desc = Podstawowe logowanie używa wyłącznie zakresu tożsamości (openid, email, profile). Połącz Dysk i Dokumenty Google tutaj, aby tworzyć, przeglądać i tworzyć kopie zapasowe manuskryptów i ADR.\n\
 google-drive-docs-title = Dysk Google i Dokumenty Google\n\
@@ -981,8 +952,8 @@ conn-auth-acct-fallback = Autoryzowane konto Google\n\
 conn-drive-optional-desc = Opcjonalna autoryzacja per plik (drive.file) do tworzenia Dokumentów Google, zapisu kopii .md i przeglądania ExoNovel Docs.\n\
 conn-revoke-confirm-msg = Cofnąć tokeny OAuth ExoNovel dla Dysku i Dokumentów Google? Odłączy to kopie zapasowe Drive bez wpływu na główne logowanie do ExoNovel.\n\
 conn-revoke-confirm-btn = Potwierdź cofnięcie\n\
-conn-redirect-configured = Adres przekierowania OAuth (zarejestrowany w Google Cloud)\n\
-conn-redirect-missing = Wymagane poświadczenia OAuth serwera (GOOGLE_OAUTH_CLIENT_ID / SECRET)\n\
+conn-redirect-configured = Adres przekierowania OAuth (skonfigurowany u dostawcy)\n\
+conn-redirect-missing = Wymagane poświadczenia Google OAuth po stronie serwera\n\
 conn-copy-uri-btn = Kopiuj URI\n\
 conn-toast-uri-copied = Skopiowano Redirect URI\n\
 drive-ws-title = Obszar roboczy Dokumentów i Dysku Google\n\
@@ -1108,11 +1079,11 @@ wallet-rail-btc = Bitcoin Lightning (L402)\n\
 wallet-rail-eth = Base / Arbitrum / Ethereum\n\
 wallet-rail-mobile = Płatność mobilna / PIX / UPI\n\
 wallet-free-title = Darmowe tryby (1 i 2)\n\
-wallet-free-desc = Aplikacja webowa Neon lub lokalny magazyn Willow na urządzeniu + darmowy przekaźnik odkrywania\n\
+wallet-free-desc = Aplikacja webowa w chmurze lub lokalny magazyn Willow na urządzeniu + darmowy przekaźnik odkrywania\n\
 wallet-free-current = Obecny plan (Darmowy)\n\
 wallet-free-switch = Przełącz na darmowy\n\
 wallet-mo-title = Synchronizacja miesięczna (ekw. 9 $/mies.)\n\
-wallet-mo-desc = Odblokowuje przełącznik Trybu 3 w Ustawieniach i ślepą replikację Meadowcap.\n\
+wallet-mo-desc = Odblokowuje przełącznik Trybu 3 w Preferencjach i ślepą replikację Meadowcap.\n\
 wallet-mo-active = Aktywny plan miesięczny\n\
 wallet-mo-activate = Aktywuj 9 $/miesiąc\n\
 wallet-yr-title = Synchronizacja roczna (ekw. 90 $/rok)\n\
@@ -1142,7 +1113,7 @@ persona-handle-label = Uchwyt\n\
 persona-bio-label = Biogram\n\
 persona-create-btn = Utwórz personę\n\
 langs-quick-title = Osobiste języki szybkiego przełączania\n\
-langs-quick-sub = Wybierz, które z 29 obsługiwanych języków pojawią się w kompaktowym przełączniku paska górnego i edytorze pisania. Wszystkie 29 pozostają dostępne w Ustawieniach.\n\
+langs-quick-sub = Wybierz, które z 29 obsługiwanych języków pojawią się w kompaktowym przełączniku paska górnego i edytorze pisania. Wszystkie 29 pozostają dostępne w Preferencjach.\n\
 langs-pinned-ui-label = Przypięte języki interfejsu\n\
 langs-pinned-input-label = Przypięte języki wprowadzania tekstu\n\
 langs-save-btn = Zapisz listy szybkiego przełączania\n\
@@ -1169,7 +1140,7 @@ profile-toast-group-created = Utworzono grupę\n\
 profile-toast-role-updated = Zaktualizowano rolę członka\n\
 profile-toast-invite-copied = Skopiowano link zaproszenia\n\
 profile-toast-plan-updated = Zaktualizowano plan synchronizacji\n\
-profile-toast-langs-saved = Zapisano szybkie przełączniki języków w bazie Neon\n\
+profile-toast-langs-saved = Zapisano szybkie przełączniki języków\n\
 profile-toast-notif-saved = Zapisano preferencje powiadomień o aktywności\n\
 cms-all = Wszystkie\n\
 cms-on-hold = Wstrzymane\n\
@@ -1178,7 +1149,7 @@ cms-accepted = Zaakceptowane\n\
 cms-proposed = Proponowane\n\
 cms-search-placeholder = Szukaj ADR...\n\
 cms-sidebar-title = MADR 4.0.0 CMS\n\
-cms-records-count-suffix = rekordów w Neon\n\
+cms-records-count-suffix = rekordów\n\
 cms-hide = Ukryj\n\
 cms-show-explorer = Pokaż eksplorator\n\
 cms-read-adr = Czytaj ADR\n\
@@ -1225,7 +1196,7 @@ cms-field-context = Kontekst i opis problemu\n\
 cms-field-drivers = Czynniki decyzyjne\n\
 cms-field-outcome = Wynik decyzji\n\
 cms-field-raw-md = Pełny Markdown (opcjonalne nadpisanie)\n\
-cms-save-adr-btn = Zapisz ADR w Neon\n\
+cms-save-adr-btn = Zapisz ADR\n\
 cms-status-opt-proposed = proposed\n\
 cms-status-opt-on-hold = on-hold (oczekuje na narzędzia)\n\
 cms-status-opt-ready = ready-to-build\n\
@@ -1249,7 +1220,7 @@ cms-add-tool-ver-ph = Zainstalowana wersja\n\
 cms-add-tool-purpose-ph = Dlaczego ExoNovel od tego zależy\n\
 cms-add-tool-btn = Dodaj narzędzie\n\
 cms-ai-providers-title = Dostawcy wnioskowania AI i aktywne modele\n\
-cms-ai-providers-sub = Skonfigurowane środowiska wykonawcze OpenCode CLI oraz zweryfikowane aktywne modele w tym środowisku.\n\
+cms-ai-providers-sub = Skonfigurowane lokalne środowisko wykonawcze CLI oraz zweryfikowane aktywne modele w tym środowisku.\n\
 cms-refresh-models = Odśwież aktywne modele\n\
 cms-ai-empty = Brak aktywnych dostawców wnioskowania skonfigurowanych w tym środowisku.\n\
 cms-model-deprecated = Wycofany\n\
@@ -1269,7 +1240,7 @@ cms-proposal-dismiss = Odrzuć\n\
 cms-proposal-reopen = Otwórz ponownie\n\
 cms-proposal-rationale = Diagnostyka / Uzasadnienie:\n\
 cms-owner-tasks-title = Zewnętrzna lista zadań właściciela i operacji\n\
-cms-owner-tasks-sub = Zadania wymagające dostępu do zewnętrznych konsol lub serwera produkcyjnego. Zaznacz po wykonaniu — stan zapisuje się bezpośrednio w Neon PostgreSQL.\n\
+cms-owner-tasks-sub = Zadania wymagające dostępu do zewnętrznych konsol lub konfiguracji serwera produkcyjnego. Zaznacz po wykonaniu, aby zapisać stan ukończenia w bazie danych.\n\
 cms-task-done = Gotowe\n\
 cms-task-pending = Oczekuje\n\
 cms-msg-redirecting-google = Przekierowywanie do ekranu zgody Google...\n\
@@ -1280,19 +1251,19 @@ cms-toast-saved-drive = Zapisano w Dokumentach / Dysku Google\n\
 cms-msg-backing-up-archive = Tworzenie kopii pełnego archiwum ExoNovel Docs i ADR na Dysku Google (to może chwilę potrwać)...\n\
 cms-msg-archive-failed = Kopia archiwum nie powiodła się.\n\
 cms-toast-archive-backed-up = Zapisano kopię archiwum na Dysku Google\n\
-cms-toast-task-done = Zadanie oznaczone jako ukończone w Neon\n\
+cms-toast-task-done = Zadanie oznaczone jako ukończone\n\
 cms-toast-task-reopened = Zadanie otwarte ponownie\n\
 cms-toast-task-failed = Nie udało się zaktualizować zadania\n\
-cms-msg-saving-adr = Zapisywanie rekordu MADR 4.0.0 w Neon...\n\
+cms-msg-saving-adr = Zapisywanie rekordu MADR 4.0.0...\n\
 cms-msg-missing-token = Brak tokenu sesji.\n\
-cms-toast-adr-saved = Zapisano ADR w Neon CMS\n\
+cms-toast-adr-saved = Zapisano ADR w CMS\n\
 cms-toast-dep-linked = Powiązano zależność narzędzia z ADR\n\
 cms-msg-scanning-crates = Wykonywanie deterministycznego skanu wydań crates.io...\n\
 cms-toast-scan-done = Zaktualizowano katalog wydań crates.io\n\
 cms-msg-scan-failed = Skanowanie nie powiodło się.\n\
 cms-msg-refreshing-models = Odświeżanie aktywnych modeli w skonfigurowanych środowiskach wnioskowania...\n\
 cms-toast-models-refreshed = Odświeżono aktywne modele dostawców\n\
-cms-msg-generating-proposal = Uruchamianie analizy propozycji przez OpenCode i aktywne modele...\n\
+cms-msg-generating-proposal = Uruchamianie analizy propozycji aktywnego wnioskowania...\n\
 cms-toast-proposal-generated = Wygenerowano notatkę propozycji dojrzałości\n\
 cms-toast-proposal-updated = Zaktualizowano status propozycji\n\
 cms-toast-tool-added = Dodano narzędzie do katalogu dojrzałości\n\
@@ -1304,11 +1275,12 @@ nav-sign-in = Anmelden\n\
 nav-toggle-menu = Navigationsmenü umschalten\n\
 nav-privacy = Datenschutzerklärung\n\
 nav-terms = Nutzungsbedingungen\n\
-live-connection-title = Globale Neon-SSE-Echtzeitverbindung\n\
+live-connection-title = Globale Echtzeit-Stream-Verbindung\n\
 ui-lang-aria = Ausgabesprache der App\n\
 input-lang-aria = Eingabesprache beim Schreiben\n\
 notifications-aria = Benachrichtigungen\n\
 switch-persona = Persona wechseln\n\
+create-personas-prompt = Erstelle Personas in deinem Profil\n\
 default-persona-label = Standard-Persona\n\
 active-badge = Aktiv\n\
 mark-all-read = Alle als gelesen markieren\n\
@@ -1356,9 +1328,9 @@ slide-1-body = Jede kreative Einheit — Charakterprofile, Weltenbau-Notizen, Pl
 slide-2-title = Mehrere Künstlernamen & Personas\n\
 slide-2-body = Autorinnen und Autoren verwalten unterschiedliche Künstlernamen und Avatare unter einem verifizierten Konto und wechseln nahtlos zwischen aktiven Personas.\n\
 slide-3-title = Web- & Local-First-Synchronisierung\n\
-slide-3-body = Arbeite online im Browser mit Neon PostgreSQL oder synchronisiere Ende-zu-Ende-verschlüsselte lokale Arbeitsbereiche über Linux, macOS, Windows, Android und iOS.\n\
+slide-3-body = Arbeite online im Browser mit verwaltetem PostgreSQL oder synchronisiere Ende-zu-Ende-verschlüsselte lokale Arbeitsbereiche über Linux, macOS, Windows, Android und iOS.\n\
 slide-4-title = Kontrollierte verbundene Apps & Widerruf\n\
-slide-4-body = Externe Integrationen wie Google Drive bleiben strikt optional und von der primären Anmeldung getrennt. Berechtigungen können jederzeit in den Einstellungen eingesehen oder widerrufen werden.\n\
+slide-4-body = Externe Integrationen wie Google Drive bleiben strikt optional und von der primären Anmeldung getrennt. Berechtigungen können jederzeit in den Präferenzen eingesehen oder widerrufen werden.\n\
 landing-formats-title = Unterstützte Schreib- & Publikationsformate\n\
 landing-formats-sub = Strukturierte Planungsdimensionen und Publikationslayouts für fünf zentrale Schreibdisziplinen.\n\
 format-novel-title = Romane\n\
@@ -1400,7 +1372,7 @@ privacy-s1-intro = Wir erheben nur die Daten, die für die Kontosicherheit, den 
 privacy-s1-google-label = Google-Anmeldedaten (openid, email, profile): \n\
 privacy-s1-google-body = Bei der Anmeldung mit Google erhalten wir Ihre verifizierte E-Mail-Adresse, den Verifizierungsstatus, den Anzeigenamen, Vor- und Nachnamen, die Profilbild-URL, das Gebietsschema sowie die Google-Konto-ID.\n\
 privacy-s1-drive-label = Optionale verbundene Google-Drive-Daten: \n\
-privacy-s1-drive-body = Die primäre Anmeldung fordert niemals Google-Drive-Berechtigungen an. Erst wenn Sie Google Drive explizit in den Einstellungen oder der Dokumentation verbinden, darf ExoNovel Ordner auflisten, Markdown/ADR-Sicherungen hochladen sowie ausgewählte Dateien wiederherstellen oder in den Papierkorb verschieben.\n\
+privacy-s1-drive-body = Die primäre Anmeldung fordert niemals Google-Drive-Berechtigungen an. Erst wenn Sie Google Drive explizit in den Präferenzen oder der Dokumentation verbinden, darf ExoNovel Ordner auflisten, Markdown/ADR-Sicherungen hochladen sowie ausgewählte Dateien wiederherstellen oder in den Papierkorb verschieben.\n\
 privacy-s1-profile-label = Weitere Anmelde- & Autorenprofilinformationen: \n\
 privacy-s1-profile-body = Bei GitHub- oder E-Mail-Anmeldung speichern wir Anzeigenamen, Künstlernamen, Biografie, Website, Standort, bevorzugtes Format, UI- und Eingabesprachen, Zeitzone, Benachrichtigungsregeln, Avatare (64px, 256px, 1024px) sowie den öffentlichen Schlüssel / did:peer.\n\
 privacy-s1-works-label = Manuskripte & Zusammenarbeitsdaten: \n\
@@ -1408,13 +1380,13 @@ privacy-s1-works-body = Kreative Werke, Story-Bibeln, Personas, Gruppenmitglieds
 privacy-s1-sec-label = Sicherheit & technische Diagnosedaten: \n\
 privacy-s1-sec-body = Anmeldezeitpunkte, IP-Adresse, Browser-User-Agent und Fehlerprotokolle ausschließlich zum Schutz vor Missbrauch und für den zuverlässigen Betrieb.\n\
 privacy-s2-title = 2. Cookies & Browser-Speicher\n\
-privacy-s2-body = ExoNovel nutzt ausschließlich technisch notwendige Authentifizierungs-Cookies (HttpOnly über Neon Auth) sowie temporären sessionStorage für Einladungscodes über OAuth-Weiterleitungen. Es werden keine Werbe- oder Tracking-Cookies verwendet.\n\
+privacy-s2-body = ExoNovel nutzt ausschließlich technisch notwendige HttpOnly-Authentifizierungs-Cookies sowie temporären Sitzungsspeicher des Browsers zur Erhaltung ausstehender Einladungscodes bei Anmelde-Weiterleitungen. Es werden keine Werbe- oder Tracking-Cookies verwendet.\n\
 privacy-s3-title = 3. Wie wir Ihre Daten verwenden\n\
 privacy-s3-li1 = Authentifizierung Ihrer Sitzung und Auflösung Ihrer did:peer-Identität über Web, Desktop und Mobil.\n\
-privacy-s3-li2 = Anzeige Ihrer gewählten Persona, des Künstlernamens, des Avatars und der Spracheinstellungen (inkl. RTL).\n\
+privacy-s3-li2 = Anzeige Ihrer gewählten Persona, des Künstlernamens, des Avatars und der Sprachpräferenzen (inkl. RTL).\n\
 privacy-s3-li3 = Betrieb gemeinsamer Schreibgruppen, Autorenzuordnung und Einladungen.\n\
 privacy-s3-li4 = Ausführung benutzergesteuerter Sicherungen und Exporte in Ihr verbundenes Google Drive.\n\
-privacy-s3-li5 = Versand von Transaktions- und Benachrichtigungs-E-Mails über Brevo (von notes@exosystems.net, noreply@exosystems.net oder support@exosystems.net).\n\
+privacy-s3-li5 = Versand aktivierter Transaktions-, Sicherheits- und Benachrichtigungs-E-Mails (von notes@exosystems.net, noreply@exosystems.net oder support@exosystems.net).\n\
 privacy-s3-li6 = Schutz vor Betrug, unbefugtem Zugriff und Verstößen gegen unsere Nutzungsbedingungen.\n\
 privacy-s4-title = 4. Google API Services User Data Policy (Limited Use) & Verbot von AI NCII\n\
 privacy-s4-intro = Die Verarbeitung und Weitergabe von Daten aus Google APIs erfolgt strikt gemäß der Google API Services User Data Policy einschließlich der Limited-Use-Anforderungen.\n\
@@ -1426,11 +1398,11 @@ privacy-s4-li3-label = Keine Bildgenerierung & Nulltoleranz für AI NCII: \n\
 privacy-s4-li3-body = ExoNovel ist eine textbasierte Plattform. Sie generiert weder Bilder noch Video oder Audio und untersagt strikt jede Nutzung für AI NCII.\n\
 privacy-s4-li4-label = Eingeschränkter Mitarbeiterzugriff: \n\
 privacy-s4-li4-body = Exosystems-Mitarbeitende lesen keine privaten Drive-Dateien oder Manuskripte, außer bei ausdrücklicher Support-Einwilligung, Sicherheitsvorfällen oder gesetzlicher Pflicht.\n\
-privacy-s5-title = 5. Datenspeicherung, Auftragsverarbeiter & Kryptografie\n\
-privacy-s5-body = Der gesamte Datenverkehr ist per HTTPS/TLS verschlüsselt. Webdaten liegen in Neon PostgreSQL und Neon Managed Auth auf Cloud-Infrastruktur; E-Mails laufen über Brevo. OAuth-Tokens verbundener Apps werden über HashiCorp Vault Transit KMS verschlüsselt, und Willow/iroh-Gerätesynchronisierung erfolgt Ende-zu-Ende-verschlüsselt.\n\
+privacy-s5-title = 5. Datenspeicherung, Sicherheit & Kryptografischer Schutz\n\
+privacy-s5-body = Der gesamte Datenverkehr zu ExoNovel ist per HTTPS/TLS verschlüsselt. Gehostete Webdaten und Kontostatus werden in verwalteten PostgreSQL-Datenbanken und verwalteten Authentifizierungsdiensten auf einer Enterprise-Cloud-Infrastruktur gespeichert, ergänzt durch transaktionalen E-Mail-Versand. Optionale OAuth-Tokens verbundener externer Apps werden serverseitig durch dedizierte Schlüsselverwaltungs-Verschlüsselung geschützt und von den primären Anmeldedaten isoliert. Auf nativen Geräten mit Peer-to-Peer-Willow- und iroh-Relay-Synchronisierung werden Inhalte Ende-zu-Ende auf dem Gerät verschlüsselt.\n\
 privacy-s6-title = 6. Widerruf, Export & Löschung Ihrer Daten\n\
 privacy-s6-li1-label = Google-Zugriff jederzeit trennen & widerrufen: \n\
-privacy-s6-li1-body = Sie können Google Drive unter Einstellungen -> Verbundene Apps trennen (sofortiger Token-Widerruf über https://oauth2.googleapis.com/revoke) oder jederzeit unter https://myaccount.google.com/permissions widerrufen.\n\
+privacy-s6-li1-body = Sie können Google Drive unter Präferenzen -> Verbundene Apps trennen (sofortiger Token-Widerruf über https://oauth2.googleapis.com/revoke) oder jederzeit unter https://myaccount.google.com/permissions widerrufen.\n\
 privacy-s6-li2-label = Export- & Löschanfragen: \n\
 privacy-s6-li2-body = Fordern Sie einen Export oder die dauerhafte Löschung Ihres Kontos per E-Mail an support@exosystems.net oder exonomyapp@gmail.com an. Verifizierte Anträge werden innerhalb von 30 Tagen abgeschlossen.\n\
 privacy-s7-title = 7. Aufbewahrung, Jugendschutz & Aktualisierungen\n\
@@ -1442,7 +1414,7 @@ terms-effective = Inkrafttreten & letzte Aktualisierung: 24. November 2026\n\
 terms-heading = ExoNovel Nutzungsbedingungen\n\
 terms-intro = Mit dem Zugriff auf ExoNovel (https://exonovel.exosystems.net), betrieben von Exosystems (https://exosystems.net), akzeptieren Sie diese Nutzungsbedingungen und unsere Datenschutzerklärung (/privacy).\n\
 terms-s1-title = 1. Eigentum an Ihren kreativen Werken\n\
-terms-s1-body = Sie behalten das vollständige Eigentum und Urheberrecht an allen Manuskripten, Figuren, Notizen, Drehbüchern und Gedichten. Sie gewähren ExoNovel lediglich die technisch notwendige Lizenz zur Speicherung, Darstellung und Synchronisierung gemäß Ihren Einstellungen.\n\
+terms-s1-body = Sie behalten das vollständige Eigentum und Urheberrecht an allen Manuskripten, Figuren, Notizen, Drehbüchern und Gedichten. Sie gewähren ExoNovel lediglich die technisch notwendige Lizenz zur Speicherung, Darstellung und Synchronisierung gemäß Ihren Präferenzen.\n\
 terms-s2-title = 2. Konten, Schlüssel & zulässige Nutzung\n\
 terms-s2-body = Sie sind für den Schutz Ihrer Zugangsdaten und did:peer-Schlüssel verantwortlich und müssen mindestens 13 Jahre alt sein. Eingriffe in die Plattformsicherheit, unbefugter Zugriff oder Spam sind untersagt.\n\
 terms-s3-title = 3. Verbotene Inhalte & Google-APIs-Compliance\n\
@@ -1452,11 +1424,11 @@ terms-s3-li1-body = Sie dürfen ExoNovel oder verbundene Google APIs nicht zur E
 terms-s3-li2-label = Rechtswidrige & missbräuchliche Inhalte: \n\
 terms-s3-li2-body = CSAM, nicht einvernehmliche intime Darstellungen, Belästigung, Hassrede und Urheberrechtsverletzungen führen zur sofortigen Kontokündigung.\n\
 terms-s4-title = 4. Verbundene externe Apps\n\
-terms-s4-body = Optionale Integrationen wie Google Drive werden nur nach Ihrer ausdrücklichen Zustimmung aktiviert und können jederzeit unter Einstellungen -> Verbundene Apps widerrufen werden.\n\
+terms-s4-body = Optionale Integrationen wie Google Drive werden nur nach Ihrer ausdrücklichen Zustimmung aktiviert und können jederzeit unter Präferenzen -> Verbundene Apps widerrufen werden.\n\
 terms-s5-title = 5. Betriebsmodi, Verfügbarkeit & Kontakt\n\
 terms-s5-body = ExoNovel bietet Web-Kollaboration, lokale Gerätespeicherung und optionale Sync-Tarife ohne Gewährleistung unterbrechungsfreier Verfügbarkeit. Kontakt: support@exosystems.net oder exonomyapp@gmail.com.\n\
-settings-subtitle = Technische Einstellungen, Sprachen, Betriebsmodi und Benachrichtigungskanäle (Käufe und Abonnements bleiben im Profil).\n\
-settings-nav-aria = Einstellungsbereiche\n\
+preferences-subtitle = Konto-, Sprach-, Betriebsmodus- und Benachrichtigungspräferenzen (Käufe und Abonnements bleiben im Profil).\n\
+preferences-nav-aria = Präferenzen-Bereiche\n\
 sec-account = Konto & Sicherheit\n\
 sec-connected-apps = Verbundene Apps & Google Docs\n\
 sec-appearance-langs = Design & Sprachen (29)\n\
@@ -1464,7 +1436,7 @@ sec-sync-storage = Synchronisierung & Speicher (3 Modi)\n\
 sec-notifications = Benachrichtigungskanäle\n\
 sec-admin-allowlist = Docs-Zugriffsliste & Konten\n\
 account-title = Konto & Souveräne Identität\n\
-save-account-btn = Kontoeinstellungen speichern\n\
+save-account-btn = Kontopräferenzen speichern\n\
 upload-avatar-label = Profilbild hochladen (64px / 256px / 1024px WebP)\n\
 root-identity-label = Stammidentität (did:peer)\n\
 display-name-label = Anzeigename\n\
@@ -1480,7 +1452,7 @@ format-opt-short = Kurzgeschichten\n\
 format-opt-screenplay = Drehbücher\n\
 format-opt-poetry = Lyrik\n\
 appearance-title = Design & Zweisprachige Architektur\n\
-appearance-desc = Die App-Ausgabesprache steuert Menüs und Layout-Richtung (auto RTL für Arabisch und Hebräisch). Die Eingabesprache steuert Editoren unabhängig. Alle Einstellungen speichern direkt in Neon (ohne localStorage).\n\
+appearance-desc = Die App-Ausgabesprache steuert Menüs und Layout-Richtung (auto RTL für Arabisch und Hebräisch). Die Eingabesprache steuert Editoren unabhängig und wird direkt im Konto gespeichert.\n\
 theme-label = Erscheinungsbild\n\
 theme-opt-system = System\n\
 theme-opt-light = Hell\n\
@@ -1491,7 +1463,7 @@ save-theme-lang-btn = Design & Sprachstandards speichern\n\
 sync-title = Drei Betriebsmodi & Kryptografische Blindheit\n\
 sync-sub = Wähle, wie ExoNovel deine Texte zwischen Web und lokalen Geräten speichert und synchronisiert.\n\
 sync-m1-title = Modus 1 · ExoNovel im Web (Kostenlos)\n\
-sync-m1-desc = Cloud-Arbeitsbereich mit Neon Postgres und Echtzeit-Updates über Tabs hinweg.\n\
+sync-m1-desc = Cloud-Arbeitsbereich mit verwaltetem PostgreSQL und Echtzeit-Updates über Tabs hinweg.\n\
 sync-m2-title = Modus 2 · Souveränes Gerät (Kostenlos)\n\
 sync-m2-desc = 100 % lokaler Willow-Speicher unter Windows, macOS, Linux, Android und iOS inklusive kostenloser iroh-Erkennung und blindem Relay.\n\
 sync-m3-title = Modus 3 · Verwaltete Web- + Gerätesynchronisierung\n\
@@ -1504,16 +1476,16 @@ sync-requires-sub = Modus-3-Synchronisierung erfordert ein aktives Abonnement im
 sync-manage-in-profile = Abonnement im Profil verwalten →\n\
 sync-save-toggle = Sync-Schalter speichern\n\
 notif-channels-title = Plattformübergreifende Zustellungskanäle\n\
-notif-brevo-prefix = Brevo Transaktions-E-Mail (notes@exosystems.net)\n\
-notif-brevo-active = · Brevo API-Schlüssel aktiv\n\
-notif-brevo-unset = · BREVO_API_KEY in der Serverumgebung konfigurieren\n\
-notif-send-test = Test-Benachrichtigung & Brevo-E-Mail senden\n\
+notif-email-prefix = Transaktionaler E-Mail-Dienst (notes@exosystems.net)\n\
+notif-email-active = · E-Mail-Versand aktiv\n\
+notif-email-unset = · Transaktionale E-Mail-Zugangsdaten nicht konfiguriert\n\
+notif-send-test = Test-Benachrichtigung & E-Mail senden\n\
 notif-in-app-title = In-App Live-Feed & Glocke\n\
-notif-in-app-desc = Sofortige Zustellung über den persistenten SSE-Stream.\n\
+notif-in-app-desc = Sofortige Zustellung über den persistenten Echtzeit-Stream.\n\
 notif-web-push-title = Browser-Benachrichtigungen\n\
 notif-web-push-desc = Native Systembanner über die Browser Notification API.\n\
 notif-native-push-title = Native Push-Geräte (Android UnifiedPush + FCM, iOS/macOS APNs, Windows WNS, Linux)\n\
-notif-email-title = Brevo Transaktions-E-Mail (Hinweise von ExoNovel)\n\
+notif-email-title = Transaktionale E-Mail (Hinweise von ExoNovel)\n\
 notif-digest-label = E-Mail-Zusammenfassungsmodus\n\
 notif-digest-instant = Sofortige E-Mail\n\
 notif-digest-daily = Tägliche Zusammenfassung\n\
@@ -1522,14 +1494,14 @@ notif-security-title = Sicherheits- & Anmeldewarnungen\n\
 notif-security-desc = Hinweis, wenn sich deine souveräne Identität auf einem neuen Gerät anmeldet.\n\
 notif-maturity-title = Reifegrad-Scanner Release-Warnungen\n\
 notif-maturity-desc = Benachrichtigung, wenn überwachte Abhängigkeiten neue Versionen veröffentlichen.\n\
-notif-save-btn = Kanal-Einstellungen speichern\n\
+notif-save-btn = Kanal-Präferenzen speichern\n\
 devices-title = Registrierte Push-Endpunkte (AOTA)\n\
 devices-sub = Registriere beliebige Push-Transporte inklusive UnifiedPush (Android/Linux), FCM (Android), APNs (iOS/macOS) oder WNS (Windows).\n\
 device-platform-label = Plattform\n\
 device-transport-label = Push-Transport\n\
 device-label-field = Gerätebezeichnung\n\
 device-token-label = Endpunkt-URL oder Geräte-Token\n\
-device-token-ph = https://ntfy.sh/... oder FCM/APNs-Token\n\
+device-token-ph = https://push.example.org/... oder FCM/APNs-Token\n\
 device-register-btn = Push-Endpunkt registrieren\n\
 device-th-label = Bezeichnung\n\
 device-th-platform = Plattform\n\
@@ -1541,7 +1513,7 @@ device-plat-linux = Linux\n\
 device-plat-macos = macOS\n\
 device-plat-windows = Windows\n\
 device-plat-web = Webbrowser\n\
-device-tr-unifiedpush = UnifiedPush (Offener Standard / ntfy)\n\
+device-tr-unifiedpush = UnifiedPush (Offener Standard)\n\
 device-tr-fcm = FCM (Firebase Cloud Messaging)\n\
 device-tr-apns = APNs (Apple Push Notification service)\n\
 device-tr-wns = WNS (Windows Push Notification Services)\n\
@@ -1564,19 +1536,19 @@ admin-th-provider = Anbieter\n\
 admin-display-name-ph = Anzeigename\n\
 admin-pen-name-ph = Künstlername\n\
 admin-save-account-btn = Kontoänderungen speichern\n\
-settings-msg-avatar-size = Avatar-Datei darf maximal 2 MB groß sein.\n\
-settings-msg-avatar-processing = Avatar-Varianten werden verarbeitet...\n\
-settings-msg-avatar-saved = Avatar gespeichert.\n\
-settings-msg-saved = Einstellungen in Neon gespeichert.\n\
-settings-toast-saved = Einstellungen gespeichert\n\
-settings-toast-notif-saved = Benachrichtigungskanäle aktualisiert\n\
-settings-toast-device-reg = Push-Gerät registriert\n\
-settings-toast-test-sent = Testbenachrichtigung & Brevo-E-Mail gesendet\n\
-settings-msg-allowlist-updated = Zugriffsliste aktualisiert.\n\
-settings-toast-tier-updated = Zugriffsebene aktualisiert\n\
-settings-toast-entry-removed = Eintrag aus Zugriffsliste entfernt\n\
-settings-msg-account-updated = Konto aktualisiert.\n\
-settings-toast-perm = Browser-Benachrichtigungsberechtigung:\n\
+preferences-msg-avatar-size = Avatar-Datei darf maximal 2 MB groß sein.\n\
+preferences-msg-avatar-processing = Avatar-Varianten werden verarbeitet...\n\
+preferences-msg-avatar-saved = Avatar gespeichert.\n\
+preferences-msg-saved = Präferenzen gespeichert.\n\
+preferences-toast-saved = Präferenzen gespeichert\n\
+preferences-toast-notif-saved = Benachrichtigungskanäle aktualisiert\n\
+preferences-toast-device-reg = Push-Gerät registriert\n\
+preferences-toast-test-sent = Testbenachrichtigung & E-Mail gesendet\n\
+preferences-msg-allowlist-updated = Zugriffsliste aktualisiert.\n\
+preferences-toast-tier-updated = Zugriffsebene aktualisiert\n\
+preferences-toast-entry-removed = Eintrag aus Zugriffsliste entfernt\n\
+preferences-msg-account-updated = Konto aktualisiert.\n\
+preferences-toast-perm = Browser-Benachrichtigungsberechtigung:\n\
 connected-apps-title = Verbundene Apps & Google Docs\n\
 connected-apps-desc = Die primäre Anmeldung nutzt nur Identitätsbereiche (openid, email, profile). Verbinde hier optional Google Drive & Google Docs zum Erstellen, Prüfen und Sichern deiner Markdown-Manuskripte und ADRs.\n\
 google-drive-docs-title = Google Drive & Google Docs\n\
@@ -1595,8 +1567,8 @@ conn-auth-acct-fallback = Autorisiertes Google-Konto\n\
 conn-drive-optional-desc = Optionale dateibezogene Autorisierung (drive.file) zum Erstellen von Google Docs, Speichern von .md-Backups und Durchsuchen von ExoNovel Docs.\n\
 conn-revoke-confirm-msg = ExoNovels Google Drive & Docs OAuth-Tokens widerrufen? Dies trennt Drive-Sicherungen, ohne deine primäre ExoNovel-Anmeldung zu beeinträchtigen.\n\
 conn-revoke-confirm-btn = Widerruf bestätigen\n\
-conn-redirect-configured = OAuth-Weiterleitungs-URI (in Google Cloud registriert)\n\
-conn-redirect-missing = Server-OAuth-Zugangsdaten erforderlich (GOOGLE_OAUTH_CLIENT_ID / SECRET)\n\
+conn-redirect-configured = OAuth-Weiterleitungs-URI (beim Anbieter konfiguriert)\n\
+conn-redirect-missing = Serverseitige Google-OAuth-Zugangsdaten erforderlich\n\
 conn-copy-uri-btn = URI kopieren\n\
 conn-toast-uri-copied = Weiterleitungs-URI kopiert\n\
 drive-ws-title = Google Docs & Drive Arbeitsbereich\n\
@@ -1722,11 +1694,11 @@ wallet-rail-btc = Bitcoin Lightning (L402)\n\
 wallet-rail-eth = Base / Arbitrum / Ethereum\n\
 wallet-rail-mobile = Mobile Money / PIX / UPI\n\
 wallet-free-title = Kostenlose Modi (1 & 2)\n\
-wallet-free-desc = Web-Neon-App oder lokaler Geräte-Willow-Speicher + kostenloses Discovery-Relay\n\
+wallet-free-desc = Cloud-Web-App oder lokaler Geräte-Willow-Speicher + kostenloses Discovery-Relay\n\
 wallet-free-current = Aktueller Tarif (Kostenlos)\n\
 wallet-free-switch = Zu Kostenlos wechseln\n\
 wallet-mo-title = Monatssynchronisierung (9 $/Monat Äquiv.)\n\
-wallet-mo-desc = Aktiviert den Modus-3-Schalter in den Einstellungen & blinde Meadowcap-Replikation.\n\
+wallet-mo-desc = Aktiviert den Modus-3-Schalter in den Präferenzen & blinde Meadowcap-Replikation.\n\
 wallet-mo-active = Aktiv (Monatlich)\n\
 wallet-mo-activate = 9 $/Monat aktivieren\n\
 wallet-yr-title = Jahressynchronisierung (90 $/Jahr Äquiv.)\n\
@@ -1756,7 +1728,7 @@ persona-handle-label = Handle\n\
 persona-bio-label = Biografie\n\
 persona-create-btn = Persona erstellen\n\
 langs-quick-title = Persönliche Schnellwechselsprachen\n\
-langs-quick-sub = Wähle aus den 29 unterstützten Sprachen diejenigen für die kompakte Kopfleiste und deinen Schreibeditor. Alle 29 bleiben in den Einstellungen verfügbar.\n\
+langs-quick-sub = Wähle aus den 29 unterstützten Sprachen diejenigen für die kompakte Kopfleiste und deinen Schreibeditor. Alle 29 bleiben in den Präferenzen verfügbar.\n\
 langs-pinned-ui-label = Angeheftete UI-Ausgabesprachen\n\
 langs-pinned-input-label = Angeheftete Eingabesprachen\n\
 langs-save-btn = Schnellwechsellisten speichern\n\
@@ -1783,7 +1755,7 @@ profile-toast-group-created = Gruppe erstellt\n\
 profile-toast-role-updated = Mitgliedsrolle aktualisiert\n\
 profile-toast-invite-copied = Einladungslink kopiert\n\
 profile-toast-plan-updated = Sync-Tarif aktualisiert\n\
-profile-toast-langs-saved = Sprach-Schnellwechsler in Neon gespeichert\n\
+profile-toast-langs-saved = Sprach-Schnellwechsler gespeichert\n\
 profile-toast-notif-saved = Aktivitätsbenachrichtigungen gespeichert\n\
 cms-all = Alle\n\
 cms-on-hold = Pausiert\n\
@@ -1792,7 +1764,7 @@ cms-accepted = Akzeptiert\n\
 cms-proposed = Vorgeschlagen\n\
 cms-search-placeholder = ADRs durchsuchen...\n\
 cms-sidebar-title = MADR 4.0.0 CMS\n\
-cms-records-count-suffix = Datensätze in Neon\n\
+cms-records-count-suffix = Datensätze\n\
 cms-hide = Ausblenden\n\
 cms-show-explorer = Explorer einblenden\n\
 cms-read-adr = ADR lesen\n\
@@ -1839,7 +1811,7 @@ cms-field-context = Kontext & Problemstellung\n\
 cms-field-drivers = Entscheidungstreiber\n\
 cms-field-outcome = Entscheidungsergebnis\n\
 cms-field-raw-md = Vollständiges Markdown (optionale Überschreibung)\n\
-cms-save-adr-btn = ADR in Neon speichern\n\
+cms-save-adr-btn = ADR speichern\n\
 cms-status-opt-proposed = proposed\n\
 cms-status-opt-on-hold = on-hold (wartet auf Tooling)\n\
 cms-status-opt-ready = ready-to-build\n\
@@ -1863,7 +1835,7 @@ cms-add-tool-ver-ph = Installierte Version\n\
 cms-add-tool-purpose-ph = Warum ExoNovel es benötigt\n\
 cms-add-tool-btn = Tool hinzufügen\n\
 cms-ai-providers-title = KI-Inferenzanbieter & aktive Modelle\n\
-cms-ai-providers-sub = Konfigurierte OpenCode-CLI-Laufzeit und verifizierte aktive Modelle dieser Umgebung.\n\
+cms-ai-providers-sub = Konfigurierte lokale CLI-Laufzeit und verifizierte aktive Modelle dieser Umgebung.\n\
 cms-refresh-models = Live-Modelle aktualisieren\n\
 cms-ai-empty = Keine aktiven Inferenzanbieter in dieser Umgebung konfiguriert.\n\
 cms-model-deprecated = Veraltet\n\
@@ -1883,7 +1855,7 @@ cms-proposal-dismiss = Verwerfen\n\
 cms-proposal-reopen = Wieder öffnen\n\
 cms-proposal-rationale = Diagnose / Begründung:\n\
 cms-owner-tasks-title = Externe Owner- & Ops-Checkliste\n\
-cms-owner-tasks-sub = Aufgaben mit externen Konsolen oder Produktionsserver-Zugriff. Nach Erledigung abhaken — der Status bleibt in Neon PostgreSQL gespeichert.\n\
+cms-owner-tasks-sub = Aufgaben mit externen Konsolen oder Produktionsserver-Konfiguration. Nach Erledigung abhaken, um den Status in der Datenbank zu speichern.\n\
 cms-task-done = Erledigt\n\
 cms-task-pending = Offen\n\
 cms-msg-redirecting-google = Weiterleitung zur Google-Zustimmung...\n\
@@ -1894,19 +1866,19 @@ cms-toast-saved-drive = In Google Docs / Drive gespeichert\n\
 cms-msg-backing-up-archive = Vollständiges ExoNovel Docs & ADR Archiv wird auf Google Drive gesichert (kann kurz dauern)...\n\
 cms-msg-archive-failed = Archiv-Backup fehlgeschlagen.\n\
 cms-toast-archive-backed-up = Archiv auf Google Drive gesichert\n\
-cms-toast-task-done = Aufgabe in Neon als erledigt markiert\n\
+cms-toast-task-done = Aufgabe als erledigt markiert\n\
 cms-toast-task-reopened = Aufgabe wieder geöffnet\n\
 cms-toast-task-failed = Aufgabe konnte nicht aktualisiert werden\n\
-cms-msg-saving-adr = MADR 4.0.0 Datensatz wird in Neon gespeichert...\n\
+cms-msg-saving-adr = MADR 4.0.0 Datensatz wird gespeichert...\n\
 cms-msg-missing-token = Sitzungs-Token fehlt.\n\
-cms-toast-adr-saved = ADR im Neon CMS gespeichert\n\
+cms-toast-adr-saved = ADR im CMS gespeichert\n\
 cms-toast-dep-linked = Tooling-Abhängigkeit mit ADR verknüpft\n\
 cms-msg-scanning-crates = Deterministischer crates.io-Release-Scan läuft...\n\
 cms-toast-scan-done = crates.io-Release-Katalog aktualisiert\n\
 cms-msg-scan-failed = Scan fehlgeschlagen.\n\
 cms-msg-refreshing-models = Live-Modelle über konfigurierte Inferenzanbieter werden aktualisiert...\n\
 cms-toast-models-refreshed = Live-Anbietermodelle aktualisiert\n\
-cms-msg-generating-proposal = OpenCode- & Inferenz-Analyse für Vorschlag läuft...\n\
+cms-msg-generating-proposal = Aktive Inferenz-Analyse für Vorschlag läuft...\n\
 cms-toast-proposal-generated = Reifegrad-Vorschlag erstellt\n\
 cms-toast-proposal-updated = Vorschlagsstatus aktualisiert\n\
 cms-toast-tool-added = Tool zum Reifegrad-Katalog hinzugefügt\n\
@@ -1918,11 +1890,12 @@ nav-sign-in = Sign in\n\
 nav-toggle-menu = Toggle navigation menu\n\
 nav-privacy = Privacy Policy\n\
 nav-terms = Terms of Service\n\
-live-connection-title = Global Neon SSE Real-Time Connection\n\
+live-connection-title = Global Real-Time Stream Connection\n\
 ui-lang-aria = App Output Language\n\
 input-lang-aria = Writing Input Language\n\
 notifications-aria = Notifications\n\
 switch-persona = Switch Persona\n\
+create-personas-prompt = Create Personas in your Profile\n\
 default-persona-label = Default Persona\n\
 active-badge = Active\n\
 mark-all-read = Mark all read\n\
@@ -1970,9 +1943,9 @@ slide-1-body = Every creative unit—character profiles, lore notes, plot beats,
 slide-2-title = Multi-Persona Pen Names\n\
 slide-2-body = Writers manage distinct pen names and avatars under one verified account, switching active personas seamlessly across collaborative manuscripts and publishing channels.\n\
 slide-3-title = Web & Local-First Sync\n\
-slide-3-body = Work online in the browser backed by Neon PostgreSQL or synchronize end-to-end encrypted local workspaces across Linux, macOS, Windows, Android, and iOS.\n\
+slide-3-body = Work online in the browser backed by managed PostgreSQL or synchronize end-to-end encrypted local workspaces across Linux, macOS, Windows, Android, and iOS.\n\
 slide-4-title = User-Controlled Connected Apps & Revocation\n\
-slide-4-body = External integrations such as Google Drive remain strictly optional and separated from primary sign-in. Users can inspect active permissions or disconnect and revoke provider tokens anytime from Settings without losing access to ExoNovel.\n\
+slide-4-body = External integrations such as Google Drive remain strictly optional and separated from primary sign-in. Users can inspect active permissions or disconnect and revoke provider tokens anytime from Preferences without losing access to ExoNovel.\n\
 landing-formats-title = Supported Authoring & Publication Formats\n\
 landing-formats-sub = Structured planning dimensions and publication layouts tailored to five core writing disciplines.\n\
 format-novel-title = Novels\n\
@@ -2014,7 +1987,7 @@ privacy-s1-intro = We collect only the information needed to authenticate your a
 privacy-s1-google-label = Google Sign-In Account Data (openid, email, profile): \n\
 privacy-s1-google-body = When you sign in with Google, we receive your verified email address, email verification status, display name, given and family name, profile picture URL, locale, and Google provider account identifier.\n\
 privacy-s1-drive-label = Optional Connected Google Drive Data: \n\
-privacy-s1-drive-body = Primary sign-in never requests Google Drive permissions. Only if you explicitly connect Google Drive inside ExoNovel's Workspace or Settings does ExoNovel request Google Drive authorization to list folders, create or rename backup folders, upload your exported Markdown documentation/manuscript archives or session transcripts, and restore or trash files you select inside the Drive Workspace.\n\
+privacy-s1-drive-body = Primary sign-in never requests Google Drive permissions. Only if you explicitly connect Google Drive inside ExoNovel's Workspace or Preferences does ExoNovel request Google Drive authorization to list folders, create or rename backup folders, upload your exported Markdown documentation/manuscript archives or session transcripts, and restore or trash files you select inside the Drive Workspace.\n\
 privacy-s1-profile-label = Other Sign-In & Author Profile Information: \n\
 privacy-s1-profile-body = If you sign in with GitHub or email/password, or customize your workspace, we store your display name, pen name/handle, biography, website, location, preferred publication format, output and input language preferences, timezone, notification preferences, uploaded avatar images (processed server-side into 64px, 256px, and 1024px WebP/JPEG variants), and your cryptographic public key / did:peer identity.\n\
 privacy-s1-works-label = Manuscripts & Collaboration Records: \n\
@@ -2022,13 +1995,13 @@ privacy-s1-works-body = Creative works, story bibles, personas, collaboration gr
 privacy-s1-sec-label = Security & Technical Diagnostics: \n\
 privacy-s1-sec-body = Sign-in timestamps, IP address, browser User-Agent string, and application health/error logs used strictly to protect accounts against unauthorized access and keep the service reliable.\n\
 privacy-s2-title = 2. Cookies & Browser Storage\n\
-privacy-s2-body = ExoNovel uses strictly necessary authentication cookies (HttpOnly session cookies managed through Neon Auth) to maintain your signed-in session, and temporary browser sessionStorage strictly to preserve pending collaboration invite codes across OAuth redirects. ExoNovel does not use third-party advertising cookies, behavioral tracking pixels, or cross-site ad networks.\n\
+privacy-s2-body = ExoNovel uses strictly necessary HttpOnly authentication session cookies to maintain your signed-in session, and temporary browser session storage strictly to preserve pending collaboration invite codes across sign-in redirects. ExoNovel does not use third-party advertising cookies, behavioral tracking pixels, or cross-site ad networks.\n\
 privacy-s3-title = 3. How We Use Your Information\n\
 privacy-s3-li1 = Authenticate your session and resolve your authoritative did:peer identity across Web, Desktop, and Mobile modes.\n\
-privacy-s3-li2 = Display your chosen author persona, pen name, avatar, and language settings (including right-to-left layout preferences).\n\
+privacy-s3-li2 = Display your chosen author persona, pen name, avatar, and language preferences (including right-to-left layout preferences).\n\
 privacy-s3-li3 = Operate collaborative story groups, contributor attribution, and group/referral invitations you initiate.\n\
 privacy-s3-li4 = Execute user-initiated backups or exports to your connected Google Drive workspace when you explicitly trigger them.\n\
-privacy-s3-li5 = Deliver transactional, security, and notification emails you enable via Brevo (sent from notes@exosystems.net, noreply@exosystems.net, or support@exosystems.net).\n\
+privacy-s3-li5 = Deliver transactional, security, and notification emails you enable (sent from notes@exosystems.net, noreply@exosystems.net, or support@exosystems.net).\n\
 privacy-s3-li6 = Prevent fraud, abuse, unauthorized access, and violations of our Terms of Service.\n\
 privacy-s4-title = 4. Google API Services User Data Policy (Limited Use) & AI / Content Restrictions\n\
 privacy-s4-intro = ExoNovel's use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements.\n\
@@ -2040,11 +2013,11 @@ privacy-s4-li3-label = No Image Generation & Zero Tolerance for AI NCII: \n\
 privacy-s4-li3-body = ExoNovel is a text-based writing and publishing platform. It does not generate images, video, or audio, and strictly prohibits using ExoNovel or any connected Google APIs for AI-generated Non-Consensual Intimate Imagery (AI NCII).\n\
 privacy-s4-li4-label = Human Access Restrictions: \n\
 privacy-s4-li4-body = Exosystems personnel do not read your private Google Drive files or private manuscripts unless (a) you explicitly grant consent for support debugging, (b) it is necessary for security or abuse investigation, or (c) it is required to comply with applicable law.\n\
-privacy-s5-title = 5. Data Storage, Subprocessors & Cryptographic Protection\n\
-privacy-s5-body = All traffic to ExoNovel is encrypted in transit using HTTPS/TLS. Hosted web records and account state are stored in Neon PostgreSQL and Neon Managed Auth, hosted on enterprise cloud application infrastructure, with email delivery handled by Brevo. When optional Connected External App offline tokens are stored server-side, they are envelope-encrypted via HashiCorp Vault Transit KMS and isolated from primary login credentials. On device-native installations using peer-to-peer Willow and iroh relay synchronization, payloads are end-to-end encrypted on your device so relay servers remain cryptographically blind to relayed content.\n\
+privacy-s5-title = 5. Data Storage, Security & Cryptographic Protection\n\
+privacy-s5-body = All traffic to ExoNovel is encrypted in transit using HTTPS/TLS. Hosted web records and account state are stored in managed PostgreSQL databases and managed authentication services on enterprise cloud infrastructure, alongside transactional email delivery. When optional Connected External App offline tokens are stored server-side, they are envelope-encrypted via dedicated key management encryption and isolated from primary login credentials. On device-native installations using peer-to-peer Willow and iroh relay synchronization, payloads are end-to-end encrypted on your device so relay servers remain cryptographically blind to relayed content.\n\
 privacy-s6-title = 6. How to Revoke Access, Export & Delete Your Data\n\
 privacy-s6-li1-label = Disconnect & Revoke Google Access Anytime: \n\
-privacy-s6-li1-body = You can disconnect Google Drive or other optional Connected Apps inside ExoNovel Settings -> Connected Apps (which revokes active tokens directly through https://oauth2.googleapis.com/revoke without closing your primary ExoNovel account), or revoke access anytime in your Google Account Permissions at https://myaccount.google.com/permissions.\n\
+privacy-s6-li1-body = You can disconnect Google Drive or other optional Connected Apps inside ExoNovel Preferences -> Connected Apps (which revokes active tokens directly through https://oauth2.googleapis.com/revoke without closing your primary ExoNovel account), or revoke access anytime in your Google Account Permissions at https://myaccount.google.com/permissions.\n\
 privacy-s6-li2-label = Export & Account Deletion Requests: \n\
 privacy-s6-li2-body = You may request a complete export or permanent deletion of your ExoNovel account, Google OAuth profile metadata, personas, avatar assets, and hosted workspace records by emailing support@exosystems.net or exonomyapp@gmail.com. Verified deletion requests are completed within 30 days and remove active personal data from our hosted database and OAuth token store.\n\
 privacy-s7-title = 7. Data Retention, Children's Privacy & Policy Updates\n\
@@ -2056,7 +2029,7 @@ terms-effective = Effective Date & Last Updated: November 24, 2026\n\
 terms-heading = ExoNovel Terms of Service\n\
 terms-intro = By accessing or using ExoNovel (https://exonovel.exosystems.net), operated by Exosystems (https://exosystems.net), you agree to be bound by these Terms of Service and our Privacy Policy (/privacy).\n\
 terms-s1-title = 1. Ownership of Your Creative Works\n\
-terms-s1-body = You retain full ownership and copyright of all manuscripts, stories, characters, worldbuilding notes, scripts, poetry, annotations, and creative assets you write or publish on ExoNovel. You grant ExoNovel only the limited technical license necessary to store, render, synchronize, back up (when directed by you), and transmit your content according to your workspace and collaboration settings.\n\
+terms-s1-body = You retain full ownership and copyright of all manuscripts, stories, characters, worldbuilding notes, scripts, poetry, annotations, and creative assets you write or publish on ExoNovel. You grant ExoNovel only the limited technical license necessary to store, render, synchronize, back up (when directed by you), and transmit your content according to your workspace and collaboration preferences.\n\
 terms-s2-title = 2. Accounts, Keys & Acceptable Use\n\
 terms-s2-body = You are responsible for safeguarding your login credentials and sovereign did:peer device keys. You must be at least 13 years old (or the minimum legal age in your jurisdiction) to create an account. You agree not to interfere with platform security, attempt unauthorized access to other users' workspaces, distribute malware, or send automated spam.\n\
 terms-s3-title = 3. Prohibited Content & Google APIs Terms of Service Compliance\n\
@@ -2066,11 +2039,11 @@ terms-s3-li1-body = You may not use ExoNovel or any connected Google APIs (inclu
 terms-s3-li2-label = Unlawful & Abusive Material: \n\
 terms-s3-li2-body = Child sexual abuse material (CSAM), non-consensual intimate imagery, harassment, hate incitement, and copyright infringement are strictly prohibited and result in immediate account suspension and termination.\n\
 terms-s4-title = 4. Connected External Apps (Google Drive & Third-Party Services)\n\
-terms-s4-body = Optional integrations such as Google Drive backup are activated only upon your explicit authorization and may be disconnected or revoked at any time in ExoNovel Settings -> Connected Apps or via your third-party provider's account security page. Your use of third-party services remains subject to their respective terms.\n\
+terms-s4-body = Optional integrations such as Google Drive backup are activated only upon your explicit authorization and may be disconnected or revoked at any time in ExoNovel Preferences -> Connected Apps or via your third-party provider's account security page. Your use of third-party services remains subject to their respective terms.\n\
 terms-s5-title = 5. Service Modes, Availability & Contact\n\
 terms-s5-body = ExoNovel provides hosted web collaboration, local-first device storage, and optional cloud-relay sync plans. Features are provided on an 'as available' basis as the platform evolves. For legal, safety, billing, or support inquiries, contact support@exosystems.net or exonomyapp@gmail.com.\n\
-settings-subtitle = Technical preferences, languages, operating modes, and delivery channels (all commercial purchases & subscriptions stay in Profile).\n\
-settings-nav-aria = Settings sections\n\
+preferences-subtitle = Account, language, operating mode, and notification delivery preferences (commercial purchases & subscriptions stay in Profile).\n\
+preferences-nav-aria = Preferences sections\n\
 sec-account = Account & Security\n\
 sec-connected-apps = Connected Apps & Google Docs\n\
 sec-appearance-langs = Appearance & Languages (29)\n\
@@ -2078,7 +2051,7 @@ sec-sync-storage = Sync & Storage (3 Modes)\n\
 sec-notifications = Notification Channels\n\
 sec-admin-allowlist = Docs Allowlist & Accounts\n\
 account-title = Account & Sovereign Identity\n\
-save-account-btn = Save Account Settings\n\
+save-account-btn = Save Account Preferences\n\
 upload-avatar-label = Upload Profile Photo (64px / 256px / 1024px WebP)\n\
 root-identity-label = Root Identity (did:peer)\n\
 display-name-label = Display Name\n\
@@ -2094,7 +2067,7 @@ format-opt-short = Short Stories\n\
 format-opt-screenplay = Screenplays\n\
 format-opt-poetry = Poetry\n\
 appearance-title = Theme & Dual Language Architecture\n\
-appearance-desc = Output UI Language controls menus and layout direction (auto RTL for Arabic and Hebrew). Default Input Language controls composers independently. All preferences save directly to Neon (zero browser localStorage).\n\
+appearance-desc = Output UI Language controls menus and layout direction (auto RTL for Arabic and Hebrew). Default Input Language controls composers independently and saves directly to your account.\n\
 theme-label = Theme Appearance\n\
 theme-opt-system = System\n\
 theme-opt-light = Light\n\
@@ -2105,7 +2078,7 @@ save-theme-lang-btn = Save Theme & Language Defaults\n\
 sync-title = Three Operating Modes & Cryptographic Blindness\n\
 sync-sub = Choose how ExoNovel stores and synchronizes your writing across Web and Device installs.\n\
 sync-m1-title = Mode 1 · ExoNovel on Web (Free)\n\
-sync-m1-desc = Cloud workspace backed by Neon Postgres with instant real-time updates across tabs.\n\
+sync-m1-desc = Cloud workspace backed by managed PostgreSQL with instant real-time updates across tabs.\n\
 sync-m2-title = Mode 2 · Sovereign Device (Free)\n\
 sync-m2-desc = 100% local Willow store on Windows, macOS, Linux, Android, and iOS. Includes free ExoNovel iroh discovery & blind relay transit.\n\
 sync-m3-title = Mode 3 · Web + Device Managed Sync\n\
@@ -2118,16 +2091,16 @@ sync-requires-sub = Mode 3 Managed Sync requires an active subscription managed 
 sync-manage-in-profile = Manage Subscription in Profile →\n\
 sync-save-toggle = Save Sync Toggle\n\
 notif-channels-title = Multi-Platform Delivery Channels\n\
-notif-brevo-prefix = Brevo Transactional Email (notes@exosystems.net)\n\
-notif-brevo-active = · Brevo API Key Active\n\
-notif-brevo-unset = · Configure BREVO_API_KEY in server env\n\
-notif-send-test = Send Test Notification & Brevo Email\n\
+notif-email-prefix = Transactional Email Service (notes@exosystems.net)\n\
+notif-email-active = · Email Delivery Active\n\
+notif-email-unset = · Transactional email credentials not configured\n\
+notif-send-test = Send Test Notification & Email\n\
 notif-in-app-title = In-App Live Feed & Bell\n\
-notif-in-app-desc = Instant delivery over the persistent SSE stream.\n\
+notif-in-app-desc = Instant delivery over the persistent real-time stream.\n\
 notif-web-push-title = Web Browser Notifications\n\
 notif-web-push-desc = Native OS banner via browser Notification API.\n\
 notif-native-push-title = Native Push Devices (Android UnifiedPush + FCM, iOS/macOS APNs, Windows WNS, Linux)\n\
-notif-email-title = Brevo Transactional Email (Notes from ExoNovel)\n\
+notif-email-title = Transactional Email (Notes from ExoNovel)\n\
 notif-digest-label = Email Digest Mode\n\
 notif-digest-instant = Instant Email\n\
 notif-digest-daily = Daily Digest\n\
@@ -2143,7 +2116,7 @@ device-platform-label = Platform\n\
 device-transport-label = Push Transport\n\
 device-label-field = Device Label\n\
 device-token-label = Endpoint URL or Device Token\n\
-device-token-ph = https://ntfy.sh/... or FCM/APNs token\n\
+device-token-ph = https://push.example.org/... or FCM/APNs token\n\
 device-register-btn = Register Push Endpoint\n\
 device-th-label = Label\n\
 device-th-platform = Platform\n\
@@ -2155,7 +2128,7 @@ device-plat-linux = Linux\n\
 device-plat-macos = macOS\n\
 device-plat-windows = Windows\n\
 device-plat-web = Web Browser\n\
-device-tr-unifiedpush = UnifiedPush (Open Standard / ntfy)\n\
+device-tr-unifiedpush = UnifiedPush (Open Standard)\n\
 device-tr-fcm = FCM (Firebase Cloud Messaging)\n\
 device-tr-apns = APNs (Apple Push Notification service)\n\
 device-tr-wns = WNS (Windows Push Notification Services)\n\
@@ -2178,19 +2151,19 @@ admin-th-provider = Provider\n\
 admin-display-name-ph = Display Name\n\
 admin-pen-name-ph = Pen Name\n\
 admin-save-account-btn = Save Account Changes\n\
-settings-msg-avatar-size = Avatar file must be 2 MB or smaller.\n\
-settings-msg-avatar-processing = Processing avatar derivatives...\n\
-settings-msg-avatar-saved = Avatar saved.\n\
-settings-msg-saved = Settings saved to Neon.\n\
-settings-toast-saved = Settings saved\n\
-settings-toast-notif-saved = Notification channels updated\n\
-settings-toast-device-reg = Push device registered\n\
-settings-toast-test-sent = Test notification & Brevo email dispatched\n\
-settings-msg-allowlist-updated = Allowlist updated.\n\
-settings-toast-tier-updated = Allowlist tier updated\n\
-settings-toast-entry-removed = Allowlist entry removed\n\
-settings-msg-account-updated = Account updated.\n\
-settings-toast-perm = Browser notification permission:\n\
+preferences-msg-avatar-size = Avatar file must be 2 MB or smaller.\n\
+preferences-msg-avatar-processing = Processing avatar derivatives...\n\
+preferences-msg-avatar-saved = Avatar saved.\n\
+preferences-msg-saved = Preferences saved.\n\
+preferences-toast-saved = Preferences saved\n\
+preferences-toast-notif-saved = Notification channels updated\n\
+preferences-toast-device-reg = Push device registered\n\
+preferences-toast-test-sent = Test notification & email dispatched\n\
+preferences-msg-allowlist-updated = Allowlist updated.\n\
+preferences-toast-tier-updated = Allowlist tier updated\n\
+preferences-toast-entry-removed = Allowlist entry removed\n\
+preferences-msg-account-updated = Account updated.\n\
+preferences-toast-perm = Browser notification permission:\n\
 connected-apps-title = Connected Apps & Google Docs\n\
 connected-apps-desc = Primary sign-in uses minimal identity scopes only (openid, email, profile). Connect Google Drive & Google Docs separately here to create, preview, and back up your Markdown manuscripts and ADRs into Google Docs or .md files.\n\
 google-drive-docs-title = Google Drive & Google Docs\n\
@@ -2209,8 +2182,8 @@ conn-auth-acct-fallback = Authorized Google account\n\
 conn-drive-optional-desc = Optional per-file authorization (drive.file) to create Google Docs, save .md backups, and browse ExoNovel Docs.\n\
 conn-revoke-confirm-msg = Revoke ExoNovel's Google Drive & Docs OAuth tokens? This disconnects Drive backups without affecting your main ExoNovel sign-in.\n\
 conn-revoke-confirm-btn = Confirm Revoke\n\
-conn-redirect-configured = OAuth Redirect URI (Registered with Google Cloud)\n\
-conn-redirect-missing = Server OAuth Credentials Required (GOOGLE_OAUTH_CLIENT_ID / SECRET)\n\
+conn-redirect-configured = OAuth Redirect URI (Configured with Provider)\n\
+conn-redirect-missing = Server Google OAuth Credentials Required\n\
 conn-copy-uri-btn = Copy URI\n\
 conn-toast-uri-copied = Redirect URI copied\n\
 drive-ws-title = Google Docs & Drive Workspace\n\
@@ -2336,11 +2309,11 @@ wallet-rail-btc = Bitcoin Lightning (L402)\n\
 wallet-rail-eth = Base / Arbitrum / Ethereum\n\
 wallet-rail-mobile = Mobile Money / PIX / UPI\n\
 wallet-free-title = Free Modes (1 & 2)\n\
-wallet-free-desc = Web Neon App or Device Local Willow Store + Free Discovery Relay\n\
+wallet-free-desc = Cloud Web App or Device Local Willow Store + Free Discovery Relay\n\
 wallet-free-current = Current Plan (Free)\n\
 wallet-free-switch = Switch to Free\n\
 wallet-mo-title = Sync Monthly ($9/mo eq.)\n\
-wallet-mo-desc = Authorizes Mode 3 Settings toggle & blind Meadowcap replication.\n\
+wallet-mo-desc = Authorizes Mode 3 Preferences toggle & blind Meadowcap replication.\n\
 wallet-mo-active = Active Monthly\n\
 wallet-mo-activate = Activate $9/month\n\
 wallet-yr-title = Sync Annual ($90/yr eq.)\n\
@@ -2370,7 +2343,7 @@ persona-handle-label = Handle\n\
 persona-bio-label = Bio\n\
 persona-create-btn = Create Persona\n\
 langs-quick-title = Personal Quick-Switch Languages\n\
-langs-quick-sub = Choose which of the 29 supported languages appear in your compact top-bar UI switcher and your writing composer Input switcher. All 29 remain available in Settings.\n\
+langs-quick-sub = Choose which of the 29 supported languages appear in your compact top-bar UI switcher and your writing composer Input switcher. All 29 remain available in Preferences.\n\
 langs-pinned-ui-label = Pinned Output UI Languages\n\
 langs-pinned-input-label = Pinned Composer Input Languages\n\
 langs-save-btn = Save Quick-Switch Language Lists\n\
@@ -2397,7 +2370,7 @@ profile-toast-group-created = Group created\n\
 profile-toast-role-updated = Member role updated\n\
 profile-toast-invite-copied = Invite link copied\n\
 profile-toast-plan-updated = Sync plan updated\n\
-profile-toast-langs-saved = Language quick-switchers saved to Neon\n\
+profile-toast-langs-saved = Language quick-switchers saved\n\
 profile-toast-notif-saved = Activity notification preferences saved\n\
 cms-all = All\n\
 cms-on-hold = On Hold\n\
@@ -2406,7 +2379,7 @@ cms-accepted = Accepted\n\
 cms-proposed = Proposed\n\
 cms-search-placeholder = Search ADRs...\n\
 cms-sidebar-title = MADR 4.0.0 CMS\n\
-cms-records-count-suffix = records in Neon\n\
+cms-records-count-suffix = records\n\
 cms-hide = Hide\n\
 cms-show-explorer = Show Explorer\n\
 cms-read-adr = Read ADR\n\
@@ -2453,7 +2426,7 @@ cms-field-context = Context and Problem Statement\n\
 cms-field-drivers = Decision Drivers\n\
 cms-field-outcome = Decision Outcome\n\
 cms-field-raw-md = Full Markdown (optional override)\n\
-cms-save-adr-btn = Save ADR to Neon\n\
+cms-save-adr-btn = Save ADR\n\
 cms-status-opt-proposed = proposed\n\
 cms-status-opt-on-hold = on-hold (awaiting tooling)\n\
 cms-status-opt-ready = ready-to-build\n\
@@ -2477,7 +2450,7 @@ cms-add-tool-ver-ph = Installed version\n\
 cms-add-tool-purpose-ph = Why ExoNovel depends on it\n\
 cms-add-tool-btn = Add Tool\n\
 cms-ai-providers-title = AI Inference Providers & Active Models\n\
-cms-ai-providers-sub = Configured OpenCode CLI runtime and verified active provider models available in this environment.\n\
+cms-ai-providers-sub = Configured local CLI runtime and verified active provider models available in this environment.\n\
 cms-refresh-models = Refresh Live Models\n\
 cms-ai-empty = No active inference providers configured in this environment.\n\
 cms-model-deprecated = Deprecated\n\
@@ -2497,7 +2470,7 @@ cms-proposal-dismiss = Dismiss\n\
 cms-proposal-reopen = Reopen\n\
 cms-proposal-rationale = Diagnostics / Rationale:\n\
 cms-owner-tasks-title = External Owner & Ops Checklist\n\
-cms-owner-tasks-sub = Tasks that require external consoles or production server access outside AI Studio. Check a box when done—state persists directly in Neon PostgreSQL so ExoNovel always tracks what remains.\n\
+cms-owner-tasks-sub = Tasks requiring external consoles or production server configuration. Check a box when done to persist completion state in the database.\n\
 cms-task-done = Done\n\
 cms-task-pending = Pending\n\
 cms-msg-redirecting-google = Redirecting to Google consent screen...\n\
@@ -2508,19 +2481,19 @@ cms-toast-saved-drive = Saved to Google Docs / Drive\n\
 cms-msg-backing-up-archive = Backing up full ExoNovel Docs & ADR archive to Google Drive (this may take a moment)...\n\
 cms-msg-archive-failed = Archive backup failed.\n\
 cms-toast-archive-backed-up = Archive backed up to Google Drive\n\
-cms-toast-task-done = Task marked complete in Neon\n\
+cms-toast-task-done = Task marked complete\n\
 cms-toast-task-reopened = Task reopened\n\
 cms-toast-task-failed = Failed to update task\n\
-cms-msg-saving-adr = Saving MADR 4.0.0 record to Neon...\n\
+cms-msg-saving-adr = Saving MADR 4.0.0 record...\n\
 cms-msg-missing-token = Missing session token.\n\
-cms-toast-adr-saved = ADR saved to Neon CMS\n\
+cms-toast-adr-saved = ADR saved to CMS\n\
 cms-toast-dep-linked = Tooling dependency linked to ADR\n\
 cms-msg-scanning-crates = Running deterministic crates.io release scan...\n\
 cms-toast-scan-done = crates.io release catalog updated\n\
 cms-msg-scan-failed = Scan failed.\n\
 cms-msg-refreshing-models = Refreshing live /v1/models across configured inference runtimes...\n\
 cms-toast-models-refreshed = Live provider models refreshed\n\
-cms-msg-generating-proposal = Running OpenCode & active inference proposal analysis...\n\
+cms-msg-generating-proposal = Running active inference proposal analysis...\n\
 cms-toast-proposal-generated = Maturity proposal note generated\n\
 cms-toast-proposal-updated = Proposal status updated\n\
 cms-toast-tool-added = Tool added to Maturity Catalog\n\
@@ -2539,14 +2512,13 @@ pub fn render_ftl_pack(code: &str) -> Option<String> {
          nav-workspace = {nav_workspace}\n\
          nav-docs = {nav_docs}\n\
          nav-profile = {nav_profile}\n\
-         nav-settings = {nav_settings}\n\
+         nav-preferences = {nav_preferences}\n\
          nav-sign-out = {nav_sign_out}\n\
-         welcome-prefix = {welcome_prefix}\n\
          ui-lang-label = {ui_lang_label}\n\
          input-lang-label = {input_lang_label}\n\
          live-sync-label = {live_sync_label}\n\
          profile-title = {profile_title}\n\
-         settings-title = {settings_title}\n\
+         preferences-title = {preferences_title}\n\
          notifications-title = {notifications_title}\n\
          save-label = {save_label}\n\
          back-to-home = {nav_home}\n\
@@ -2558,14 +2530,13 @@ pub fn render_ftl_pack(code: &str) -> Option<String> {
         nav_workspace = seed.nav_workspace,
         nav_docs = seed.nav_docs,
         nav_profile = seed.nav_profile,
-        nav_settings = seed.nav_settings,
+        nav_preferences = seed.nav_preferences,
         nav_sign_out = seed.nav_sign_out,
-        welcome_prefix = seed.welcome_prefix,
         ui_lang_label = seed.ui_lang_label,
         input_lang_label = seed.input_lang_label,
         live_sync_label = seed.live_sync_label,
         profile_title = seed.profile_title,
-        settings_title = seed.settings_title,
+        preferences_title = seed.preferences_title,
         notifications_title = seed.notifications_title,
         save_label = seed.save_label,
         extra = extra,

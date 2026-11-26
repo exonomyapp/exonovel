@@ -15,7 +15,7 @@ Die produktive ExoNovel-Anwendung—inklusive des integrierten privaten **Doku-R
 - **Full-Stack Rust & Leptos (`cargo-leptos` + Axum, Familie `0.8`)**:
   - **Rekursionslimit (`#![recursion_limit = "512"]`)**: In `crates/frontend`, `crates/app` und `crates/server` gesetzt, weil tief verschachtelte Leptos-`view!`-Makros das Standardlimit (`128`) von `rustc` überschreiten.
   - **Crate-Aufbau**: `crates/app` (gemeinsame UI + Router), `crates/frontend` (WASM-Hydrierung), `crates/server` (nativer Axum-Server unter `127.0.0.1:3001`).
-  - **Build- & Paket-Pipeline**: GitHub Actions baut und testet auf `ubuntu-latest` (`exonovel-server` + `site/` + `docs/` + `AGENTS.md`) und überträgt das fertige Paket nach `/opt/exonovel` auf den Produktionsserver.
+  - **Build- & Paket-Pipeline**: GitHub Actions baut und testet auf CI-Runnern (`exonovel-server` + `site/` + `docs/` + `AGENTS.md`) und überträgt das fertige Paket in das Produktions-Anwendungsverzeichnis auf dem Produktionsserver.
 - **Native Rust-Anbindungen**:
   - **Neon PostgreSQL** via `sqlx` (`DATABASE_URL` / `DATABASE_URL_UNPOOLED`), **Neon Object Storage** via S3-API, **Neon Managed Better Auth** via JWKS (`jsonwebtoken`) und **dezentrale Identität/Sync** via `ed25519-dalek`, `willow25` und `iroh`.
 

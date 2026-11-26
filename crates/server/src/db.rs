@@ -1282,7 +1282,7 @@ pub async fn update_user_profile(
     }
     if let Some(tab) = &input.last_active_tab {
         let v = tab.trim();
-        if !["workspace", "docs", "profile", "settings"].contains(&v) {
+        if !["workspace", "docs", "profile", "preferences"].contains(&v) {
             return Err("Unsupported tab identifier.".to_string());
         }
     }

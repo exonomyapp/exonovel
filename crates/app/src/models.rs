@@ -420,7 +420,7 @@ pub struct NotificationsListResponse {
 pub struct NotificationPrefsResponse {
     pub preferences: NotificationPreferences,
     pub devices: Vec<NotificationDevice>,
-    pub brevo_configured: bool,
+    pub email_configured: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -506,7 +506,7 @@ pub enum ActiveTab {
     Workspace,
     Docs,
     Profile,
-    Settings,
+    Preferences,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -603,7 +603,7 @@ pub struct DriveBackupResponse {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SettingsSection {
+pub enum PreferencesSection {
     Account,
     ConnectedApps,
     AppearanceAndLanguages,
@@ -661,7 +661,7 @@ impl AppearanceMode {
     }
 }
 
-pub async fn fetch_neon_jwt(auth_url: &str, verifier: Option<&str>) -> Option<String> {
+pub async fn fetch_session_jwt(auth_url: &str, verifier: Option<&str>) -> Option<String> {
     let base = auth_url.trim_end_matches('/');
     if let Some(v) = verifier {
         let session_url = format!("{base}/get-session?neon_auth_session_verifier={v}");
@@ -695,7 +695,7 @@ pub async fn resolve_fresh_jwt(
     let auth_url = auth_config.get_untracked().and_then(|c| c.auth_url);
     let fallback_jwt = initial_jwt.get_untracked();
     if let Some(url) = auth_url {
-        if let Some(fresh) = fetch_neon_jwt(&url, None).await {
+        if let Some(fresh) = fetch_session_jwt(&url, None).await {
             return Some(fresh);
         }
     }
@@ -706,7 +706,7 @@ pub async fn load_authenticated_user(
     auth_url: &str,
     verifier: Option<&str>,
 ) -> Option<(VerifiedUser, String)> {
-    let jwt = fetch_neon_jwt(auth_url, verifier).await?;
+    let jwt = fetch_session_jwt(auth_url, verifier).await?;
     let resp = Request::get("/api/me")
         .header("Authorization", &format!("Bearer {jwt}"))
         .send()
@@ -725,7 +725,7 @@ pub async fn save_profile_patch(
     patch: serde_json::Value,
 ) -> Result<ProfilePatchResponse, String> {
     let fresh = match auth_url {
-        Some(url) => fetch_neon_jwt(url, None).await,
+        Some(url) => fetch_session_jwt(url, None).await,
         None => None,
     };
     let Some(jwt) = fresh.or_else(|| fallback_jwt.map(str::to_string)) else {
@@ -755,7 +755,7 @@ pub async fn upload_avatar_file(
     persona_did: Option<String>,
 ) -> Result<AvatarUploadResponse, String> {
     let fresh = match auth_url {
-        Some(url) => fetch_neon_jwt(url, None).await,
+        Some(url) => fetch_session_jwt(url, None).await,
         None => None,
     };
     let Some(jwt) = fresh.or_else(|| fallback_jwt.map(str::to_string)) else {
@@ -837,7 +837,7 @@ pub async fn start_google_connect_flow(
     Ok(())
 }
 
-// Pre-auth temporary invite persistence uses sessionStorage only (zero localStorage across the app)
+// Pre-auth temporary invite persistence across OAuth redirects
 pub fn read_session_storage(key: &str) -> Option<String> {
     web_sys::window()
         .and_then(|w| w.session_storage().ok().flatten())
@@ -1122,27 +1122,6 @@ pub fn MonitorIcon() -> impl IntoView {
             <rect width="20" height="14" x="2" y="3" rx="2"/>
             <line x1="8" x2="16" y1="21" y2="21"/>
             <line x1="12" x2="12" y1="17" y2="21"/>
-        </svg>
-    }
-}
-
-#[component]
-pub fn MenuIcon() -> impl IntoView {
-    view! {
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <line x1="4" x2="20" y1="6" y2="6"/>
-            <line x1="4" x2="20" y1="12" y2="12"/>
-            <line x1="4" x2="20" y1="18" y2="18"/>
-        </svg>
-    }
-}
-
-#[component]
-pub fn CloseIcon() -> impl IntoView {
-    view! {
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <line x1="18" x2="6" y1="6" y2="18"/>
-            <line x1="6" x2="18" y1="6" y2="18"/>
         </svg>
     }
 }

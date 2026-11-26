@@ -403,7 +403,7 @@ pub fn DocsCmsView(
     };
 
     let toggle_owner_task = move |task_key: String, next_done: bool| {
-        let done_toast = i18n.tr_untracked("cms_toast_task_done", "Task marked complete in Neon");
+        let done_toast = i18n.tr_untracked("cms_toast_task_done", "Task marked complete");
         let reopened_toast = i18n.tr_untracked("cms_toast_task_reopened", "Task reopened");
         let failed_toast = i18n.tr_untracked("cms_toast_task_failed", "Failed to update task");
         let loc = i18n.ui_locale.get_untracked();
@@ -467,10 +467,10 @@ pub fn DocsCmsView(
         let active_locale = i18n.ui_locale.get_untracked();
         set_busy_msg.set(Some(i18n.tr_untracked(
             "cms_msg_saving_adr",
-            "Saving MADR 4.0.0 record to Neon...",
+            "Saving MADR 4.0.0 record...",
         )));
         let missing_tok = i18n.tr_untracked("cms_msg_missing_token", "Missing session token.");
-        let saved_toast = i18n.tr_untracked("cms_toast_adr_saved", "ADR saved to Neon CMS");
+        let saved_toast = i18n.tr_untracked("cms_toast_adr_saved", "ADR saved to CMS");
         let save_failed = i18n.tr_untracked("cms_msg_save_failed", "Save failed.");
         let payload = serde_json::json!({
             "id": form_id.get_untracked(),
@@ -612,7 +612,7 @@ pub fn DocsCmsView(
         let tool_key = selected_scan_tool.get_untracked();
         let gen_prefix = i18n.tr_untracked(
             "cms_msg_generating_proposal",
-            "Running OpenCode & active inference proposal analysis...",
+            "Running active inference proposal analysis...",
         );
         set_busy_msg.set(Some(format!("{gen_prefix} ({tool_key})")));
         let gen_toast = i18n.tr_untracked(
@@ -780,7 +780,7 @@ pub fn DocsCmsView(
                                 {move || format!(
                                     "{} {}",
                                     adrs.get().len(),
-                                    i18n.tr("cms_records_count_suffix", "records in Neon")
+                                    i18n.tr("cms_records_count_suffix", "records")
                                 )}
                             </div>
                         </div>
@@ -1427,7 +1427,7 @@ pub fn DocsCmsView(
                                         </div>
                                         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                                             <button type="submit" class="exo-btn exo-btn-primary">
-                                                {move || i18n.tr("cms_save_adr_btn", "Save ADR to Neon")}
+                                                {move || i18n.tr("cms_save_adr_btn", "Save ADR")}
                                             </button>
                                             <button
                                                 type="button"
@@ -1718,7 +1718,7 @@ pub fn DocsCmsView(
                                             <p class="exo-sub" style="margin: 4px 0 0;">
                                                 {move || i18n.tr(
                                                     "cms_ai_providers_sub",
-                                                    "Configured OpenCode CLI runtime and verified active provider models available in this environment."
+                                                    "Configured local CLI runtime and verified active provider models available in this environment."
                                                 )}
                                             </p>
                                         </div>
@@ -1787,7 +1787,7 @@ pub fn DocsCmsView(
                                     <p class="exo-sub" style="margin: 6px 0 18px;">
                                         {move || i18n.tr(
                                             "cms_owner_tasks_sub",
-                                            "Tasks that require external consoles or production server access outside AI Studio. Check a box when done—state persists directly in Neon PostgreSQL so ExoNovel always tracks what remains."
+                                            "Tasks requiring external consoles or production server configuration. Check a box when done to persist completion state in the database."
                                         )}
                                     </p>
 

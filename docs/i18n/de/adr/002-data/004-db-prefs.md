@@ -6,14 +6,14 @@ Status: Vorgeschlagen (zur Eigentümer-Prüfung)
 
 ## Kontext & Fragestellung
 
-ExoNovel authentifiziert über Neon Managed Better Auth und speichert Benutzereinstellungen in **Neon PostgreSQL (`user_profiles`)** (`appearance_mode`, `preferred_format`, `locale`, `timezone`, `active_persona_did`, `last_active_tab`, `last_doc_path`, Benachrichtigungs-Flags). Redundantes Schreiben in Browser-`localStorage` erzeugt Drift zwischen Geräten.
+ExoNovel authentifiziert über Neon Managed Better Auth und speichert Benutzerpräferenzen in **Neon PostgreSQL (`user_profiles`)** (`appearance_mode`, `preferred_format`, `locale`, `timezone`, `active_persona_did`, `last_active_tab`, `last_doc_path`, Benachrichtigungs-Flags). Redundantes Schreiben in Browser-`localStorage` erzeugt Drift zwischen Geräten.
 
 ## Antwort & Architekturentscheidung
 
-**Sobald eine Anmeldung vorliegt, ist Browser-`localStorage` für persistente Nutzereinstellungen überflüssig und schädlich.**
+**Sobald eine Anmeldung vorliegt, ist Browser-`localStorage` für persistente Nutzerpräferenzen überflüssig und schädlich.**
 
 ### 1. Einzige Wahrheitsquelle: Neon PostgreSQL (`user_profiles`)
-- Alle dauerhaften Einstellungen (`appearance_mode`, `ui_locale`, `default_input_locale`, `preferred_format`, `timezone`, `active_persona_did`, `last_active_tab`, `last_doc_path`, `docs_sidebar_collapsed`, `docs_sidebar_width`, `notify_prefs_json`) liegen ausschließlich in Neon PostgreSQL, werden mit `/api/me` geladen und über `PUT /api/profile` gespeichert.
+- Alle dauerhaften Präferenzen (`appearance_mode`, `ui_locale`, `default_input_locale`, `preferred_format`, `timezone`, `active_persona_did`, `last_active_tab`, `last_doc_path`, `docs_sidebar_collapsed`, `docs_sidebar_width`, `notify_prefs_json`) liegen ausschließlich in Neon PostgreSQL, werden mit `/api/me` geladen und über `PUT /api/profile` gespeichert.
 - Serverseitiges Rendering (`shell()` in `crates/server/src/main.rs`) injiziert `<html lang="..." dir="..." data-appearance="...">` ohne `localStorage`.
 
 ### 2. Strikte Vor-Authentifizierungs-Ausnahmen

@@ -6,7 +6,7 @@ mod i18n;
 mod live;
 mod models;
 mod profile;
-mod settings;
+mod preferences;
 
 use gloo_net::http::Request;
 use leptos::prelude::*;
@@ -26,13 +26,13 @@ use crate::{
         account_role_key, active_persona_for_user, copy_text_to_clipboard, detect_browser_timezone,
         display_name_for_user, is_safe_avatar_url, load_authenticated_user, read_session_storage,
         remove_session_storage, resolve_fresh_jwt, save_profile_patch, sleep_ms,
-        write_session_storage, ActiveTab, AppearanceMode, AuthConfigResponse, BellIcon, CloseIcon,
-        CopyIcon, GitHubLogoIcon, GoogleLogoIcon, InvitePreview, LocaleFlag, MenuIcon, MonitorIcon,
-        MoonIcon, NotificationItem, NotificationsListResponse, ProfilePatchResponse,
-        SettingsSection, SunIcon, VerifiedUser,
+        write_session_storage, ActiveTab, AppearanceMode, AuthConfigResponse, BellIcon, CopyIcon,
+        GitHubLogoIcon, GoogleLogoIcon, InvitePreview, LocaleFlag, MonitorIcon, MoonIcon,
+        NotificationItem, NotificationsListResponse, PreferencesSection, ProfilePatchResponse,
+        ProfileTab, SunIcon, VerifiedUser,
     },
+    preferences::PreferencesView,
     profile::ProfileView,
-    settings::SettingsView,
 };
 
 #[cfg(not(feature = "ssr"))]
@@ -151,14 +151,14 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
     let (chip_open, set_chip_open) = signal(false);
     let (bell_open, set_bell_open) = signal(false);
     let (lang_open, set_lang_open) = signal(false);
-    let (mobile_nav_open, set_mobile_nav_open) = signal(false);
     let (notifications, set_notifications) = signal::<Vec<NotificationItem>>(Vec::new());
     let (unread_count, set_unread_count) = signal(0_usize);
     let (toast_msg, set_toast_msg) = signal::<Option<String>>(None);
     let (toast_seq, set_toast_seq) = signal(0_u64);
     let (pending_invite, set_pending_invite) = signal::<Option<String>>(None);
     let (sse_started, set_sse_started) = signal(false);
-    let settings_initial_section = RwSignal::new(None::<SettingsSection>);
+    let preferences_initial_section = RwSignal::new(None::<PreferencesSection>);
+    let profile_initial_tab = RwSignal::new(None::<ProfileTab>);
     let (oauth_banner, set_oauth_banner) = signal::<Option<(bool, String)>>(None);
 
     let is_authenticated = Memo::new(move |_| current_user.get().is_some());
@@ -237,8 +237,8 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                     }
                     if let Some(tab_param) = params.get("tab") {
                         match tab_param.as_str() {
-                            "settings" => {
-                                set_active_tab.set(ActiveTab::Settings);
+                            "preferences" => {
+                                set_active_tab.set(ActiveTab::Preferences);
                                 should_clean = true;
                             }
                             "docs" => {
@@ -251,8 +251,8 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                     }
                     if let Some(sec_param) = params.get("section") {
                         if sec_param == "connected-apps" {
-                            settings_initial_section.set(Some(SettingsSection::ConnectedApps));
-                            set_active_tab.set(ActiveTab::Settings);
+                            preferences_initial_section.set(Some(PreferencesSection::ConnectedApps));
+                            set_active_tab.set(ActiveTab::Preferences);
                         }
                         params.delete("section");
                         should_clean = true;
@@ -309,7 +309,7 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
         }
     });
 
-    // Apply Theme Appearance cleanly to <html> WITHOUT touching localStorage
+    // Apply Theme Appearance cleanly to <html>
     Effect::new(move |_| {
         let mode = appearance.get();
         if let Some(root) = web_sys::window()
@@ -341,7 +341,7 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
         });
     };
 
-    // Start global Neon SSE listener once signed in & react to notification events
+    // Start global real-time stream listener once signed in & react to notification events
     Effect::new(move |_| {
         if is_authenticated.get() && !sse_started.get_untracked() {
             set_sse_started.set(true);
@@ -371,7 +371,7 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
 
     let navigate_to_subpage = move |dest: ActiveTab| {
         let current = active_tab.get_untracked();
-        if current != ActiveTab::Settings && current != ActiveTab::Profile {
+        if current != ActiveTab::Preferences && current != ActiveTab::Profile {
             let tab_to_save = match current {
                 ActiveTab::Docs => ActiveTab::Docs,
                 _ => ActiveTab::Workspace,
@@ -391,7 +391,6 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
         set_chip_open.set(false);
         set_bell_open.set(false);
         set_lang_open.set(false);
-        set_mobile_nav_open.set(false);
         set_active_tab.set(dest);
     };
 
@@ -517,7 +516,6 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
         set_chip_open.set(false);
         set_bell_open.set(false);
         set_lang_open.set(false);
-        set_mobile_nav_open.set(false);
         leptos::task::spawn_local(async move {
             if let Some(url) = auth_url {
                 let endpoint = format!("{}/sign-out", url.trim_end_matches('/'));
@@ -538,6 +536,17 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
 
     view! {
         <div class="exo-shell">
+            <Show when=move || chip_open.get() || bell_open.get() || lang_open.get()>
+                <div
+                    class="exo-nav-backdrop"
+                    on:click=move |_| {
+                        set_chip_open.set(false);
+                        set_bell_open.set(false);
+                        set_lang_open.set(false);
+                    }
+                />
+            </Show>
+
             <nav class="navbar-solid">
                 <a
                     href="/"
@@ -545,33 +554,16 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                     class="navbar-brand-link"
                     on:click=move |_| {
                         set_show_signin.set(false);
-                        set_mobile_nav_open.set(false);
+                        set_chip_open.set(false);
+                        set_bell_open.set(false);
+                        set_lang_open.set(false);
                     }
                 >
                     <img src="/exonovel-logo.png" alt="ExoNovel" class="navbar-logo navbar-logo-light" />
                     <img src="/exonovel-logo-dark.png" alt="ExoNovel" class="navbar-logo navbar-logo-dark" />
                 </a>
 
-                <button
-                    type="button"
-                    class="navbar-mobile-toggle"
-                    aria-label=move || i18n.tr("nav_toggle_menu", "Toggle navigation menu")
-                    aria-expanded=move || if mobile_nav_open.get() { "true" } else { "false" }
-                    on:click=move |_| {
-                        set_chip_open.set(false);
-                        set_bell_open.set(false);
-                        set_lang_open.set(false);
-                        set_mobile_nav_open.update(|v| *v = !*v);
-                    }
-                >
-                    {move || if mobile_nav_open.get() {
-                        view! { <CloseIcon /> }.into_any()
-                    } else {
-                        view! { <MenuIcon /> }.into_any()
-                    }}
-                </button>
-
-                <div class=move || if mobile_nav_open.get() { "navbar-menu navbar-menu-open" } else { "navbar-menu" }>
+                <div class="navbar-menu">
                     {move || match current_user.get() {
                         Some(user) => {
                             let can_read_docs = user.authorized;
@@ -584,7 +576,12 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                             };
                             let chip_initial = chip_name.chars().next().unwrap_or('W').to_uppercase().to_string();
                             let active_did_cmp = active_p.persona_did.clone();
-                            let personas_list = user.personas.clone();
+                            let other_personas: Vec<_> = user
+                                .personas
+                                .clone()
+                                .into_iter()
+                                .filter(|p| p.persona_did != active_did_cmp)
+                                .collect();
                             let pinned_ui_sv = StoredValue::new(
                                 user.profile
                                     .as_ref()
@@ -594,49 +591,49 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
 
                             view! {
                                 <>
-                                    <a href="https://exosystems.net/" class="nav-link" on:click=move |_| set_mobile_nav_open.set(false)>
-                                        {move || i18n.tr("nav_home", "Home")}
-                                    </a>
+                                    <div class="exo-desktop-nav-links">
+                                        <a href="https://exosystems.net/" class="nav-link">
+                                            {move || i18n.tr("nav_home", "Home")}
+                                        </a>
 
-                                    <button
-                                        type="button"
-                                        class=move || if active_tab.get() == ActiveTab::Workspace { "nav-link nav-link-active" } else { "nav-link" }
-                                        on:click=move |_| {
-                                            set_chip_open.set(false);
-                                            set_bell_open.set(false);
-                                            set_lang_open.set(false);
-                                            set_mobile_nav_open.set(false);
-                                            set_active_tab.set(ActiveTab::Workspace);
-                                            persist_profile_patch(serde_json::json!({ "lastActiveTab": "workspace" }));
-                                        }
-                                    >
-                                        {move || i18n.tr("nav_workspace", "ExoNovel")}
-                                    </button>
+                                        <button
+                                            type="button"
+                                            class=move || if active_tab.get() == ActiveTab::Workspace { "nav-link nav-link-active" } else { "nav-link" }
+                                            on:click=move |_| {
+                                                set_chip_open.set(false);
+                                                set_bell_open.set(false);
+                                                set_lang_open.set(false);
+                                                set_active_tab.set(ActiveTab::Workspace);
+                                                persist_profile_patch(serde_json::json!({ "lastActiveTab": "workspace" }));
+                                            }
+                                        >
+                                            {move || i18n.tr("nav_workspace", "ExoNovel")}
+                                        </button>
 
-                                    {if can_read_docs {
-                                        view! {
-                                            <button
-                                                type="button"
-                                                class=move || if active_tab.get() == ActiveTab::Docs { "nav-link nav-link-active" } else { "nav-link" }
-                                                on:click=move |_| {
-                                                    set_chip_open.set(false);
-                                                    set_bell_open.set(false);
-                                                    set_lang_open.set(false);
-                                                    set_mobile_nav_open.set(false);
-                                                    set_active_tab.set(ActiveTab::Docs);
-                                                    persist_profile_patch(serde_json::json!({ "lastActiveTab": "docs" }));
-                                                }
-                                            >
-                                                {move || i18n.tr("nav_docs", "Docs & ADRs")}
-                                            </button>
-                                        }.into_any()
-                                    } else {
-                                        view! { <span /> }.into_any()
-                                    }}
+                                        {if can_read_docs {
+                                            view! {
+                                                <button
+                                                    type="button"
+                                                    class=move || if active_tab.get() == ActiveTab::Docs { "nav-link nav-link-active" } else { "nav-link" }
+                                                    on:click=move |_| {
+                                                        set_chip_open.set(false);
+                                                        set_bell_open.set(false);
+                                                        set_lang_open.set(false);
+                                                        set_active_tab.set(ActiveTab::Docs);
+                                                        persist_profile_patch(serde_json::json!({ "lastActiveTab": "docs" }));
+                                                    }
+                                                >
+                                                    {move || i18n.tr("nav_docs", "Docs & ADRs")}
+                                                </button>
+                                            }.into_any()
+                                        } else {
+                                            view! { <span /> }.into_any()
+                                        }}
 
-                                    <div class="exo-live-indicator" title=move || i18n.tr("live_connection_title", "Global Neon SSE Real-Time Connection")>
-                                        <span class=move || if live.connected.get() { "exo-live-dot exo-live-dot-on" } else { "exo-live-dot" } />
-                                        <span>{move || i18n.tr("live_sync_label", "Live")}</span>
+                                        <div class="exo-live-indicator" title=move || i18n.tr("live_connection_title", "Global Real-Time Stream Connection")>
+                                            <span class=move || if live.connected.get() { "exo-live-dot exo-live-dot-on" } else { "exo-live-dot" } />
+                                            <span>{move || i18n.tr("live_sync_label", "Live")}</span>
+                                        </div>
                                     </div>
 
                                     <div class="exo-lang-wrap">
@@ -662,7 +659,7 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                                 view! {
                                                     <>
                                                         <LocaleFlag code=cur />
-                                                        <span>{name}</span>
+                                                        <span class="exo-lang-trigger-name">{name}</span>
                                                     </>
                                                 }
                                             }}
@@ -698,7 +695,6 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                                                     let next = code_click.clone();
                                                                     i18n.ui_locale.set(next.clone());
                                                                     set_lang_open.set(false);
-                                                                    set_mobile_nav_open.set(false);
                                                                     persist_profile_patch(serde_json::json!({ "uiLocale": next }));
                                                                 }
                                                             >
@@ -776,10 +772,38 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                         </Show>
                                     </div>
 
+                                    <span class="gadget-row">
+                                        <button
+                                            type="button"
+                                            class="ctl"
+                                            title=move || {
+                                                let m = appearance.get();
+                                                i18n.tr(m.label_key(), m.label())
+                                            }
+                                            aria-label=move || {
+                                                let m = appearance.get();
+                                                i18n.tr(m.label_key(), m.label())
+                                            }
+                                            on:click=move |_| {
+                                                let next = appearance.get_untracked().next();
+                                                set_appearance.set(next);
+                                                persist_profile_patch(serde_json::json!({ "appearanceMode": next.as_str() }));
+                                            }
+                                        >
+                                            {move || match appearance.get() {
+                                                AppearanceMode::Light => view! { <SunIcon /> }.into_any(),
+                                                AppearanceMode::Dark => view! { <MoonIcon /> }.into_any(),
+                                                AppearanceMode::System => view! { <MonitorIcon /> }.into_any(),
+                                            }}
+                                        </button>
+                                    </span>
+
                                     <div class="exo-user-chip-wrap">
                                         <button
                                             type="button"
                                             class="exo-user-chip"
+                                            aria-label=chip_name.clone()
+                                            aria-expanded=move || if chip_open.get() { "true" } else { "false" }
                                             on:click=move |_| {
                                                 set_bell_open.set(false);
                                                 set_lang_open.set(false);
@@ -791,77 +815,142 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                             } else {
                                                 view! { <div class="exo-avatar-sm">{chip_initial}</div> }.into_any()
                                             }}
-                                            <span>{chip_name}</span>
-                                            <span style="font-size: 14px; opacity: 0.8;">"▾"</span>
+                                            <span class="exo-user-chip-name">{chip_name}</span>
+                                            <span class="exo-user-chip-caret">"▾"</span>
                                         </button>
 
                                         <Show when=move || chip_open.get()>
                                             <div class="exo-chip-menu" role="menu">
+                                                <div class="exo-mobile-nav-section">
+                                                    <div class="exo-chip-menu-row">
+                                                        <span class="exo-live-indicator">
+                                                            <span class=move || if live.connected.get() { "exo-live-dot exo-live-dot-on" } else { "exo-live-dot" } />
+                                                            <span>{move || i18n.tr("live_sync_label", "Live")}</span>
+                                                        </span>
+                                                    </div>
+                                                    <a
+                                                        href="https://exosystems.net/"
+                                                        class="exo-chip-menu-item"
+                                                        on:click=move |_| set_chip_open.set(false)
+                                                    >
+                                                        <span>{move || i18n.tr("nav_home", "Home")}</span>
+                                                    </a>
+                                                    <button
+                                                        type="button"
+                                                        class=move || if active_tab.get() == ActiveTab::Workspace { "exo-chip-menu-item exo-chip-menu-item-active" } else { "exo-chip-menu-item" }
+                                                        on:click=move |_| {
+                                                            set_chip_open.set(false);
+                                                            set_active_tab.set(ActiveTab::Workspace);
+                                                            persist_profile_patch(serde_json::json!({ "lastActiveTab": "workspace" }));
+                                                        }
+                                                    >
+                                                        <span>{move || i18n.tr("nav_workspace", "ExoNovel")}</span>
+                                                    </button>
+                                                    {if can_read_docs {
+                                                        view! {
+                                                            <button
+                                                                type="button"
+                                                                class=move || if active_tab.get() == ActiveTab::Docs { "exo-chip-menu-item exo-chip-menu-item-active" } else { "exo-chip-menu-item" }
+                                                                on:click=move |_| {
+                                                                    set_chip_open.set(false);
+                                                                    set_active_tab.set(ActiveTab::Docs);
+                                                                    persist_profile_patch(serde_json::json!({ "lastActiveTab": "docs" }));
+                                                                }
+                                                            >
+                                                                <span>{move || i18n.tr("nav_docs", "Docs & ADRs")}</span>
+                                                            </button>
+                                                        }.into_any()
+                                                    } else {
+                                                        view! { <span /> }.into_any()
+                                                    }}
+                                                    <div class="exo-chip-menu-divider" />
+                                                </div>
+
                                                 <button
                                                     type="button"
                                                     class=move || if active_tab.get() == ActiveTab::Profile { "exo-chip-menu-item exo-chip-menu-item-active" } else { "exo-chip-menu-item" }
-                                                    on:click=move |_| navigate_to_subpage(ActiveTab::Profile)
+                                                    on:click=move |_| {
+                                                        profile_initial_tab.set(Some(ProfileTab::Overview));
+                                                        navigate_to_subpage(ActiveTab::Profile);
+                                                    }
                                                 >
                                                     <span>{move || i18n.tr("nav_profile", "Profile & Billing")}</span>
                                                 </button>
 
                                                 <div class="exo-chip-menu-divider" />
-                                                <div class="exo-chip-menu-label">{move || i18n.tr("switch_persona", "Switch Persona")}</div>
-                                                {personas_list.clone().into_iter().map(|p| {
-                                                    let p_did = p.persona_did.clone();
-                                                    let is_curr = p_did == active_did_cmp;
-                                                    let p_empty = p.display_name.is_empty();
-                                                    let p_raw = p.display_name.clone();
-                                                    let p_name = if p_empty {
-                                                        i18n.tr_untracked("default_persona_label", "Default Persona")
-                                                    } else {
-                                                        p.display_name.clone()
-                                                    };
-                                                    let p_avatar = if !p.avatar_thumb_url.is_empty() { p.avatar_thumb_url.clone() } else { p.avatar_url.clone() };
-                                                    let p_init = p_name.chars().next().unwrap_or('W').to_uppercase().to_string();
-                                                    let p_name_toast = p_name.clone();
+                                                {if other_personas.is_empty() {
                                                     view! {
-                                                        <button
-                                                            type="button"
-                                                            class=if is_curr { "exo-chip-menu-item exo-chip-menu-item-active" } else { "exo-chip-menu-item" }
-                                                            on:click=move |_| {
-                                                                set_chip_open.set(false);
-                                                                set_mobile_nav_open.set(false);
-                                                                persist_profile_patch(serde_json::json!({ "activePersonaDid": p_did.clone() }));
-                                                                let prefix = i18n.tr_untracked("toast_switched_persona", "Switched persona");
-                                                                show_toast(format!("{prefix}: {p_name_toast}"));
-                                                            }
-                                                        >
-                                                            <span style="display: inline-flex; align-items: center; gap: 8px; min-width: 0;">
-                                                                {if is_safe_avatar_url(&p_avatar) {
-                                                                    view! { <img src=p_avatar alt=p_name.clone() class="exo-avatar-sm" /> }.into_any()
-                                                                } else {
-                                                                    view! { <div class="exo-avatar-sm">{p_init}</div> }.into_any()
-                                                                }}
-                                                                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                                                    {move || if p_empty {
-                                                                        i18n.tr("default_persona_label", "Default Persona")
-                                                                    } else {
-                                                                        p_raw.clone()
-                                                                    }}
-                                                                </span>
+                                                        <div class="exo-chip-menu-row">
+                                                            <span class="exo-chip-menu-row-text">
+                                                                {move || i18n.tr("create_personas_prompt", "Create Personas in your Profile")}
                                                             </span>
-                                                            {if is_curr {
-                                                                view! { <span class="exo-tag exo-tag-accent">{move || i18n.tr("active_badge", "Active")}</span> }.into_any()
-                                                            } else {
-                                                                view! { <span /> }.into_any()
-                                                            }}
-                                                        </button>
-                                                    }
-                                                }).collect_view()}
+                                                            <button
+                                                                type="button"
+                                                                class="exo-btn exo-chip-menu-row-btn"
+                                                                on:click=move |_| {
+                                                                    profile_initial_tab.set(Some(ProfileTab::Personas));
+                                                                    navigate_to_subpage(ActiveTab::Profile);
+                                                                }
+                                                            >
+                                                                {move || i18n.tr("tab_personas", "Personas")}
+                                                            </button>
+                                                        </div>
+                                                    }.into_any()
+                                                } else {
+                                                    view! {
+                                                        <>
+                                                            <div class="exo-chip-menu-label">{move || i18n.tr("switch_persona", "Switch Persona")}</div>
+                                                            {other_personas.clone().into_iter().map(|p| {
+                                                                let p_did = p.persona_did.clone();
+                                                                let p_empty = p.display_name.is_empty();
+                                                                let p_raw = p.display_name.clone();
+                                                                let p_name = if p_empty {
+                                                                    i18n.tr_untracked("default_persona_label", "Default Persona")
+                                                                } else {
+                                                                    p.display_name.clone()
+                                                                };
+                                                                let p_avatar = if !p.avatar_thumb_url.is_empty() { p.avatar_thumb_url.clone() } else { p.avatar_url.clone() };
+                                                                let p_init = p_name.chars().next().unwrap_or('W').to_uppercase().to_string();
+                                                                let p_name_toast = p_name.clone();
+                                                                view! {
+                                                                    <button
+                                                                        type="button"
+                                                                        class="exo-chip-menu-item"
+                                                                        on:click=move |_| {
+                                                                            set_chip_open.set(false);
+                                                                            persist_profile_patch(serde_json::json!({ "activePersonaDid": p_did.clone() }));
+                                                                            let prefix = i18n.tr_untracked("toast_switched_persona", "Switched persona");
+                                                                            show_toast(format!("{prefix}: {p_name_toast}"));
+                                                                        }
+                                                                    >
+                                                                        <span style="display: inline-flex; align-items: center; gap: 8px; min-width: 0;">
+                                                                            {if is_safe_avatar_url(&p_avatar) {
+                                                                                view! { <img src=p_avatar alt=p_name.clone() class="exo-avatar-sm" /> }.into_any()
+                                                                            } else {
+                                                                                view! { <div class="exo-avatar-sm">{p_init}</div> }.into_any()
+                                                                            }}
+                                                                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                                                {move || if p_empty {
+                                                                                    i18n.tr("default_persona_label", "Default Persona")
+                                                                                } else {
+                                                                                    p_raw.clone()
+                                                                                }}
+                                                                            </span>
+                                                                        </span>
+                                                                    </button>
+                                                                }
+                                                            }).collect_view()}
+                                                        </>
+                                                    }.into_any()
+                                                }}
 
                                                 <div class="exo-chip-menu-divider" />
                                                 <button
                                                     type="button"
-                                                    class=move || if active_tab.get() == ActiveTab::Settings { "exo-chip-menu-item exo-chip-menu-item-active" } else { "exo-chip-menu-item" }
-                                                    on:click=move |_| navigate_to_subpage(ActiveTab::Settings)
+                                                    class=move || if active_tab.get() == ActiveTab::Preferences { "exo-chip-menu-item exo-chip-menu-item-active" } else { "exo-chip-menu-item" }
+                                                    on:click=move |_| navigate_to_subpage(ActiveTab::Preferences)
                                                 >
-                                                    <span>{move || i18n.tr("nav_settings", "Settings")}</span>
+                                                    <span>{move || i18n.tr("nav_preferences", "Preferences")}</span>
                                                 </button>
                                                 <button
                                                     type="button"
@@ -878,65 +967,57 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                         }
                         None => view! {
                             <>
-                                <a
-                                    href="/#overview"
-                                    class="nav-link"
-                                    on:click=move |_| {
-                                        set_show_signin.set(false);
-                                        set_mobile_nav_open.set(false);
-                                    }
-                                >
-                                    {move || i18n.tr("nav_overview", "Overview")}
-                                </a>
-                                <a
-                                    href="/#formats"
-                                    class="nav-link"
-                                    on:click=move |_| {
-                                        set_show_signin.set(false);
-                                        set_mobile_nav_open.set(false);
-                                    }
-                                >
-                                    {move || i18n.tr("nav_formats", "Formats")}
-                                </a>
+                                <div class="exo-desktop-nav-links">
+                                    <a
+                                        href="/#overview"
+                                        class="nav-link"
+                                        on:click=move |_| set_show_signin.set(false)
+                                    >
+                                        {move || i18n.tr("nav_overview", "Overview")}
+                                    </a>
+                                    <a
+                                        href="/#formats"
+                                        class="nav-link"
+                                        on:click=move |_| set_show_signin.set(false)
+                                    >
+                                        {move || i18n.tr("nav_formats", "Formats")}
+                                    </a>
+                                </div>
                                 <button
                                     type="button"
                                     class="exo-btn exo-btn-primary"
-                                    on:click=move |_| {
-                                        set_show_signin.set(true);
-                                        set_mobile_nav_open.set(false);
-                                    }
+                                    on:click=move |_| set_show_signin.set(true)
                                 >
                                     {move || i18n.tr("nav_sign_in", "Sign in")}
                                 </button>
+                                <span class="gadget-row">
+                                    <button
+                                        type="button"
+                                        class="ctl"
+                                        title=move || {
+                                            let m = appearance.get();
+                                            i18n.tr(m.label_key(), m.label())
+                                        }
+                                        aria-label=move || {
+                                            let m = appearance.get();
+                                            i18n.tr(m.label_key(), m.label())
+                                        }
+                                        on:click=move |_| {
+                                            let next = appearance.get_untracked().next();
+                                            set_appearance.set(next);
+                                            persist_profile_patch(serde_json::json!({ "appearanceMode": next.as_str() }));
+                                        }
+                                    >
+                                        {move || match appearance.get() {
+                                            AppearanceMode::Light => view! { <SunIcon /> }.into_any(),
+                                            AppearanceMode::Dark => view! { <MoonIcon /> }.into_any(),
+                                            AppearanceMode::System => view! { <MonitorIcon /> }.into_any(),
+                                        }}
+                                    </button>
+                                </span>
                             </>
                         }.into_any(),
                     }}
-
-                    <span class="gadget-row">
-                        <button
-                            type="button"
-                            class="ctl"
-                            title=move || {
-                                let m = appearance.get();
-                                i18n.tr(m.label_key(), m.label())
-                            }
-                            aria-label=move || {
-                                let m = appearance.get();
-                                i18n.tr(m.label_key(), m.label())
-                            }
-                            on:click=move |_| {
-                                let next = appearance.get_untracked().next();
-                                set_appearance.set(next);
-                                persist_profile_patch(serde_json::json!({ "appearanceMode": next.as_str() }));
-                            }
-                        >
-                            {move || match appearance.get() {
-                                AppearanceMode::Light => view! { <SunIcon /> }.into_any(),
-                                AppearanceMode::Dark => view! { <MoonIcon /> }.into_any(),
-                                AppearanceMode::System => view! { <MonitorIcon /> }.into_any(),
-                            }}
-                        </button>
-                    </span>
                 </div>
             </nav>
 
@@ -1002,6 +1083,7 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                     return_tab=return_tab
                                     on_copy_did=show_did_copied_toast
                                     on_toast=show_toast
+                                    initial_tab=profile_initial_tab
                                     on_back=move || {
                                         let dest = return_tab.get_untracked();
                                         let is_auth = current_user.get_untracked().is_some_and(|u| u.authorized);
@@ -1013,10 +1095,10 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                     }
                                 />
                             }.into_any(),
-                            ActiveTab::Settings => {
+                            ActiveTab::Preferences => {
                                 if let Some(user) = current_user.get_untracked() {
                                     view! {
-                                        <SettingsView
+                                        <PreferencesView
                                             auth_config=auth_config
                                             initial_jwt=session_jwt
                                             user=user
@@ -1025,7 +1107,10 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                             set_appearance=set_appearance
                                             on_copy_did=show_did_copied_toast
                                             on_toast=show_toast
-                                            on_open_profile_billing=move || navigate_to_subpage(ActiveTab::Profile)
+                                            on_open_profile_billing=move || {
+                                                profile_initial_tab.set(Some(ProfileTab::Overview));
+                                                navigate_to_subpage(ActiveTab::Profile);
+                                            }
                                             on_profile_updated=move |updated: ProfilePatchResponse| {
                                                 set_current_user.update(|u_opt| {
                                                     if let Some(u) = u_opt {
@@ -1035,7 +1120,7 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                                     }
                                                 });
                                             }
-                                            initial_section=settings_initial_section
+                                            initial_section=preferences_initial_section
                                             on_back=move || {
                                                 let dest = return_tab.get_untracked();
                                                 let is_auth = current_user.get_untracked().is_some_and(|u| u.authorized);
@@ -1058,11 +1143,14 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                         set_active_tab.set(ActiveTab::Docs);
                                         persist_profile_patch(serde_json::json!({ "lastActiveTab": "docs" }));
                                     }
-                                    on_open_profile=move || navigate_to_subpage(ActiveTab::Profile)
-                                    on_open_settings=move || navigate_to_subpage(ActiveTab::Settings)
+                                    on_open_profile=move || {
+                                        profile_initial_tab.set(Some(ProfileTab::Overview));
+                                        navigate_to_subpage(ActiveTab::Profile);
+                                    }
+                                    on_open_preferences=move || navigate_to_subpage(ActiveTab::Preferences)
                                     on_open_connected_apps=move || {
-                                        settings_initial_section.set(Some(SettingsSection::ConnectedApps));
-                                        navigate_to_subpage(ActiveTab::Settings);
+                                        preferences_initial_section.set(Some(PreferencesSection::ConnectedApps));
+                                        navigate_to_subpage(ActiveTab::Preferences);
                                     }
                                     on_copy_did=show_did_copied_toast
                                 />
@@ -1088,7 +1176,7 @@ fn WorkspaceHomeView(
     current_user: ReadSignal<Option<VerifiedUser>>,
     on_open_docs: impl Fn() + Copy + Send + Sync + 'static,
     on_open_profile: impl Fn() + Copy + Send + Sync + 'static,
-    on_open_settings: impl Fn() + Copy + Send + Sync + 'static,
+    on_open_preferences: impl Fn() + Copy + Send + Sync + 'static,
     on_open_connected_apps: impl Fn() + Copy + Send + Sync + 'static,
     on_copy_did: impl Fn(String) + Copy + Send + Sync + 'static,
 ) -> impl IntoView {
@@ -1113,9 +1201,7 @@ fn WorkspaceHomeView(
                 };
                 let did_copy = persona_did.clone();
                 let did_anim = persona_did.clone();
-                let avatar_url = persona.avatar_url.clone();
                 let handle = persona.handle.clone();
-                let initial = display_name.chars().next().unwrap_or('W').to_uppercase().to_string();
                 let can_read_docs = user.authorized;
                 let role_label = i18n.tr(account_role_key(&user.account_role), "User");
                 let sync_tier = user.profile.as_ref().map(|p| p.sync_plan_tier.clone()).unwrap_or_else(|| "free".to_string());
@@ -1123,31 +1209,20 @@ fn WorkspaceHomeView(
                 view! {
                     <>
                         <div class=move || format!("exo-card {}", live.anim_class("profile", &did_anim))>
-                            <div class="exo-home-hero">
-                                {if is_safe_avatar_url(&avatar_url) {
-                                    view! { <img src=avatar_url alt=display_name.clone() class="exo-avatar" /> }.into_any()
-                                } else {
-                                    view! { <div class="exo-avatar">{initial}</div> }.into_any()
-                                }}
-                                <div>
-                                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                        <h1 class="exo-h1">
-                                            {i18n.tr("welcome_prefix", "Welcome,")} " " {display_name} "."
-                                        </h1>
-                                        <span class="exo-tag exo-tag-accent">{role_label}</span>
-                                        <span class="exo-tag tabular-nums">{i18n.tr("plan_label", "Plan:")} " " {sync_tier}</span>
-                                    </div>
-                                    <p class="exo-sub">
-                                        {if !handle.is_empty() {
-                                            format!("{} {handle} · {email_label}", i18n.tr("pen_name_label", "Pen name:"))
-                                        } else {
-                                            email_label
-                                        }}
-                                    </p>
-                                </div>
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <h1 class="exo-h1">"ExoNovel"</h1>
+                                <span class="exo-tag exo-tag-accent">{role_label}</span>
+                                <span class="exo-tag tabular-nums">{i18n.tr("plan_label", "Plan:")} " " {sync_tier}</span>
                             </div>
+                            <p class="exo-sub" style="margin-top: 8px;">
+                                {if !handle.is_empty() {
+                                    format!("{display_name} · {} {handle} · {email_label}", i18n.tr("pen_name_label", "Pen name:"))
+                                } else {
+                                    format!("{display_name} · {email_label}")
+                                }}
+                            </p>
 
-                            <p class="exo-sub" style="margin-top: 16px;">
+                            <p class="exo-sub" style="margin-top: 14px;">
                                 {i18n.tr("workspace_desc", "Your collaborative creative writing space anchored to your sovereign did:peer identity across Web Mode 1, Free Device Mode 2, and Managed Blind Sync Mode 3.")}
                             </p>
 
@@ -1158,8 +1233,8 @@ fn WorkspaceHomeView(
                                 <button type="button" class="exo-btn" on:click=move |_| on_open_connected_apps()>
                                     {i18n.tr("btn_connected_apps", "Connected Apps & Google Docs")}
                                 </button>
-                                <button type="button" class="exo-btn" on:click=move |_| on_open_settings()>
-                                    {i18n.tr("nav_settings", "Settings")}
+                                <button type="button" class="exo-btn" on:click=move |_| on_open_preferences()>
+                                    {i18n.tr("nav_preferences", "Preferences")}
                                 </button>
                                 {if can_read_docs {
                                     view! {
@@ -1215,14 +1290,14 @@ fn PublicLandingView(
             "slide_3_title",
             "Web & Local-First Sync",
             "slide_3_body",
-            "Work online in the browser backed by Neon PostgreSQL or synchronize end-to-end encrypted local workspaces across Linux, macOS, Windows, Android, and iOS.",
+            "Work online in the browser backed by managed PostgreSQL or synchronize end-to-end encrypted local workspaces across Linux, macOS, Windows, Android, and iOS.",
         ),
         (
             "04",
             "slide_4_title",
             "User-Controlled Connected Apps & Revocation",
             "slide_4_body",
-            "External integrations such as Google Drive remain strictly optional and separated from primary sign-in. Users can inspect active permissions or disconnect and revoke provider tokens anytime from Settings without losing access to ExoNovel.",
+            "External integrations such as Google Drive remain strictly optional and separated from primary sign-in. Users can inspect active permissions or disconnect and revoke provider tokens anytime from Preferences without losing access to ExoNovel.",
         ),
     ];
 
@@ -1616,7 +1691,6 @@ fn PublicFooter() -> impl IntoView {
 #[component]
 fn PrivacyPolicyView() -> impl IntoView {
     let i18n = use_i18n();
-    let (mobile_nav_open, set_mobile_nav_open) = signal(false);
 
     view! {
         <div class="exo-shell">
@@ -1626,20 +1700,7 @@ fn PrivacyPolicyView() -> impl IntoView {
                     <img src="/exonovel-logo.png" alt="ExoNovel" class="navbar-logo navbar-logo-light" />
                     <img src="/exonovel-logo-dark.png" alt="ExoNovel" class="navbar-logo navbar-logo-dark" />
                 </a>
-                <button
-                    type="button"
-                    class="navbar-mobile-toggle"
-                    aria-label=move || i18n.tr("nav_toggle_menu", "Toggle navigation menu")
-                    aria-expanded=move || if mobile_nav_open.get() { "true" } else { "false" }
-                    on:click=move |_| set_mobile_nav_open.update(|v| *v = !*v)
-                >
-                    {move || if mobile_nav_open.get() {
-                        view! { <CloseIcon /> }.into_any()
-                    } else {
-                        view! { <MenuIcon /> }.into_any()
-                    }}
-                </button>
-                <div class=move || if mobile_nav_open.get() { "navbar-menu navbar-menu-open" } else { "navbar-menu" }>
+                <div class="navbar-menu">
                     <a href="/" class="nav-link">{move || i18n.tr("nav_home", "Home")}</a>
                     <a href="/signin" class="exo-btn exo-btn-primary">{move || i18n.tr("nav_sign_in", "Sign in")}</a>
                 </div>
@@ -1677,7 +1738,7 @@ fn PrivacyPolicyView() -> impl IntoView {
                             " "
                             {move || i18n.tr(
                                 "privacy_s1_drive_body",
-                                "Primary sign-in never requests Google Drive permissions. Only if you explicitly connect Google Drive inside ExoNovel's Workspace or Settings does ExoNovel request Google Drive authorization to list folders, create or rename backup folders, upload your exported Markdown documentation/manuscript archives or session transcripts, and restore or trash files you select inside the Drive Workspace."
+                                "Primary sign-in never requests Google Drive permissions. Only if you explicitly connect Google Drive inside ExoNovel's Workspace or Preferences does ExoNovel request Google Drive authorization to list folders, create or rename backup folders, upload your exported Markdown documentation/manuscript archives or session transcripts, and restore or trash files you select inside the Drive Workspace."
                             )}
                         </li>
                         <li>
@@ -1710,17 +1771,17 @@ fn PrivacyPolicyView() -> impl IntoView {
                     <p class="exo-legal-body">
                         {move || i18n.tr(
                             "privacy_s2_body",
-                            "ExoNovel uses strictly necessary authentication cookies (HttpOnly session cookies managed through Neon Auth) to maintain your signed-in session, and temporary browser sessionStorage strictly to preserve pending collaboration invite codes across OAuth redirects. ExoNovel does not use third-party advertising cookies, behavioral tracking pixels, or cross-site ad networks."
+                            "ExoNovel uses strictly necessary HttpOnly authentication session cookies to maintain your signed-in session, and temporary browser session storage strictly to preserve pending collaboration invite codes across sign-in redirects. ExoNovel does not use third-party advertising cookies, behavioral tracking pixels, or cross-site ad networks."
                         )}
                     </p>
 
                     <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("privacy_s3_title", "3. How We Use Your Information")}</h2>
                     <ul class="exo-legal-list">
                         <li>{move || i18n.tr("privacy_s3_li1", "Authenticate your session and resolve your authoritative did:peer identity across Web, Desktop, and Mobile modes.")}</li>
-                        <li>{move || i18n.tr("privacy_s3_li2", "Display your chosen author persona, pen name, avatar, and language settings (including right-to-left layout preferences).")}</li>
+                        <li>{move || i18n.tr("privacy_s3_li2", "Display your chosen author persona, pen name, avatar, and language preferences (including right-to-left layout preferences).")}</li>
                         <li>{move || i18n.tr("privacy_s3_li3", "Operate collaborative story groups, contributor attribution, and group/referral invitations you initiate.")}</li>
                         <li>{move || i18n.tr("privacy_s3_li4", "Execute user-initiated backups or exports to your connected Google Drive workspace when you explicitly trigger them.")}</li>
-                        <li>{move || i18n.tr("privacy_s3_li5", "Deliver transactional, security, and notification emails you enable via Brevo (sent from notes@exosystems.net, noreply@exosystems.net, or support@exosystems.net).")}</li>
+                        <li>{move || i18n.tr("privacy_s3_li5", "Deliver transactional, security, and notification emails you enable (sent from notes@exosystems.net, noreply@exosystems.net, or support@exosystems.net).")}</li>
                         <li>{move || i18n.tr("privacy_s3_li6", "Prevent fraud, abuse, unauthorized access, and violations of our Terms of Service.")}</li>
                     </ul>
 
@@ -1766,11 +1827,11 @@ fn PrivacyPolicyView() -> impl IntoView {
                         </li>
                     </ul>
 
-                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("privacy_s5_title", "5. Data Storage, Subprocessors & Cryptographic Protection")}</h2>
+                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("privacy_s5_title", "5. Data Storage, Security & Cryptographic Protection")}</h2>
                     <p class="exo-legal-body">
                         {move || i18n.tr(
                             "privacy_s5_body",
-                            "All traffic to ExoNovel is encrypted in transit using HTTPS/TLS. Hosted web records and account state are stored in Neon PostgreSQL and Neon Managed Auth, hosted on enterprise cloud application infrastructure, with email delivery handled by Brevo. When optional Connected External App offline tokens are stored server-side, they are envelope-encrypted via HashiCorp Vault Transit KMS and isolated from primary login credentials. On device-native installations using peer-to-peer Willow and iroh relay synchronization, payloads are end-to-end encrypted on your device so relay servers remain cryptographically blind to relayed content."
+                            "All traffic to ExoNovel is encrypted in transit using HTTPS/TLS. Hosted web records and account state are stored in managed PostgreSQL databases and managed authentication services on enterprise cloud infrastructure, alongside transactional email delivery. When optional Connected External App offline tokens are stored server-side, they are envelope-encrypted via dedicated key management encryption and isolated from primary login credentials. On device-native installations using peer-to-peer Willow and iroh relay synchronization, payloads are end-to-end encrypted on your device so relay servers remain cryptographically blind to relayed content."
                         )}
                     </p>
 
@@ -1781,7 +1842,7 @@ fn PrivacyPolicyView() -> impl IntoView {
                             " "
                             {move || i18n.tr(
                                 "privacy_s6_li1_body",
-                                "You can disconnect Google Drive or other optional Connected Apps inside ExoNovel Settings -> Connected Apps (which revokes active tokens directly through https://oauth2.googleapis.com/revoke without closing your primary ExoNovel account), or revoke access anytime in your Google Account Permissions at https://myaccount.google.com/permissions."
+                                "You can disconnect Google Drive or other optional Connected Apps inside ExoNovel Preferences -> Connected Apps (which revokes active tokens directly through https://oauth2.googleapis.com/revoke without closing your primary ExoNovel account), or revoke access anytime in your Google Account Permissions at https://myaccount.google.com/permissions."
                             )}
                         </li>
                         <li>
@@ -1820,7 +1881,6 @@ fn PrivacyPolicyView() -> impl IntoView {
 #[component]
 fn TermsOfServiceView() -> impl IntoView {
     let i18n = use_i18n();
-    let (mobile_nav_open, set_mobile_nav_open) = signal(false);
 
     view! {
         <div class="exo-shell">
@@ -1830,20 +1890,7 @@ fn TermsOfServiceView() -> impl IntoView {
                     <img src="/exonovel-logo.png" alt="ExoNovel" class="navbar-logo navbar-logo-light" />
                     <img src="/exonovel-logo-dark.png" alt="ExoNovel" class="navbar-logo navbar-logo-dark" />
                 </a>
-                <button
-                    type="button"
-                    class="navbar-mobile-toggle"
-                    aria-label=move || i18n.tr("nav_toggle_menu", "Toggle navigation menu")
-                    aria-expanded=move || if mobile_nav_open.get() { "true" } else { "false" }
-                    on:click=move |_| set_mobile_nav_open.update(|v| *v = !*v)
-                >
-                    {move || if mobile_nav_open.get() {
-                        view! { <CloseIcon /> }.into_any()
-                    } else {
-                        view! { <MenuIcon /> }.into_any()
-                    }}
-                </button>
-                <div class=move || if mobile_nav_open.get() { "navbar-menu navbar-menu-open" } else { "navbar-menu" }>
+                <div class="navbar-menu">
                     <a href="/" class="nav-link">{move || i18n.tr("nav_home", "Home")}</a>
                     <a href="/signin" class="exo-btn exo-btn-primary">{move || i18n.tr("nav_sign_in", "Sign in")}</a>
                 </div>
@@ -1864,7 +1911,7 @@ fn TermsOfServiceView() -> impl IntoView {
                     <p class="exo-legal-body">
                         {move || i18n.tr(
                             "terms_s1_body",
-                            "You retain full ownership and copyright of all manuscripts, stories, characters, worldbuilding notes, scripts, poetry, annotations, and creative assets you write or publish on ExoNovel. You grant ExoNovel only the limited technical license necessary to store, render, synchronize, back up (when directed by you), and transmit your content according to your workspace and collaboration settings."
+                            "You retain full ownership and copyright of all manuscripts, stories, characters, worldbuilding notes, scripts, poetry, annotations, and creative assets you write or publish on ExoNovel. You grant ExoNovel only the limited technical license necessary to store, render, synchronize, back up (when directed by you), and transmit your content according to your workspace and collaboration preferences."
                         )}
                     </p>
 
@@ -1906,7 +1953,7 @@ fn TermsOfServiceView() -> impl IntoView {
                     <p class="exo-legal-body">
                         {move || i18n.tr(
                             "terms_s4_body",
-                            "Optional integrations such as Google Drive backup are activated only upon your explicit authorization and may be disconnected or revoked at any time in ExoNovel Settings -> Connected Apps or via your third-party provider's account security page. Your use of third-party services remains subject to their respective terms."
+                            "Optional integrations such as Google Drive backup are activated only upon your explicit authorization and may be disconnected or revoked at any time in ExoNovel Preferences -> Connected Apps or via your third-party provider's account security page. Your use of third-party services remains subject to their respective terms."
                         )}
                     </p>
 

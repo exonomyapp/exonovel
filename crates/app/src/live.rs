@@ -5,7 +5,7 @@ use leptos::prelude::*;
 use crate::models::{AuthConfigResponse, LivePatchEvent};
 
 /// Global App-Wide Live UI Subscription & Arrival Motion Registry (ADR 009).
-/// Supports store-agnostic "neon" (SSE/PgListener) and "willow" (local store) origins.
+/// Supports store-agnostic "cloud" (PostgreSQL/SSE) and "willow" (local store) origins.
 #[derive(Clone, Copy)]
 pub struct LiveSyncState {
     pub connected: RwSignal<bool>,
@@ -21,7 +21,7 @@ impl LiveSyncState {
         Self {
             connected: RwSignal::new(false),
             last_event: RwSignal::new(None),
-            last_origin: RwSignal::new("neon".to_string()),
+            last_origin: RwSignal::new("cloud".to_string()),
             pulse_seq: RwSignal::new(0),
             active_animations: RwSignal::new(HashMap::new()),
         }

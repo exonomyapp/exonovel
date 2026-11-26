@@ -14,5 +14,5 @@ Nadrzędny: [005-docs-ui](../005-docs-ui.md)
 2. **Obszar treści Markdown**:
    - Pełna szerokość robocza z obsługą GitHub Flavored Markdown (tabele, listy zadań, cytaty, bloki kodu z kopiowaniem, linki wewnętrzne `.md`, kotwice nagłówków) i prawym spisem **Na tej stronie**.
 3. **Przestrzeń Google Docs i Drive**:
-   - Dostępna w **Ustawienia -> Połączone aplikacje i Google Docs** dla wszystkich kont oraz na pasku **Dokumentacja i ADR** dla uprawnionych czytelników (`drive.file` + `userinfo.email`).
+   - Dostępna w **Preferencje -> Połączone aplikacje i Google Docs** dla wszystkich kont oraz na pasku **Dokumentacja i ADR** dla uprawnionych czytelników (`drive.file` + `userinfo.email`).
    - Pozwala łączyć lub odłączać konto Google bez wylogowania z aplikacji, konwertować Markdown do edytowalnych Dokumentów Google, zarządzać plikami/folderami, eksportować pojedyncze ADR i wykonywać pełną kopię zapasową **`ExoNovel Docs`**—wszystkie akcje destrukcyjne używają potwierdzeń w interfejsie zamiast `window.alert`/`window.confirm`.

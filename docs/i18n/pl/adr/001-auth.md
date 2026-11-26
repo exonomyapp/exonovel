@@ -33,10 +33,10 @@ Własność musi być oparta na kryptografii, przenośna między platformami i n
 6. **Infrastruktura portfeli i kluczy AOTA (`All of the Above`)**:
    - Zgodnie z zasadą **AOTA** platforma wspiera natywny `exo-wallet` (`did:peer`), **MetaMask** / ponad 500 portfeli przez **Reown AppKit (WalletConnect)** + **SIWE/SIWX**, portfele wbudowane (**Privy** / **Dynamic**), **Passkeys (WebAuthn)** oraz **Google / GitHub / E-mail** (zobacz [003-wallets](001-auth/003-wallets.md) i [004-pay](../004-pay.md)).
 
-7. **Połączone aplikacje zewnętrzne, opcjonalne zakresy i unieważnianie w Ustawieniach (`AOTA`)**:
+7. **Połączone aplikacje zewnętrzne, opcjonalne zakresy i unieważnianie w Preferencjach (`AOTA`)**:
    - **Minimalne logowanie a opcjonalne zgody**: Podstawowe logowanie SSO żąda wyłącznie uprawnień tożsamości (`email`, `profile`, `openid`). Rozszerzone dostępy (np. Google Drive/Docs, repozytoria GitHub) są udzielane świadomie oddzielnie.
    - **Ograniczenie Neon Auth zweryfikowane (`2026-11-23`)**: Zarządzane proxy OAuth Neon przepisuje przekierowania Google do `scope=email+profile+openid` bez `access_type=offline`, a `unlinkAccount` odpina całe logowanie.
-   - **Architektura produkcyjna (`connected_apps` na `did:peer`)**: Backend produkcyjny (`crates/server`) przechowuje opcjonalne integracje w tabeli **`connected_apps`** szyfrowanej zgodnie z [004-vault-kms](001-auth/004-vault-kms.md), umożliwiając odłączenie i wywołanie `https://oauth2.googleapis.com/revoke` z poziomu **Ustawienia -> Połączone aplikacje** bez zrywania sesji głównej.
+   - **Architektura produkcyjna (`connected_apps` na `did:peer`)**: Backend produkcyjny (`crates/server`) przechowuje opcjonalne integracje w tabeli **`connected_apps`** szyfrowanej zgodnie z [004-vault-kms](001-auth/004-vault-kms.md), umożliwiając odłączenie i wywołanie `https://oauth2.googleapis.com/revoke` z poziomu **Preferencje -> Połączone aplikacje** bez zrywania sesji głównej.
 
 ## Dokumenty podrzędne (Sub-ADRs)
 

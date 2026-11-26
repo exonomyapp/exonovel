@@ -1,7 +1,7 @@
 # 008. Wieloplatformowy system powiadomień (5 platform docelowych, Web i Brevo E-mail)
 
 Data: 2026-11-21
-Status: Zaakceptowano (Brevo aktywne; podział Profil vs Ustawienia w stylu GitHub i Android FCM+UnifiedPush potwierdzone)
+Status: Zaakceptowano (Brevo aktywne; podział Profil vs Preferencje w stylu GitHub i Android FCM+UnifiedPush potwierdzone)
 
 ## Kontekst
 
@@ -20,9 +20,9 @@ Zdarzenia z `notifications`, `notification_devices` i `notification_preferences`
   - `noreply@exosystems.net` (`"Exosystems"`) — wiadomości logowania i systemowe.
   - `support@exosystems.net` (`"ExoSupport"`) — obsługa zgłoszeń wsparcia.
 
-### 2. Ścisły podział Profil vs Ustawienia (Styl GitHub)
+### 2. Ścisły podział Profil vs Preferencje (Styl GitHub)
 - **Profil**: Zawiera **100% wszystkich funkcji finansowych, portfeli, paywalli i zakupów** oraz powiadomienia o zarobkach i współpracy (`notify_author_earnings`, `notify_reader_purchases`, zaproszenia, polecenia, komentarze, wzmianki/forki).
-- **Ustawienia**: Zawierają **preferencje techniczne, języki, tryb synchronizacji, kanały powiadomień i panel admina** (`notify_security_signins`, `notify_maturity_releases`, `notify_maturity_unblocked`), bez żadnych opcji finansowych.
+- **Preferencje**: Zawierają **preferencje techniczne, języki, tryb synchronizacji, kanały powiadomień i panel admina** (`notify_security_signins`, `notify_maturity_releases`, `notify_maturity_unblocked`), bez żadnych opcji finansowych.
 
 ### 3. Parytet zapisu Neon + Willow
 Wszystkie tabele powiadomień zachowują współrzędne `willow_*` dla pracy lokalnej bez dostępu do sieci.

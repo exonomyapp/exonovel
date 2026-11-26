@@ -15,12 +15,12 @@
 ## 2. Unfinished Work in Progress (Immediate Queue)
 
 1. **GitHub Actions Full Rust/WASM Build & Production Deploy (`https://exonovel.exosystems.net`)**:
-   - Push the workspace to `main` so GitHub Actions (`cargo check`, `cargo test`, `cargo leptos build --release`) builds and deploys the full Rust app (complete EN/DE/PL UI localization across `settings.rs`, `profile.rs`, `connected_apps_ui.rs`, `cms.rs`, `lib.rs`, `server/src/i18n.rs`, multilingual `AGENTS.md` in `de`/`pl`, single `docs/session.md`, hierarchical MADR 4.0.0 tree & split CMS views, `adr_translations`, public homepage carousel, `/privacy`, `/terms`, and mobile styles).
+   - Push the workspace to `main` so GitHub Actions (`cargo check`, `cargo test`, `cargo leptos build --release`) builds and deploys the updated Rust app (app-wide `Preferences` rename across UI/code/`user_profiles`/docs, mobile single-row Avatar navbar + fixed viewport dropdown sheets, clean `ExoNovel` home header, active-persona filter + `Profile -> Personas` empty state, and scrubbed vendor-neutral UI/API/legal copy alongside existing EN/DE/PL UI & docs parity).
 2. **Google OAuth Brand, Client & Redirect URI Verification**:
-   - In Google Cloud Console -> Google Auth Platform -> Clients -> **`ExoNovel`** (`902812495809-jspg...`), verify Authorized redirect URI `https://exonovel.exosystems.net/api/oauth/google/callback`, confirm `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` in `/opt/exonovel/env`, upload `public/assets/exonovel-google-logo.png` in Branding, and re-submit Google verification.
-3. **Owner Review of Split CMS, Multilingual Docs & Mobile UI**:
-   - Pending owner live review on `https://exonovel.exosystems.net` across desktop and mobile viewports (`Tooling & Proposals` vs `AI Inference`, `"Draft ADR from Proposal"` workflow, German/Polish UI & docs switching including `AGENTS.md`, and responsive navigation/Settings/Profile/Docs breakpoints).
-   - Confirm `opencode` CLI binary path and active `NVIDIA_NIM_API_KEY` (or `NVIDIA_API_KEY`) in production `/opt/exonovel/env` so Proposal Note generation answers using active remote inference.
+   - In Google Auth Platform -> Clients -> **`ExoNovel`**, verify Authorized redirect URI `https://exonovel.exosystems.net/api/oauth/google/callback`, confirm server Google OAuth credentials in the production environment, upload `public/assets/exonovel-google-logo.png` in Branding, and submit verification.
+3. **Owner Review of Split CMS, Multilingual Docs, Preferences & Mobile UI**:
+   - Pending owner live review on `https://exonovel.exosystems.net` across desktop and mobile viewports (mobile Avatar dropdown, language/notification viewport sheets, clean home header, active-persona filtering, `Tooling & Proposals` vs `AI Inference`, `"Draft ADR from Proposal"`, German/Polish UI & docs switching, and responsive Preferences/Profile/Docs breakpoints).
+   - Confirm active headless CLI binary path and inference provider credentials in the production server environment so Proposal Note generation answers using active remote inference.
 
 ---
 

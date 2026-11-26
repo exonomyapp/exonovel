@@ -15,5 +15,5 @@ Status: Akzeptiert
    - Volle verfügbare Breite mit GitHub Flavored Markdown (Tabellen, Checklisten, Blockquotes, Codeblöcke mit Kopierfunktion, interne `.md`-Navigation, Überschriftsanker).
    - Fixierte rechte Gliederung **Auf dieser Seite**, Theme-Umschalter und Live-Aktualisierung.
 3. **Google Docs & Drive-Arbeitsbereich**:
-   - Verfügbar in **Einstellungen -> Verbundene Apps & Google Docs** für alle Konten sowie in der **Docs & ADRs**-Werkzeugleiste für berechtigte Lesende (`drive.file` + `userinfo.email`).
+   - Verfügbar in **Präferenzen -> Verbundene Apps & Google Docs** für alle Konten sowie in der **Docs & ADRs**-Werkzeugleiste für berechtigte Lesende (`drive.file` + `userinfo.email`).
    - Ermöglicht Verbinden/Widerrufen ohne Abmeldung, Umwandlung von Markdown in bearbeitbare Google Docs, Ordnerverwaltung, Dateisuche/-vorschau/-umbenennung/-löschung, direkten ADR-Export sowie vollständige **`ExoNovel Docs`**-Archivsicherungen—stets mit Inline-Bestätigung ohne `window.alert`/`window.confirm`.

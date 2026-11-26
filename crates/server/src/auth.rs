@@ -110,7 +110,7 @@ pub async fn verify_neon_auth_token(
     else {
         return Err((
             StatusCode::SERVICE_UNAVAILABLE,
-            Json(serde_json::json!({ "error": "Neon Auth is not configured." })),
+            Json(serde_json::json!({ "error": "Authentication service is not configured." })),
         ));
     };
 

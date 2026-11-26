@@ -325,11 +325,11 @@ pub async fn send_brevo_email_as(
         .json(&payload)
         .send()
         .await
-        .map_err(|e| format!("Brevo request failed: {e}"))?;
+        .map_err(|e| format!("Email delivery request failed: {e}"))?;
 
     if !resp.status().is_success() {
         let txt = resp.text().await.unwrap_or_default();
-        return Err(format!("Brevo error: {txt}"));
+        return Err(format!("Email delivery error: {txt}"));
     }
     Ok(true)
 }
@@ -608,14 +608,14 @@ pub async fn api_get_notification_prefs(
         })
         .collect();
 
-    let brevo_configured = std::env::var("BREVO_API_KEY")
+    let email_configured = std::env::var("BREVO_API_KEY")
         .map(|v| !v.trim().is_empty())
         .unwrap_or(false);
 
     Ok(Json(serde_json::json!({
         "preferences": prefs,
         "devices": devices,
-        "brevoConfigured": brevo_configured,
+        "emailConfigured": email_configured,
     })))
 }
 
@@ -852,7 +852,7 @@ pub async fn api_test_notification(
         did,
         "security_signin",
         "ExoNovel Live Notification Test",
-        "Real-time Neon SSE delivery and Brevo transactional email routing verified.",
+        "Real-time live stream delivery and transactional email routing verified.",
         "/",
     )
     .await
@@ -1061,7 +1061,7 @@ pub async fn api_activate_sync_plan(
         "author_earnings",
         "ExoNovel Sync Subscription Updated",
         &format!(
-            "Mode 3 plan '{}' recorded ({} {:.2}). Settings Sync & Storage controls updated.",
+            "Mode 3 plan '{}' recorded ({} {:.2}). Preferences Sync & Storage controls updated.",
             body.plan_tier,
             currency,
             amount_cents as f64 / 100.0

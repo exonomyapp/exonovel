@@ -25,11 +25,24 @@ pub fn ProfileView(
     on_copy_did: impl Fn(String) + Copy + Send + Sync + 'static,
     on_toast: impl Fn(String) + Copy + Send + Sync + 'static,
     on_back: impl Fn() + Copy + Send + Sync + 'static,
+    #[prop(optional)] initial_tab: Option<RwSignal<Option<ProfileTab>>>,
 ) -> impl IntoView {
     let live = use_live_sync();
     let i18n = use_i18n();
 
-    let (active_profile_tab, set_active_profile_tab) = signal(ProfileTab::Overview);
+    let (active_profile_tab, set_active_profile_tab) = signal(
+        initial_tab
+            .and_then(|s| s.get_untracked())
+            .unwrap_or(ProfileTab::Overview),
+    );
+    if let Some(ext_sig) = initial_tab {
+        Effect::new(move |_| {
+            if let Some(tab) = ext_sig.get() {
+                set_active_profile_tab.set(tab);
+                ext_sig.set(None);
+            }
+        });
+    }
     let (groups, set_groups) = signal::<Vec<GroupView>>(Vec::new());
     let (invites, set_invites) = signal::<Vec<InviteView>>(Vec::new());
     let (referrals, set_referrals) = signal::<Vec<ReferralView>>(Vec::new());
@@ -60,7 +73,7 @@ pub fn ProfileView(
     let (new_group_name, set_new_group_name) = signal(String::new());
     let (new_group_desc, set_new_group_desc) = signal(String::new());
 
-    // Pinned languages (managed via Neon user_profiles)
+    // Pinned languages
     let (pinned_ui, set_pinned_ui) = signal::<Vec<String>>(Vec::new());
     let (pinned_input, set_pinned_input) = signal::<Vec<String>>(Vec::new());
 
@@ -466,7 +479,7 @@ pub fn ProfileView(
                     });
                     on_toast(i18n.tr_untracked(
                         "profile_toast_langs_saved",
-                        "Language quick-switchers saved to Neon",
+                        "Language quick-switchers saved",
                     ));
                 }
                 Err(e) => set_profile_notice.set(Some(e)),
@@ -875,7 +888,7 @@ pub fn ProfileView(
                             <div class="exo-grid-3" style="margin-top: 14px;">
                                 <div class="exo-format-tile">
                                     <h3>{move || i18n.tr("wallet_free_title", "Free Modes (1 & 2)")}</h3>
-                                    <p>{move || i18n.tr("wallet_free_desc", "Web Neon App or Device Local Willow Store + Free Discovery Relay")}</p>
+                                    <p>{move || i18n.tr("wallet_free_desc", "Cloud Web App or Device Local Willow Store + Free Discovery Relay")}</p>
                                     <button
                                         type="button"
                                         class="exo-btn"
@@ -891,7 +904,7 @@ pub fn ProfileView(
                                 </div>
                                 <div class="exo-format-tile" style="border-color: var(--accent);">
                                     <h3>{move || i18n.tr("wallet_mo_title", "Sync Monthly ($9/mo eq.)")}</h3>
-                                    <p>{move || i18n.tr("wallet_mo_desc", "Authorizes Mode 3 Settings toggle & blind Meadowcap replication.")}</p>
+                                    <p>{move || i18n.tr("wallet_mo_desc", "Authorizes Mode 3 Preferences toggle & blind Meadowcap replication.")}</p>
                                     <button
                                         type="button"
                                         class="exo-btn exo-btn-primary"
@@ -1143,7 +1156,7 @@ pub fn ProfileView(
                         <div class="exo-card">
                             <h2 class="exo-h2">{move || i18n.tr("langs_quick_title", "Personal Quick-Switch Languages")}</h2>
                             <p class="exo-sub">
-                                {move || i18n.tr("langs_quick_sub", "Choose which of the 29 supported languages appear in your compact top-bar UI switcher and your writing composer Input switcher. All 29 remain available in Settings.")}
+                                {move || i18n.tr("langs_quick_sub", "Choose which of the 29 supported languages appear in your compact top-bar UI switcher and your writing composer Input switcher. All 29 remain available in Preferences.")}
                             </p>
 
                             <div class="exo-grid-2" style="margin-top: 16px;">

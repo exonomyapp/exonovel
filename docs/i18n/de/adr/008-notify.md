@@ -1,7 +1,7 @@
 # 008. Plattformübergreifendes Benachrichtigungssystem (5 Zielplattformen, Web & Brevo-E-Mail)
 
 Datum: 2026-11-21
-Status: Akzeptiert (Brevo aktiv; GitHub-Stil-Aufteilung Profil vs. Einstellungen & Android FCM+UnifiedPush bestätigt)
+Status: Akzeptiert (Brevo aktiv; GitHub-Stil-Aufteilung Profil vs. Präferenzen & Android FCM+UnifiedPush bestätigt)
 
 ## Kontext
 
@@ -20,9 +20,9 @@ Ereignisse aus `notifications`, `notification_devices` und `notification_prefere
   - `noreply@exosystems.net` (`"Exosystems"`) — Authentifizierungs- und allgemeine System-Mails.
   - `support@exosystems.net` (`"ExoSupport"`) — Support-Anfragen und Antworten.
 
-### 2. Strikte Trennung Profil vs. Einstellungen (GitHub-Stil)
+### 2. Strikte Trennung Profil vs. Präferenzen (GitHub-Stil)
 - **Profil**: Enthält **100 % aller kommerziellen, Wallet-, Paywall- und Kauf-Funktionen** sowie soziale und Umsatz-Benachrichtigungen (`notify_author_earnings`, `notify_reader_purchases`, Einladungen, Empfehlungen, Kommentare, Erwähnungen/Forks).
-- **Einstellungen**: Enthält **technische Präferenzen, Sprachen, Sync-Modus, Benachrichtigungskanäle & Admin-Reifegrad** (`notify_security_signins`, `notify_maturity_releases`, `notify_maturity_unblocked`), niemals Zahlungs- oder Wallet-Verwaltung.
+- **Präferenzen**: Enthält **technische Präferenzen, Sprachen, Sync-Modus, Benachrichtigungskanäle & Admin-Reifegrad** (`notify_security_signins`, `notify_maturity_releases`, `notify_maturity_unblocked`), niemals Zahlungs- oder Wallet-Verwaltung.
 
 ### 3. Neon + Willow Speicherparität
 Alle Benachrichtigungstabellen führen identische `willow_*`-Koordinaten für offlinefähige native Installationen.

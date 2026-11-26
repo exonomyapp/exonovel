@@ -1,11 +1,11 @@
 # 008. Cross-Platform Notification System (5 Target Platforms, Web & Active Brevo Email)
 
 Date: 2026-11-21
-Status: Accepted (Brevo active now; GitHub-style Profile vs. Settings split & Android FCM+UnifiedPush confirmed)
+Status: Accepted (Brevo active now; GitHub-style Profile vs. Preferences split & Android FCM+UnifiedPush confirmed)
 
 ## Context
 
-ExoNovel runs on **Web** plus **5 native platforms: Linux, macOS, Windows, Android, and iOS**. Users need timely alerts for social collaboration, **author commercial/paywall revenue events**, security/billing events, and **Maturity Process** updates (when watched libraries announce or release new versions or unblock `on-hold` ADRs). Preferences live in **Neon PostgreSQL** (and relocate identically with `willow25`, zero `localStorage`), and all UI controls follow a clean **GitHub-style Profile vs. Settings split**.
+ExoNovel runs on **Web** plus **5 native platforms: Linux, macOS, Windows, Android, and iOS**. Users need timely alerts for social collaboration, **author commercial/paywall revenue events**, security/billing events, and **Maturity Process** updates (when watched libraries announce or release new versions or unblock `on-hold` ADRs). Preferences live in **Neon PostgreSQL** (and relocate identically with `willow25`, zero `localStorage`), and all UI controls follow a clean **GitHub-style Profile vs. Preferences split**.
 
 ## Decision
 
@@ -29,19 +29,19 @@ Notifications are generated once as structured events in Neon PostgreSQL / local
   - **iOS**: **APNs** via Rust **`a2` (`0.3.x`)** HTTP/2 client using `.p8` Token-Based Authentication.
 - **Transactional Email (`Brevo` — Active Now on `exosystems.net`)**:
   - Calls **Brevo Transactional Email API v3** (`POST https://api.brevo.com/v3/smtp/email`) using `BREVO_API_KEY` (subdomain sending path `exonovel.exosystems.net` dropped in favor of verified root `exosystems.net` DNS with DKIM `brevo1`/`brevo2`, DMARC, and branded tracking domain `exomail.exosystems.net`).
-  - Three functional non-secret sender identities (hardcoded as defaults in `crates/server/src/notify.rs` `BrevoSenderRole::resolve`, auto-seeded into `/opt/exonovel/env` on every deploy by `.github/workflows/deploy.yml`, and left commented in `.env.example` as optional overrides only — never required in AI Studio Secrets):
+  - Three functional non-secret sender identities (hardcoded as defaults in `crates/server/src/notify.rs` `BrevoSenderRole::resolve`, auto-seeded into the production server environment on every deploy by `.github/workflows/deploy.yml`, and left commented in `.env.example` as optional overrides only — never required in deployment secrets):
     - **Notifications (`BREVO_SENDER_NOTES_EMAIL` / `BREVO_SENDER_NOTES_NAME`)**: **`notes@exosystems.net`** (`"Notes from ExoNovel"`) — notification-domain alerts, digests, and maturity notices.
     - **General / Non-Notification (`BREVO_SENDER_NOREPLY_EMAIL` / `BREVO_SENDER_NOREPLY_NAME`)**: **`noreply@exosystems.net`** (`"Exosystems"`) — general automated/auth emails outside the notification domain.
     - **User Support (`BREVO_SENDER_SUPPORT_EMAIL` / `BREVO_SENDER_SUPPORT_NAME`)**: **`support@exosystems.net`** (`"ExoSupport"`) — user support inquiries and issue replies.
 
-### 2. GitHub-Style Profile vs. Settings Split (Strict Ownership Boundary)
-ExoNovel adopts a **modern GitHub UI format** for both **Profile** (tabbed header workspace) and **Settings** (left-rail category sidebar), with a strict boundary: **100% of commercial, wallet, purchase, and billing activity lives in Profile — zero commercial items live in Settings**:
+### 2. GitHub-Style Profile vs. Preferences Split (Strict Ownership Boundary)
+ExoNovel adopts a **modern GitHub UI format** for both **Profile** (tabbed header workspace) and **Preferences** (left-rail category sidebar), with a strict boundary: **100% of commercial, wallet, purchase, and billing activity lives in Profile — zero commercial items live in Preferences**:
 
 - **Profile Page (Identity, Collaboration & ALL Commercial / Wallet Activity)**:
   - *Tabs*: `Overview`, `Works`, `Groups & Invites`, **`Wallet, Paywalls & Purchases`**, `Personas`, `Notifications`.
   - **Everything financial belongs here**, including:
     - **Author Commercials**: Paywall pricing, connected payout accounts (`Stripe Connect`, `dLocal`, `Razorpay`, `Flutterwave`, `Airwallex`, `TON`, `Lightning`, `Reown AppKit` / `USDC`), and author earnings/payouts.
-    - **Reader Purchases & ExoNovel Sync Subscription**: History/receipts of works unlocked from other authors **plus** purchasing/renewing **ExoNovel Cloud + Device Sync** (`$9/month` or `$90/year` local-currency equivalent, paid directly to ExoNovel's own `did:peer` wallets—which in turn unlocks the Sync toggle in Settings).
+    - **Reader Purchases & ExoNovel Sync Subscription**: History/receipts of works unlocked from other authors **plus** purchasing/renewing **ExoNovel Cloud + Device Sync** (`$9/month` or `$90/year` local-currency equivalent, paid directly to ExoNovel's own `did:peer` wallets—which in turn unlocks the Sync toggle in Preferences).
     - **Profile Notification Checkboxes**:
       - `notify_author_earnings` — **Author Paywall Earnings & Payouts** (when readers pay for your works or payouts settle)
       - `notify_reader_purchases` — **Reader Purchases & Sync Plan Billing** (receipts when you unlock another author's work or renew ExoNovel Sync)
@@ -50,9 +50,9 @@ ExoNovel adopts a **modern GitHub UI format** for both **Profile** (tabbed heade
       - `notify_moderator_comments` — Moderator feedback on your creative objects
       - `notify_collaborator_comments` — Collaborator & reader comments/replies
       - `notify_mentions_and_forks` — `@mentions`, persona messages, and story architecture forks
-- **Settings Page (Strictly Technical Preferences, Languages, Sync Mode & Admin Maturity)**:
-  - *Sidebar sections*: `Account & Security`, `Appearance & Languages` (Output UI locale, Default Input locale, pinned quick-switchers, offline `.ftl` pack downloads), `Sync & Storage` (enables Cloud + Device Meadowcap-delegated Willow sync once subscribed via Profile), `Notification Channels` (Web Push, Desktop/Mobile Push, Brevo email & instant/daily/weekly digest cadence, paired devices), and *(Admin only)* `Docs Allowlist & Maturity Process`.
-  - **Settings Notification Checkboxes**:
+- **Preferences Page (Strictly Technical Preferences, Languages, Sync Mode & Admin Maturity)**:
+  - *Sidebar sections*: `Account & Security`, `Appearance & Languages` (Output UI locale, Default Input locale, pinned quick-switchers, offline `.ftl` pack downloads), `Sync & Storage` (enables Cloud + Device Meadowcap-delegated Willow sync once subscribed via Profile), `Notification Channels` (Web Push, Desktop/Mobile Push, transactional email & instant/daily/weekly digest cadence, paired devices), and *(Admin only)* `Docs Allowlist & Maturity Process`.
+  - **Preferences Notification Checkboxes**:
     - `notify_security_signins` — New device login, `did:peer` key linkage, or password/session events
     - `notify_maturity_releases` *(Admin / Owner)* — Watched dependency announces an upcoming feature or ships a new release
     - `notify_maturity_unblocked` *(Admin / Owner)* — An `on-hold` ADR has its blocking tool requirement satisfied (`ready-to-build`) or a new capability proposal (`maturity_proposal_notes`) is ready for review

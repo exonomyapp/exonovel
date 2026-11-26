@@ -3,7 +3,7 @@ use leptos::prelude::*;
 use wasm_bindgen::JsCast;
 
 use crate::{
-    connected_apps_ui::ConnectedAppsSettingsPanel,
+    connected_apps_ui::ConnectedAppsPreferencesPanel,
     i18n::use_i18n,
     live::use_live_sync,
     models::{
@@ -11,15 +11,13 @@ use crate::{
         display_name_for_user, is_safe_avatar_url, locale_flag_emoji, resolve_fresh_jwt,
         save_profile_patch, upload_avatar_file, ActiveTab, AllowlistEntry, AllowlistResponse,
         AppearanceMode, AuthConfigResponse, CopyIcon, IdentitiesResponse, IdentityRecord,
-        NotificationDevice, NotificationPreferences, NotificationPrefsResponse, ProfilePatchResponse,
-        SettingsSection, VerifiedUser,
+        NotificationDevice, NotificationPreferences, NotificationPrefsResponse, PreferencesSection,
+        ProfilePatchResponse, VerifiedUser,
     },
 };
 
 #[cfg(not(feature = "ssr"))]
-fn request_browser_notification_permission(
-    on_result: impl Fn(String) + 'static,
-) {
+fn request_browser_notification_permission(on_result: impl Fn(String) + 'static) {
     if let Ok(promise) = web_sys::Notification::request_permission() {
         wasm_bindgen_futures::spawn_local(async move {
             match wasm_bindgen_futures::JsFuture::from(promise).await {
@@ -34,13 +32,10 @@ fn request_browser_notification_permission(
 }
 
 #[cfg(feature = "ssr")]
-fn request_browser_notification_permission(
-    _on_result: impl Fn(String) + 'static,
-) {
-}
+fn request_browser_notification_permission(_on_result: impl Fn(String) + 'static) {}
 
 #[component]
-pub fn SettingsView(
+pub fn PreferencesView(
     auth_config: ReadSignal<Option<AuthConfigResponse>>,
     initial_jwt: ReadSignal<Option<String>>,
     user: VerifiedUser,
@@ -52,7 +47,7 @@ pub fn SettingsView(
     on_open_profile_billing: impl Fn() + Copy + Send + Sync + 'static,
     on_profile_updated: impl Fn(ProfilePatchResponse) + Copy + Send + Sync + 'static,
     on_back: impl Fn() + Copy + Send + Sync + 'static,
-    #[prop(optional)] initial_section: Option<RwSignal<Option<SettingsSection>>>,
+    #[prop(optional)] initial_section: Option<RwSignal<Option<PreferencesSection>>>,
 ) -> impl IntoView {
     let live = use_live_sync();
     let i18n = use_i18n();
@@ -75,7 +70,7 @@ pub fn SettingsView(
     let (active_section, set_active_section) = signal(
         initial_section
             .and_then(|s| s.get_untracked())
-            .unwrap_or(SettingsSection::Account),
+            .unwrap_or(PreferencesSection::Account),
     );
     if let Some(ext_sig) = initial_section {
         Effect::new(move |_| {
@@ -127,7 +122,7 @@ pub fn SettingsView(
     // Notification Channels & Devices
     let (notif_prefs, set_notif_prefs) = signal(NotificationPreferences::default());
     let (devices, set_devices) = signal::<Vec<NotificationDevice>>(Vec::new());
-    let (brevo_configured, set_brevo_configured) = signal(false);
+    let (email_configured, set_email_configured) = signal(false);
     let (dev_platform, set_dev_platform) = signal("android".to_string());
     let (dev_transport, set_dev_transport) = signal("unifiedpush".to_string());
     let (dev_token, set_dev_token) = signal(String::new());
@@ -166,7 +161,7 @@ pub fn SettingsView(
                     if let Ok(data) = resp.json::<NotificationPrefsResponse>().await {
                         set_notif_prefs.set(data.preferences);
                         set_devices.set(data.devices);
-                        set_brevo_configured.set(data.brevo_configured);
+                        set_email_configured.set(data.email_configured);
                     }
                 }
             }
@@ -218,7 +213,7 @@ pub fn SettingsView(
                 if let Some(file) = files.get(0) {
                     if file.size() > 2_097_152.0 {
                         set_profile_msg.set(Some(i18n.tr_untracked(
-                            "settings_msg_avatar_size",
+                            "preferences_msg_avatar_size",
                             "Avatar file must be 2 MB or smaller.",
                         )));
                         return;
@@ -232,7 +227,7 @@ pub fn SettingsView(
                             if let Ok(res) = reader_clone.result() {
                                 if let Some(data_url) = res.as_string() {
                                     set_profile_msg.set(Some(i18n.tr_untracked(
-                                        "settings_msg_avatar_processing",
+                                        "preferences_msg_avatar_processing",
                                         "Processing avatar derivatives...",
                                     )));
                                     leptos::task::spawn_local(async move {
@@ -258,7 +253,7 @@ pub fn SettingsView(
                                                     on_profile_updated(updated);
                                                 }
                                                 set_profile_msg.set(Some(i18n.tr_untracked(
-                                                    "settings_msg_avatar_saved",
+                                                    "preferences_msg_avatar_saved",
                                                     "Avatar saved.",
                                                 )));
                                             }
@@ -276,7 +271,7 @@ pub fn SettingsView(
         }
     };
 
-    let save_settings_profile = move || {
+    let save_preferences_profile = move || {
         set_saving_profile.set(true);
         set_profile_msg.set(None);
         let auth_url = auth_config.get_untracked().and_then(|c| c.auth_url);
@@ -307,10 +302,10 @@ pub fn SettingsView(
                 Ok(updated) => {
                     on_profile_updated(updated);
                     set_profile_msg.set(Some(i18n.tr_untracked(
-                        "settings_msg_saved",
-                        "Settings saved to Neon.",
+                        "preferences_msg_saved",
+                        "Preferences saved.",
                     )));
-                    on_toast(i18n.tr_untracked("settings_toast_saved", "Settings saved"));
+                    on_toast(i18n.tr_untracked("preferences_toast_saved", "Preferences saved"));
                 }
                 Err(e) => set_profile_msg.set(Some(e)),
             }
@@ -340,7 +335,7 @@ pub fn SettingsView(
                 if let Ok(resp) = req.send().await {
                     if resp.ok() {
                         on_toast(i18n.tr_untracked(
-                            "settings_toast_notif_saved",
+                            "preferences_toast_notif_saved",
                             "Notification channels updated",
                         ));
                     }
@@ -373,7 +368,7 @@ pub fn SettingsView(
                         set_dev_token.set(String::new());
                         reload_channels_and_admin();
                         on_toast(i18n.tr_untracked(
-                            "settings_toast_device_reg",
+                            "preferences_toast_device_reg",
                             "Push device registered",
                         ));
                     }
@@ -394,8 +389,8 @@ pub fn SettingsView(
             {
                 if resp.ok() {
                     on_toast(i18n.tr_untracked(
-                        "settings_toast_test_sent",
-                        "Test notification & Brevo email dispatched",
+                        "preferences_toast_test_sent",
+                        "Test notification & email dispatched",
                     ));
                 } else {
                     let msg = resp.text().await.unwrap_or_default();
@@ -432,7 +427,7 @@ pub fn SettingsView(
                         set_grant_did.set(String::new());
                         set_new_note.set(String::new());
                         set_admin_msg.set(Some(i18n.tr_untracked(
-                            "settings_msg_allowlist_updated",
+                            "preferences_msg_allowlist_updated",
                             "Allowlist updated.",
                         )));
                         reload_channels_and_admin();
@@ -459,7 +454,7 @@ pub fn SettingsView(
                     if resp.ok() {
                         reload_channels_and_admin();
                         on_toast(i18n.tr_untracked(
-                            "settings_toast_tier_updated",
+                            "preferences_toast_tier_updated",
                             "Allowlist tier updated",
                         ));
                     }
@@ -489,7 +484,7 @@ pub fn SettingsView(
                 if resp.ok() {
                     reload_channels_and_admin();
                     on_toast(i18n.tr_untracked(
-                        "settings_toast_entry_removed",
+                        "preferences_toast_entry_removed",
                         "Allowlist entry removed",
                     ));
                 }
@@ -519,7 +514,7 @@ pub fn SettingsView(
                 if let Ok(resp) = req.send().await {
                     if resp.ok() {
                         set_edit_msg.set(Some(i18n.tr_untracked(
-                            "settings_msg_account_updated",
+                            "preferences_msg_account_updated",
                             "Account updated.",
                         )));
                         reload_channels_and_admin();
@@ -538,9 +533,9 @@ pub fn SettingsView(
         <main class="page-main">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px;">
                 <div>
-                    <h1 class="exo-h1">{move || i18n.tr("settings_title", "Settings")}</h1>
+                    <h1 class="exo-h1">{move || i18n.tr("preferences_title", "Preferences")}</h1>
                     <p class="exo-sub" style="margin: 4px 0 0;">
-                        {move || i18n.tr("settings_subtitle", "Technical preferences, languages, operating modes, and delivery channels (all commercial purchases & subscriptions stay in Profile).")}
+                        {move || i18n.tr("preferences_subtitle", "Account, language, operating mode, and notification delivery preferences (commercial purchases & subscriptions stay in Profile).")}
                     </p>
                 </div>
                 <button type="button" class="exo-btn" on:click=move |_| on_back()>
@@ -548,48 +543,48 @@ pub fn SettingsView(
                 </button>
             </div>
 
-            <div class="exo-gh-settings">
-                <nav class="exo-gh-nav" aria-label=move || i18n.tr("settings_nav_aria", "Settings sections")>
+            <div class="exo-gh-preferences">
+                <nav class="exo-gh-nav" aria-label=move || i18n.tr("preferences_nav_aria", "Preferences sections")>
                     <button
                         type="button"
-                        class=move || if active_section.get() == SettingsSection::Account { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
-                        on:click=move |_| set_active_section.set(SettingsSection::Account)
+                        class=move || if active_section.get() == PreferencesSection::Account { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
+                        on:click=move |_| set_active_section.set(PreferencesSection::Account)
                     >
                         <span>{move || i18n.tr("sec_account", "Account & Security")}</span>
                     </button>
                     <button
                         type="button"
-                        class=move || if active_section.get() == SettingsSection::ConnectedApps { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
-                        on:click=move |_| set_active_section.set(SettingsSection::ConnectedApps)
+                        class=move || if active_section.get() == PreferencesSection::ConnectedApps { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
+                        on:click=move |_| set_active_section.set(PreferencesSection::ConnectedApps)
                     >
                         <span>{move || i18n.tr("sec_connected_apps", "Connected Apps & Google Docs")}</span>
                     </button>
                     <button
                         type="button"
-                        class=move || if active_section.get() == SettingsSection::AppearanceAndLanguages { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
-                        on:click=move |_| set_active_section.set(SettingsSection::AppearanceAndLanguages)
+                        class=move || if active_section.get() == PreferencesSection::AppearanceAndLanguages { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
+                        on:click=move |_| set_active_section.set(PreferencesSection::AppearanceAndLanguages)
                     >
                         <span>{move || i18n.tr("sec_appearance_langs", "Appearance & Languages (29)")}</span>
                     </button>
                     <button
                         type="button"
-                        class=move || if active_section.get() == SettingsSection::SyncAndStorage { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
-                        on:click=move |_| set_active_section.set(SettingsSection::SyncAndStorage)
+                        class=move || if active_section.get() == PreferencesSection::SyncAndStorage { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
+                        on:click=move |_| set_active_section.set(PreferencesSection::SyncAndStorage)
                     >
                         <span>{move || i18n.tr("sec_sync_storage", "Sync & Storage (3 Modes)")}</span>
                     </button>
                     <button
                         type="button"
-                        class=move || if active_section.get() == SettingsSection::NotificationChannels { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
-                        on:click=move |_| set_active_section.set(SettingsSection::NotificationChannels)
+                        class=move || if active_section.get() == PreferencesSection::NotificationChannels { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
+                        on:click=move |_| set_active_section.set(PreferencesSection::NotificationChannels)
                     >
                         <span>{move || i18n.tr("sec_notifications", "Notification Channels")}</span>
                     </button>
                     <Show when=move || is_admin>
                         <button
                             type="button"
-                            class=move || if active_section.get() == SettingsSection::AdminDocsAndMaturity { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
-                            on:click=move |_| set_active_section.set(SettingsSection::AdminDocsAndMaturity)
+                            class=move || if active_section.get() == PreferencesSection::AdminDocsAndMaturity { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
+                            on:click=move |_| set_active_section.set(PreferencesSection::AdminDocsAndMaturity)
                         >
                             <span>{move || i18n.tr("sec_admin_allowlist", "Docs Allowlist & Accounts")}</span>
                         </button>
@@ -598,7 +593,7 @@ pub fn SettingsView(
 
                 <div class="exo-gh-content">
                     {move || match active_section.get() {
-                        SettingsSection::Account => {
+                        PreferencesSection::Account => {
                             let avatar_preview = avatar_url.get();
                             let did_display = user_did.get_value();
                             let av_alt = display_name.get();
@@ -709,27 +704,27 @@ pub fn SettingsView(
                                         type="button"
                                         class="exo-btn exo-btn-primary"
                                         disabled=move || saving_profile.get()
-                                        on:click=move |_| save_settings_profile()
+                                        on:click=move |_| save_preferences_profile()
                                     >
-                                        {move || i18n.tr("save_account_btn", "Save Account Settings")}
+                                        {move || i18n.tr("save_account_btn", "Save Account Preferences")}
                                     </button>
                                 </div>
                             }.into_any()
                         }
 
-                        SettingsSection::ConnectedApps => view! {
-                            <ConnectedAppsSettingsPanel
+                        PreferencesSection::ConnectedApps => view! {
+                            <ConnectedAppsPreferencesPanel
                                 auth_config=auth_config
                                 initial_jwt=initial_jwt
                                 on_toast=on_toast
                             />
                         }.into_any(),
 
-                        SettingsSection::AppearanceAndLanguages => view! {
+                        PreferencesSection::AppearanceAndLanguages => view! {
                             <div class="exo-card">
                                 <h2 class="exo-h2">{move || i18n.tr("appearance_title", "Theme & Dual Language Architecture")}</h2>
                                 <p class="exo-sub">
-                                    {move || i18n.tr("appearance_desc", "Output UI Language controls menus and layout direction (auto RTL for Arabic and Hebrew). Default Input Language controls composers independently. All preferences save directly to Neon (zero browser localStorage).")}
+                                    {move || i18n.tr("appearance_desc", "Output UI Language controls menus and layout direction (auto RTL for Arabic and Hebrew). Default Input Language controls composers independently and saves directly to your account.")}
                                 </p>
 
                                 <div class="exo-grid-2" style="margin-top: 16px;">
@@ -788,14 +783,14 @@ pub fn SettingsView(
                                     type="button"
                                     class="exo-btn exo-btn-primary"
                                     style="margin-top: 18px;"
-                                    on:click=move |_| save_settings_profile()
+                                    on:click=move |_| save_preferences_profile()
                                 >
                                     {move || i18n.tr("save_theme_lang_btn", "Save Theme & Language Defaults")}
                                 </button>
                             </div>
                         }.into_any(),
 
-                        SettingsSection::SyncAndStorage => view! {
+                        PreferencesSection::SyncAndStorage => view! {
                             <div class="exo-card">
                                 <h2 class="exo-h2">{move || i18n.tr("sync_title", "Three Operating Modes & Cryptographic Blindness")}</h2>
                                 <p class="exo-sub">
@@ -805,7 +800,7 @@ pub fn SettingsView(
                                 <div class="exo-grid-3" style="margin-top: 16px;">
                                     <div class="exo-format-tile">
                                         <h3>{move || i18n.tr("sync_m1_title", "Mode 1 · ExoNovel on Web (Free)")}</h3>
-                                        <p>{move || i18n.tr("sync_m1_desc", "Cloud workspace backed by Neon Postgres with instant real-time updates across tabs.")}</p>
+                                        <p>{move || i18n.tr("sync_m1_desc", "Cloud workspace backed by managed PostgreSQL with instant real-time updates across tabs.")}</p>
                                     </div>
                                     <div class="exo-format-tile">
                                         <h3>{move || i18n.tr("sync_m2_title", "Mode 2 · Sovereign Device (Free)")}</h3>
@@ -858,7 +853,7 @@ pub fn SettingsView(
                                                 type="button"
                                                 class="exo-btn exo-btn-primary"
                                                 style="margin-top: 14px;"
-                                                on:click=move |_| save_settings_profile()
+                                                on:click=move |_| save_preferences_profile()
                                             >
                                                 {move || i18n.tr("sync_save_toggle", "Save Sync Toggle")}
                                             </button>
@@ -868,24 +863,24 @@ pub fn SettingsView(
                             </div>
                         }.into_any(),
 
-                        SettingsSection::NotificationChannels => view! {
+                        PreferencesSection::NotificationChannels => view! {
                             <div>
                                 <div class="exo-card">
                                     <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
                                         <div>
                                             <h2 class="exo-h2" style="margin: 0;">{move || i18n.tr("notif_channels_title", "Multi-Platform Delivery Channels")}</h2>
                                             <p class="exo-sub" style="margin: 4px 0 0;">
-                                                {move || i18n.tr("notif_brevo_prefix", "Brevo Transactional Email (notes@exosystems.net)")}
+                                                {move || i18n.tr("notif_email_prefix", "Transactional Email Service (notes@exosystems.net)")}
                                                 " "
-                                                {move || if brevo_configured.get() {
-                                                    i18n.tr("notif_brevo_active", "· Brevo API Key Active")
+                                                {move || if email_configured.get() {
+                                                    i18n.tr("notif_email_active", "· Email Delivery Active")
                                                 } else {
-                                                    i18n.tr("notif_brevo_unset", "· Configure BREVO_API_KEY in server env")
+                                                    i18n.tr("notif_email_unset", "· Transactional email credentials not configured")
                                                 }}
                                             </p>
                                         </div>
                                         <button type="button" class="exo-btn" on:click=send_test_notification>
-                                            {move || i18n.tr("notif_send_test", "Send Test Notification & Brevo Email")}
+                                            {move || i18n.tr("notif_send_test", "Send Test Notification & Email")}
                                         </button>
                                     </div>
 
@@ -902,7 +897,7 @@ pub fn SettingsView(
                                                             set_notif_prefs.update(|np| np.in_app_enabled = v);
                                                         }
                                                     />
-                                                    <span><strong>{move || i18n.tr("notif_in_app_title", "In-App Live Feed & Bell")}</strong> " — " {move || i18n.tr("notif_in_app_desc", "Instant delivery over the persistent SSE stream.")}</span>
+                                                    <span><strong>{move || i18n.tr("notif_in_app_title", "In-App Live Feed & Bell")}</strong> " — " {move || i18n.tr("notif_in_app_desc", "Instant delivery over the persistent real-time stream.")}</span>
                                                 </label>
                                                 <label class="exo-check-row">
                                                     <input
@@ -913,7 +908,7 @@ pub fn SettingsView(
                                                             set_notif_prefs.update(|np| np.web_push_enabled = v);
                                                             if v {
                                                                 request_browser_notification_permission(move |st| {
-                                                                    on_toast(format!("{} {st}", i18n.tr_untracked("settings_toast_perm", "Browser notification permission:")));
+                                                                    on_toast(format!("{} {st}", i18n.tr_untracked("preferences_toast_perm", "Browser notification permission:")));
                                                                 });
                                                             }
                                                         }
@@ -940,7 +935,7 @@ pub fn SettingsView(
                                                             set_notif_prefs.update(|np| np.email_enabled = v);
                                                         }
                                                     />
-                                                    <span><strong>{move || i18n.tr("notif_email_title", "Brevo Transactional Email (Notes from ExoNovel)")}</strong></span>
+                                                    <span><strong>{move || i18n.tr("notif_email_title", "Transactional Email (Notes from ExoNovel)")}</strong></span>
                                                 </label>
                                                 <div class="exo-field" style="margin-top: 14px;">
                                                     <label class="exo-label">{move || i18n.tr("notif_digest_label", "Email Digest Mode")}</label>
@@ -1023,7 +1018,7 @@ pub fn SettingsView(
                                                     prop:value=move || dev_transport.get()
                                                     on:change=move |ev| set_dev_transport.set(event_target_value(&ev))
                                                 >
-                                                    <option value="unifiedpush">{move || i18n.tr("device_tr_unifiedpush", "UnifiedPush (Open Standard / ntfy)")}</option>
+                                                    <option value="unifiedpush">{move || i18n.tr("device_tr_unifiedpush", "UnifiedPush (Open Standard)")}</option>
                                                     <option value="fcm">{move || i18n.tr("device_tr_fcm", "FCM (Firebase Cloud Messaging)")}</option>
                                                     <option value="apns">{move || i18n.tr("device_tr_apns", "APNs (Apple Push Notification service)")}</option>
                                                     <option value="wns">{move || i18n.tr("device_tr_wns", "WNS (Windows Push Notification Services)")}</option>
@@ -1045,7 +1040,7 @@ pub fn SettingsView(
                                                     type="text"
                                                     class="exo-input exo-mono"
                                                     required=true
-                                                    placeholder=move || i18n.tr("device_token_ph", "https://ntfy.sh/... or FCM/APNs token")
+                                                    placeholder=move || i18n.tr("device_token_ph", "https://push.example.org/... or FCM/APNs token")
                                                     prop:value=move || dev_token.get()
                                                     on:input=move |ev| set_dev_token.set(event_target_value(&ev))
                                                 />
@@ -1089,7 +1084,7 @@ pub fn SettingsView(
                             </div>
                         }.into_any(),
 
-                        SettingsSection::AdminDocsAndMaturity => view! {
+                        PreferencesSection::AdminDocsAndMaturity => view! {
                             <div>
                                 <div class="exo-card">
                                     <h2 class="exo-h2">{move || i18n.tr("admin_allowlist_title", "Documentation Access Allowlist")}</h2>

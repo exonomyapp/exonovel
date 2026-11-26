@@ -22,7 +22,7 @@ ExoNovel läuft als Webanwendung sowie nativ auf **Linux, macOS, Windows, Androi
    - **Modus 2 — ExoNovel auf dem Gerät (`Kostenlos`)**: Native Builds für **Linux, macOS, Windows, Android und iOS** starten lokal **ohne Neon-Zwang** mittels **`willow25`** (`0.7.11`) und **ExoNovels kostenloser `iroh`-Discovery-&-Relay-Zone** (`v1.4.x`). **Blind-Relay-Gebot**: Alle über Modus-2-Relays gepufferten Nutzdaten werden vor Versand auf dem Gerät Ende-zu-Ende verschlüsselt.
    - **Modus 3 — Web + Gerät mit verwaltetem Sync (`Kostenpflichtig: Gegenwert von 9 USD/Monat oder 90 USD/Jahr in Landeswährung`)**:
      - Aktivierung und Abrechnung erfolgen im Bereich **Profil** (ExoNovel agiert dabei selbst als Peer mit eigener `did:peer` und AOTA-Wallets).
-     - Nach Aktivierung entsperren sich die **Sync-Regler in den Einstellungen** und registrieren die `did:peer`-IDs mittels **Meadowcap-Fähigkeitsdelegation** in `willow25` auf ExoNovels verwaltetem Sync-Knoten—mit clientseitiger AEAD-Verschlüsselung, sodass der Backup-Knoten **kryptografisch blind** bleibt.
+     - Nach Aktivierung entsperren sich die **Sync-Regler in den Präferenzen** und registrieren die `did:peer`-IDs mittels **Meadowcap-Fähigkeitsdelegation** in `willow25` auf ExoNovels verwaltetem Sync-Knoten—mit clientseitiger AEAD-Verschlüsselung, sodass der Backup-Knoten **kryptografisch blind** bleibt.
      - Verlustfreier Export (`Neon -> willow25`) und Re-Import (`willow25 -> Neon`) über `willow_*`-Koordinaten und kausale **`loro` (`1.18.0`)**-CRDT-Frontiers.
 
 ## Unter-ADRs

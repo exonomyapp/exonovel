@@ -40,7 +40,7 @@ pub struct LivePatchEvent {
     pub op: String,
     pub changed_fields: Vec<String>,
     pub payload: serde_json::Value,
-    /// "neon" or "willow" (ADR 009 store-agnostic parity)
+    /// "cloud" or "willow" (ADR 009 store-agnostic parity)
     pub origin: String,
     pub emitted_at_ms: i64,
 }
@@ -85,7 +85,7 @@ impl LiveBus {
                 .unwrap_or(0);
         }
         if event.origin.is_empty() {
-            event.origin = "neon".to_string();
+            event.origin = "cloud".to_string();
         }
         let _ = self.tx.send(event);
     }
@@ -144,7 +144,7 @@ pub async fn emit_live_patch(
         op: op.into(),
         changed_fields,
         payload,
-        origin: "neon".to_string(),
+        origin: "cloud".to_string(),
         emitted_at_ms: SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_millis() as i64)
@@ -299,7 +299,7 @@ pub async fn api_events_stream(
                         op: "reload".to_string(),
                         changed_fields: Vec::new(),
                         payload: serde_json::json!({ "reason": "lagged" }),
-                        origin: "neon".to_string(),
+                        origin: "cloud".to_string(),
                         emitted_at_ms: 0,
                     };
                     Event::default()
@@ -339,7 +339,7 @@ mod tests {
             op: "insert".to_string(),
             changed_fields: vec![],
             payload: serde_json::json!({}),
-            origin: "neon".to_string(),
+            origin: "cloud".to_string(),
             emitted_at_ms: 1,
         };
         assert!(!event_matches_principal(&other_ev, &user_p));

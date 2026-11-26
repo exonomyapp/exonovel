@@ -17,7 +17,7 @@ ExoNovel działa w przeglądarce oraz natywnie na **Linux, macOS, Windows, Andro
    - **Tryb 1 — ExoNovel w sieci (`Darmowy`)**: Przeglądarkowa obsługa oparta na **Neon PostgreSQL**.
    - **Tryb 2 — ExoNovel na urządzeniu (`Darmowy`)**: Aplikacje natywne uruchamiają się lokalnie **bez wymagania Neon**, używając **`willow25`** (`0.7.11`) i darmowej strefy **relay/discovery `iroh`** (`v1.4.x`). **Zasada ślepego przekaźnika**: wszystkie dane buforowane w trybie 2 są szyfrowane end-to-end na urządzeniu nadawcy.
    - **Tryb 3 — Sieć + Urządzenie z zarządzanym synciem (`Płatny: równowartość 9 USD/mies. lub 90 USD/rok w walucie lokalnej`)**:
-     - Aktywacja i rozliczenie w **Profilu** (ExoNovel działa jako partner z własnym `did:peer`), odblokowując przełącznik **Synchronizacji w Ustawieniach** oparty o delegację uprawnień **Meadowcap** w `willow25` i pełne szyfrowanie AEAD po stronie klienta.
+     - Aktywacja i rozliczenie w **Profilu** (ExoNovel działa jako partner z własnym `did:peer`), odblokowując przełącznik **Synchronizacji w Preferencjach** oparty o delegację uprawnień **Meadowcap** w `willow25` i pełne szyfrowanie AEAD po stronie klienta.
      - Dwukierunkowy eksport (`Neon -> willow25`) i import (`willow25 -> Neon`) z zachowaniem przyczynowej historii **`loro` (`1.18.0`)**.
 
 ## Dokumenty podrzędne (Sub-ADRs)

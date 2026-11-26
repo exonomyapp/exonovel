@@ -214,20 +214,20 @@ async fn wrap_oauth_token(plaintext: &str) -> Result<String, String> {
             }))
             .send()
             .await
-            .map_err(|e| format!("Vault Transit encrypt error: {e}"))?;
+            .map_err(|e| format!("Token envelope encrypt error: {e}"))?;
         if !resp.status().is_success() {
             let status = resp.status();
-            let err_text = resp.text().await.unwrap_or_default();
-            return Err(format!("Vault Transit encrypt rejected ({status}): {err_text}"));
+            let _err_text = resp.text().await.unwrap_or_default();
+            return Err(format!("Token envelope encrypt rejected ({status})."));
         }
         let body: serde_json::Value = resp
             .json()
             .await
-            .map_err(|e| format!("Vault Transit parse error: {e}"))?;
+            .map_err(|e| format!("Token envelope parse error: {e}"))?;
         let ct = body
             .pointer("/data/ciphertext")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| "Vault Transit missing ciphertext.".to_string())?;
+            .ok_or_else(|| "Token envelope missing ciphertext.".to_string())?;
         return Ok(ct.to_string());
     }
     seal_secret(plaintext)
@@ -240,9 +240,9 @@ async fn unwrap_oauth_token(ciphertext: &str) -> Result<String, String> {
     }
     if trimmed.starts_with("vault:") {
         let vault_addr = non_empty_env("VAULT_ADDR")
-            .ok_or_else(|| "VAULT_ADDR is required to unwrap Vault Transit tokens.".to_string())?;
+            .ok_or_else(|| "Token encryption service address is not configured.".to_string())?;
         let vault_token = non_empty_env("VAULT_TOKEN")
-            .ok_or_else(|| "VAULT_TOKEN is required to unwrap Vault Transit tokens.".to_string())?;
+            .ok_or_else(|| "Token encryption service credentials are not configured.".to_string())?;
         let key_name = non_empty_env("VAULT_TRANSIT_KEY").unwrap_or_else(|| "exonovel".to_string());
         let url = format!(
             "{}/v1/transit/decrypt/{}",
@@ -258,26 +258,26 @@ async fn unwrap_oauth_token(ciphertext: &str) -> Result<String, String> {
             }))
             .send()
             .await
-            .map_err(|e| format!("Vault Transit decrypt error: {e}"))?;
+            .map_err(|e| format!("Token envelope decrypt error: {e}"))?;
         if !resp.status().is_success() {
             return Err(format!(
-                "Vault Transit decrypt failed ({}).",
+                "Token envelope decrypt failed ({}).",
                 resp.status()
             ));
         }
         let body: serde_json::Value = resp
             .json()
             .await
-            .map_err(|e| format!("Vault Transit decrypt parse error: {e}"))?;
+            .map_err(|e| format!("Token envelope decrypt parse error: {e}"))?;
         let b64_plain = body
             .pointer("/data/plaintext")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| "Vault Transit missing plaintext.".to_string())?;
+            .ok_or_else(|| "Token envelope missing plaintext.".to_string())?;
         let bytes = B64_STD
             .decode(b64_plain)
-            .map_err(|_| "Vault Transit invalid base64 plaintext.".to_string())?;
+            .map_err(|_| "Token envelope invalid base64 plaintext.".to_string())?;
         return String::from_utf8(bytes)
-            .map_err(|_| "Vault Transit plaintext is not UTF-8.".to_string());
+            .map_err(|_| "Token envelope plaintext is not UTF-8.".to_string());
     }
     open_secret(trimmed)
 }
@@ -435,14 +435,14 @@ pub async fn api_google_oauth_start(
     let Some((client_id, _)) = google_oauth_credentials() else {
         return Err(err_json(
             StatusCode::SERVICE_UNAVAILABLE,
-            "GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET are not configured on the server.",
+            "Google Drive & Docs integration is not configured on the server.",
         ));
     };
 
     let redirect_uri = resolve_google_redirect_uri(&headers);
     let return_tab = match body.return_tab.as_deref() {
         Some("docs") if user.authorized => "docs".to_string(),
-        _ => "settings".to_string(),
+        _ => "preferences".to_string(),
     };
     let return_doc_path = body
         .return_doc_path
@@ -514,7 +514,7 @@ fn callback_redirect_url(
             format!("/?tab=docs&doc={}", url_encode_component(return_doc_path))
         }
     } else {
-        "/?tab=settings&section=connected-apps".to_string()
+        "/?tab=preferences&section=connected-apps".to_string()
     };
 
     if let Some(err) = oauth_error {
@@ -555,13 +555,13 @@ pub async fn api_google_oauth_callback(
         Some(s) => match open_oauth_state(s) {
             Ok(p) => p,
             Err(err) => {
-                let target = callback_redirect_url("settings", "", false, Some(&err));
+                let target = callback_redirect_url("preferences", "", false, Some(&err));
                 return Redirect::to(&target).into_response();
             }
         },
         None => {
             let target = callback_redirect_url(
-                "settings",
+                "preferences",
                 "",
                 false,
                 Some("Missing OAuth state parameter."),
@@ -925,7 +925,7 @@ async fn get_valid_google_access_token(
     let Some(r) = row else {
         return Err(err_json(
             StatusCode::PRECONDITION_REQUIRED,
-            "Google Drive & Docs is not connected. Open Settings -> Connected Apps & Google Docs to connect.",
+            "Google Drive & Docs is not connected. Open Preferences -> Connected Apps & Google Docs to connect.",
         ));
     };
 
@@ -933,7 +933,7 @@ async fn get_valid_google_access_token(
     if status != "connected" {
         return Err(err_json(
             StatusCode::PRECONDITION_REQUIRED,
-            "Google Drive & Docs connection was disconnected. Please reconnect in Settings -> Connected Apps & Google Docs.",
+            "Google Drive & Docs connection was disconnected. Please reconnect in Preferences -> Connected Apps & Google Docs.",
         ));
     }
 
@@ -954,7 +954,7 @@ async fn get_valid_google_access_token(
         mark_google_revoked(pool, did_peer).await;
         return Err(err_json(
             StatusCode::UNAUTHORIZED,
-            "Google session expired without a refresh token. Please reconnect in Settings -> Connected Apps & Google Docs.",
+            "Google session expired without a refresh token. Please reconnect in Preferences -> Connected Apps & Google Docs.",
         ));
     }
 
@@ -988,7 +988,7 @@ async fn get_valid_google_access_token(
             mark_google_revoked(pool, did_peer).await;
             return Err(err_json(
                 StatusCode::UNAUTHORIZED,
-                "Google authorization was revoked or expired. Please reconnect in Settings.",
+                "Google authorization was revoked or expired. Please reconnect in Preferences.",
             ));
         }
         return Err(err_json(
@@ -1877,13 +1877,13 @@ mod tests {
             redirect_uri: "https://exonovel.exosystems.net/api/oauth/google/callback".to_string(),
             exp: now_unix_secs() + 300,
             nonce: "abcdef".to_string(),
-            return_tab: "settings".to_string(),
+            return_tab: "preferences".to_string(),
             return_doc_path: "docs/adr/001-auth.md".to_string(),
         };
         let tok = seal_oauth_state(&payload).expect("state seal should succeed");
         let parsed = open_oauth_state(&tok).expect("state open should succeed");
         assert_eq!(parsed.did_peer, "did:peer:0z6Mktest123");
-        assert_eq!(parsed.return_tab, "settings");
+        assert_eq!(parsed.return_tab, "preferences");
         assert_eq!(sanitize_drive_id("1AbC_xyz-99"), Some("1AbC_xyz-99".to_string()));
         assert_eq!(sanitize_drive_id("../etc/passwd"), None);
         assert_eq!(escape_drive_query_value("Bob's \\ Notes"), "Bob\\'s \\\\ Notes");

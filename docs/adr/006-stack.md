@@ -9,7 +9,7 @@ Status: Accepted
 
 The ExoNovel production application—including its built-in private **Docs Reader**—must run **100% in Rust and Leptos** without Node.js.
 
-During documentation interviews inside **Google AI Studio**, the AI Studio preview sandbox provides only a Node.js runtime (`rustc` and `cargo` are not installed in the sandbox). To keep the docs readable inside AI Studio, a temporary Node.js + React/TypeScript viewer exists strictly inside the AI Studio preview environment.
+During documentation interviews inside the **preview container**, the preview sandbox provides only a Node.js runtime (`rustc` and `cargo` are not installed in the sandbox). Under `AGENTS.md` Rule 19, implementation effort focuses exclusively on the deployable Rust/Leptos application verified statically locally and compiled/deployed via GitHub Actions.
 
 ## Decision
 
@@ -20,19 +20,18 @@ During documentation interviews inside **Google AI Studio**, the AI Studio previ
   - **Version Policy**: Uses unpinned minor ranges (`leptos = "0.8"`, `axum = "0.8"`) aligned with `exosystems_net`'s `0.8.20` Leptos generation without locking patch versions.
   - **Compiler Recursion Limit (`#![recursion_limit = "512"]`)**: Declared across `crates/frontend/src/lib.rs`, `crates/app/src/lib.rs`, and `crates/server/src/main.rs` because deeply nested Leptos `view!` macros and combined `ssr`/`hydrate` type evaluation exceed `rustc`'s built-in `128` compile-time recursion safety ceiling.
   - **Workspace Layout**: `crates/app` (shared Leptos UI + router), `crates/frontend` (WASM client hydration), and `crates/server` (Axum native server binary).
-  - **Build & Packaging Pipeline**: GitHub Actions compiles, tests, and bundles a finished release package (`exonovel-server` + `site/` + `docs/` + `AGENTS.md`) on GitHub-hosted `ubuntu-latest` machines and deploys only that finished package to `/opt/exonovel` on the production Linux host (`127.0.0.1:3001`, separate from `exosystems_net` on `127.0.0.1:3000`). No Rust build tools are required on the production server.
+  - **Build & Packaging Pipeline**: GitHub Actions compiles, tests, and bundles a finished release package (`exonovel-server` + `site/` + `docs/` + `AGENTS.md`) on CI runners and deploys only that finished package to the production application directory on the production server (`127.0.0.1:3001`, separate from `exosystems_net` on `127.0.0.1:3000`). No Rust build tools are required on the production server.
   - **Built-In Leptos Docs Reader**: Implemented natively inside ExoNovel using Leptos components and Rust Markdown rendering (`comrak` with GitHub Flavored Markdown extensions plus `ammonia` HTML sanitization).
-  - **Immediate Admin & Reader Visibility**: As soon as `exonomyapp@gmail.com` (or any email allowlisted in `docs_access_allowlist`) signs in to ExoNovel (`https://exonovel.exosystems.net`), the **Docs Reader** option is visible in ExoNovel's Leptos navigation; **Settings** is accessible to all signed-in accounts (including **Connected External Apps** lifecycle), with site-admin panels restricted to the admin account.
+  - **Immediate Admin & Reader Visibility**: As soon as `exonomyapp@gmail.com` (or any email allowlisted in `docs_access_allowlist`) signs in to ExoNovel (`https://exonovel.exosystems.net`), the **Docs Reader** option is visible in ExoNovel's Leptos navigation; **Preferences** is accessible to all signed-in accounts (including **Connected External Apps** lifecycle), with site-admin panels restricted to the admin account.
 - **Native Rust Connections to Neon Services**:
   - **Neon PostgreSQL**: Connected directly via `sqlx` (or `tokio-postgres`) with `?sslmode=require` using `DATABASE_URL` / `DATABASE_URL_UNPOOLED`.
   - **Neon Object Storage**: Connected directly via `aws-sdk-s3` (or `object_store`) using `AWS_ENDPOINT_URL_S3`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`.
-  - **Neon Managed Better Auth**: Leptos calls Neon Auth's hosted HTTPS endpoints (`https://ep-wispy-wave-bgqyejp5.neonauth.c-9.eu-central-1.aws.neon.tech/exonovel/auth`) directly from the browser; the Rust/Axum server verifies session tokens natively using `jsonwebtoken` + `reqwest` against `NEON_AUTH_JWKS_URL`.
+  - **Neon Managed Better Auth**: Leptos calls Neon Auth's configured HTTPS endpoint (`NEON_AUTH_BASE_URL` env var) directly from the browser; the Rust/Axum server verifies session tokens natively using `jsonwebtoken` + `reqwest` against `NEON_AUTH_JWKS_URL`.
   - **Decentralized Identity & P2P Sync**: Native Rust crates (`ed25519-dalek` for `did:peer` and `iroh` for P2P sync).
 
-### 2. Google AI Studio Preview Reader Scope
+### 2. Preview Container vs. Production Deployment Scope
 
-- The Node.js files (`server.ts`, `src/`, `package.json`) exist solely so Google AI Studio can render a live preview inside its Node-only container while editing documentation and synced GitHub files (`https://github.com/exonomyapp/exonovel`), including the temporary preview-only Google Drive workspace and same-origin token revocation proxy (`POST /api/oauth/google/revoke`).
-- Production deployment at `https://exonovel.exosystems.net` runs the compiled **Rust + Leptos** ExoNovel application—not Node.js.
+- Production deployment at `https://exonovel.exosystems.net` runs the compiled **Rust + Leptos** ExoNovel application—not Node.js. All active development, UI/API features, and CI/CD packaging target `crates/` exclusively (`AGENTS.md` Rule 19).
 
 ## Consequences
 
