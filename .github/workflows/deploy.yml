@@ -123,7 +123,7 @@ jobs:
           retention-days: 5
 
   deploy:
-    name: Deploy Finished ExoNovel Package to Tencent
+    name: Deploy Finished ExoNovel Package to Production
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -135,7 +135,7 @@ jobs:
           name: exonovel-package
           path: deploy
 
-      - name: Upload finished package to Tencent server
+      - name: Upload finished package to production server
         uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -229,36 +229,3 @@ jobs:
             echo "ExoNovel failed to answer cleanly on 127.0.0.1:3001."
             sudo journalctl -u exonovel -n 40 --no-pager || true
             exit 1
-
-  cleanup-dependabot-prs:
-    name: Close Legacy Ungrouped Cargo Dependabot PRs
-    needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - name: Close superseded pre-lockfile-only Cargo PRs
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          PRS=$(gh pr list \
-            --repo "${{ github.repository }}" \
-            --state open \
-            --limit 100 \
-            --json number,author,headRefName \
-            --jq '.[] | select((.author.login == "dependabot[bot]" or .author.login == "app/dependabot") and (.headRefName | startswith("dependabot/cargo/")) and ((.headRefName | startswith("dependabot/cargo/cargo-compatible")) | not)) | .number')
-
-          if [ -z "$PRS" ]; then
-            echo "No legacy ungrouped Cargo Dependabot PRs to close."
-            exit 0
-          fi
-
-          for pr in $PRS; do
-            echo "Closing legacy Cargo Dependabot PR #$pr..."
-            gh pr close "$pr" \
-              --repo "${{ github.repository }}" \
-              --comment "Closing superseded ungrouped Cargo Dependabot PR now that main builds cleanly and .github/dependabot.yml uses grouped weekly Cargo.lock-only updates."
-          done

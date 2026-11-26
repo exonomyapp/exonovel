@@ -15,7 +15,7 @@ Parent: [005-docs-ui](../005-docs-ui.md)
    - Full-width content area reaching the right edge of the viewport without artificial horizontal caps or empty right-side margins.
    - Full GitHub Flavored Markdown (tables, task checklists, blockquotes, fenced code blocks with copy, internal `.md` navigation, heading anchors).
    - Sticky right-rail **On this page** outline, light/dark theme toggle, and live polling against `/api/docs` and `/api/doc`.
-3. **Google Drive Workspace & Chat Transcript Archive**:
-   - Header **Google Drive** launch detects existing Google SSO logins from Neon Auth (`listAccounts()`), pre-fills `login_hint`, and launches the Drive authorization flow automatically on click when needed.
-   - Inside Drive Workspace, authorized users can browse, search, preview, rename, trash, and restore Drive files, save the active Markdown doc, run a full **`ExoNovel Docs`** folder archive backup preserving the `docs/` hierarchy, convert AI Studio chat exports (`.txt`, `.md`, `.json`) into formatted Markdown transcripts in Drive, and inspect Drive Activity.
-   - All Drive write, rename, trash, restore, and permanent-delete actions require explicit in-app confirmation modals (`window.alert` / `window.confirm` forbidden).
+3. **Google Docs & Drive Workspace**:
+   - Inside **Settings -> Connected Apps & Google Docs** (accessible to all signed-in accounts) and in the **Docs & ADRs** toolbar (for Docs-authorized users), ExoNovel separates optional Google Docs/Drive authorization (`drive.file` + `userinfo.email` with automatic `login_hint` from Neon Auth) from primary identity sign-in (`openid email profile`).
+   - Users can connect or revoke Google tokens anytime (`/api/oauth/google/start`, `/api/oauth/google/callback`, `/api/oauth/google/revoke`), create editable native Google Docs (`application/vnd.google-apps.document`) converted from Markdown, browse/search/preview/rename/trash/restore/delete Drive files, save individual ADRs to Google Docs or `.md`, and run a full **`ExoNovel Docs`** folder archive backup preserving the `docs/` hierarchy.
+   - All destructive or disconnect actions use inline confirmation UI controls (`window.alert` / `window.confirm` forbidden).

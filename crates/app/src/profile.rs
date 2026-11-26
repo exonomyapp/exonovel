@@ -10,8 +10,8 @@ use crate::{
         invite_url_for_code, is_safe_avatar_url, load_authenticated_user, resolve_fresh_jwt,
         save_profile_patch, upload_avatar_file, ActiveTab, AuthConfigResponse, BillingLedgerItem,
         BillingResponse, CopyIcon, CreateInviteResponse, GroupView, GroupsResponse, InviteView,
-        InvitesResponse, NotificationPreferences, NotificationPrefsResponse, PersonasResponse,
-        ProfileTab, ReferralView, VerifiedUser,
+        InvitesResponse, LocaleFlag, NotificationPreferences, NotificationPrefsResponse,
+        PersonasResponse, ProfileTab, ReferralView, VerifiedUser,
     },
 };
 
@@ -164,7 +164,8 @@ pub fn ProfileView(
                             u.active_persona = updated.active_persona;
                         }
                     });
-                    on_toast(format!("Switched to {label}"));
+                    let toast_prefix = i18n.tr_untracked("toast_switched_persona", "Switched persona");
+                    on_toast(format!("{toast_prefix}: {label}"));
                 }
                 Err(e) => set_profile_notice.set(Some(e)),
             }
@@ -202,7 +203,10 @@ pub fn ProfileView(
                             set_new_persona_name.set(String::new());
                             set_new_persona_handle.set(String::new());
                             set_new_persona_bio.set(String::new());
-                            on_toast("Persona created".to_string());
+                            on_toast(i18n.tr_untracked(
+                                "profile_toast_persona_created",
+                                "Persona created",
+                            ));
                         }
                     } else {
                         let msg = resp.text().await.unwrap_or_default();
@@ -239,7 +243,10 @@ pub fn ProfileView(
                             }
                         }
                         set_editing_persona_did.set(None);
-                        on_toast("Persona updated".to_string());
+                        on_toast(i18n.tr_untracked(
+                            "profile_toast_persona_updated",
+                            "Persona updated",
+                        ));
                     }
                 }
             }
@@ -251,7 +258,10 @@ pub fn ProfileView(
             if let Some(files) = input.files() {
                 if let Some(file) = files.get(0) {
                     if file.size() > 2_097_152.0 {
-                        set_profile_notice.set(Some("Image must be 2 MB or smaller.".to_string()));
+                        set_profile_notice.set(Some(i18n.tr_untracked(
+                            "profile_msg_img_size",
+                            "Image must be 2 MB or smaller.",
+                        )));
                         return;
                     }
                     let auth_url = auth_config.get_untracked().and_then(|c| c.auth_url);
@@ -278,7 +288,10 @@ pub fn ProfileView(
                                                     set_current_user.set(Some(fresh_user));
                                                 }
                                             }
-                                            on_toast("Persona avatar processed".to_string());
+                                            on_toast(i18n.tr_untracked(
+                                                "profile_toast_avatar_done",
+                                                "Persona avatar processed",
+                                            ));
                                         }
                                     });
                                 }
@@ -315,7 +328,10 @@ pub fn ProfileView(
                         set_new_group_name.set(String::new());
                         set_new_group_desc.set(String::new());
                         reload_profile_hub();
-                        on_toast("Group created".to_string());
+                        on_toast(i18n.tr_untracked(
+                            "profile_toast_group_created",
+                            "Group created",
+                        ));
                     }
                 }
             }
@@ -338,7 +354,21 @@ pub fn ProfileView(
                 if let Ok(resp) = req.send().await {
                     if resp.ok() {
                         reload_profile_hub();
-                        on_toast(format!("Member role set to {next_role}"));
+                        let role_disp = i18n.tr_untracked(
+                            if next_role == "manager" {
+                                "status_manager"
+                            } else {
+                                "status_member"
+                            },
+                            next_role,
+                        );
+                        on_toast(format!(
+                            "{}: {role_disp}",
+                            i18n.tr_untracked(
+                                "profile_toast_role_updated",
+                                "Member role updated"
+                            )
+                        ));
                     }
                 }
             }
@@ -363,7 +393,10 @@ pub fn ProfileView(
                             let url = invite_url_for_code(&created.invite.code);
                             copy_text_to_clipboard(&url);
                             reload_profile_hub();
-                            on_toast("Invite link copied".to_string());
+                            on_toast(i18n.tr_untracked(
+                                "profile_toast_invite_copied",
+                                "Invite link copied",
+                            ));
                         }
                     }
                 }
@@ -396,7 +429,13 @@ pub fn ProfileView(
                             }
                         }
                         reload_profile_hub();
-                        on_toast(format!("Sync plan updated: {plan_tier}"));
+                        on_toast(format!(
+                            "{}: {plan_tier}",
+                            i18n.tr_untracked(
+                                "profile_toast_plan_updated",
+                                "Sync plan updated"
+                            )
+                        ));
                     }
                 }
             }
@@ -425,7 +464,10 @@ pub fn ProfileView(
                             u.profile = Some(updated.profile);
                         }
                     });
-                    on_toast("Language quick-switchers saved to Neon".to_string());
+                    on_toast(i18n.tr_untracked(
+                        "profile_toast_langs_saved",
+                        "Language quick-switchers saved to Neon",
+                    ));
                 }
                 Err(e) => set_profile_notice.set(Some(e)),
             }
@@ -452,7 +494,10 @@ pub fn ProfileView(
             {
                 if let Ok(resp) = req.send().await {
                     if resp.ok() {
-                        on_toast("Activity notification preferences saved".to_string());
+                        on_toast(i18n.tr_untracked(
+                            "profile_toast_notif_saved",
+                            "Activity notification preferences saved",
+                        ));
                     }
                 }
             }
@@ -470,8 +515,8 @@ pub fn ProfileView(
     };
 
     let back_label = move || match return_tab.get() {
-        ActiveTab::Docs => "← Back to Docs & ADRs",
-        _ => "← Back to Workspace",
+        ActiveTab::Docs => format!("← {}", i18n.tr("nav_docs", "Docs & ADRs")),
+        _ => i18n.tr("back_to_workspace", "← Back to Workspace"),
     };
 
     let plan_badge = move || {
@@ -505,9 +550,9 @@ pub fn ProfileView(
                                 <div>
                                     <h1 class="exo-h1">{name}</h1>
                                     <div class="exo-sub" style="margin-top: 4px;">
-                                        "Active persona "
+                                        {move || i18n.tr("active_persona_label", "Active persona")} " "
                                         <strong>{ap.handle}</strong>
-                                        " · Sync tier: "
+                                        " · " {move || i18n.tr("sync_tier_label", "Sync tier:")} " "
                                         <strong class="tabular-nums">{plan_badge()}</strong>
                                     </div>
                                     <div class="exo-mono" style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
@@ -527,17 +572,17 @@ pub fn ProfileView(
                 <div class="exo-alert-error">{m}</div>
             })}
 
-            <nav class="exo-gh-tabs" aria-label="Profile sections">
+            <nav class="exo-gh-tabs" aria-label=move || i18n.tr("profile_tabs_aria", "Profile sections")>
                 {[
-                    (ProfileTab::Overview, "Overview"),
-                    (ProfileTab::Works, "Works"),
-                    (ProfileTab::Groups, "Groups & Invites"),
-                    (ProfileTab::Wallet, "Wallet, Paywalls & Purchases"),
-                    (ProfileTab::Personas, "Personas"),
-                    (ProfileTab::LanguagesAndAlerts, "Languages & Notifications"),
+                    (ProfileTab::Overview, "tab_overview", "Overview"),
+                    (ProfileTab::Works, "tab_works", "Works"),
+                    (ProfileTab::Groups, "tab_groups", "Groups & Invites"),
+                    (ProfileTab::Wallet, "tab_wallet", "Wallet, Paywalls & Purchases"),
+                    (ProfileTab::Personas, "tab_personas", "Personas"),
+                    (ProfileTab::LanguagesAndAlerts, "tab_langs_alerts", "Languages & Notifications"),
                 ]
                 .into_iter()
-                .map(|(tab, label)| {
+                .map(|(tab, tr_key, fallback)| {
                     view! {
                         <button
                             type="button"
@@ -548,7 +593,7 @@ pub fn ProfileView(
                             }
                             on:click=move |_| set_active_profile_tab.set(tab)
                         >
-                            {label}
+                            {move || i18n.tr(tr_key, fallback)}
                         </button>
                     }
                 })
@@ -559,27 +604,27 @@ pub fn ProfileView(
                 ProfileTab::Overview => view! {
                     <div>
                         <div class="exo-card">
-                            <h2 class="exo-h2">"Public Creator Identity Overview"</h2>
+                            <h2 class="exo-h2">{move || i18n.tr("profile_overview_title", "Public Creator Identity Overview")}</h2>
                             <p class="exo-sub">
-                                "Your sovereign root identity anchors your works, personas, group invitations, paywall payouts, and reader purchases."
+                                {move || i18n.tr("profile_overview_desc", "Your sovereign root identity anchors your works, personas, group invitations, paywall payouts, and reader purchases.")}
                             </p>
                             {referred_by.get().map(|inviter| view! {
                                 <div class="exo-invite-banner" style="margin-top: 16px;">
-                                    <span>"Referred to ExoNovel by: " <strong>{inviter}</strong></span>
+                                    <span>{move || i18n.tr("profile_referred_by", "Referred to ExoNovel by:")} " " <strong>{inviter}</strong></span>
                                 </div>
                             })}
                             <div class="exo-grid-3" style="margin-top: 18px;">
                                 <div class="exo-format-tile">
-                                    <h3>"Personas"</h3>
-                                    <p class="tabular-nums">{move || current_user.get().map(|u| u.personas.len()).unwrap_or(0)} " workspace keys"</p>
+                                    <h3>{move || i18n.tr("personas_label", "Personas")}</h3>
+                                    <p class="tabular-nums">{move || current_user.get().map(|u| u.personas.len()).unwrap_or(0)} " " {move || i18n.tr("profile_personas_unit", "workspace keys")}</p>
                                 </div>
                                 <div class="exo-format-tile">
-                                    <h3>"Groups"</h3>
-                                    <p class="tabular-nums">{move || groups.get().len()} " collaborative groups"</p>
+                                    <h3>{move || i18n.tr("groups_label", "Groups")}</h3>
+                                    <p class="tabular-nums">{move || groups.get().len()} " " {move || i18n.tr("profile_groups_unit", "collaborative groups")}</p>
                                 </div>
                                 <div class="exo-format-tile">
-                                    <h3>"Referrals"</h3>
-                                    <p class="tabular-nums">{move || referrals.get().len()} " joined writers"</p>
+                                    <h3>{move || i18n.tr("referrals_label", "Referrals")}</h3>
+                                    <p class="tabular-nums">{move || referrals.get().len()} " " {move || i18n.tr("profile_referrals_unit", "joined writers")}</p>
                                 </div>
                             </div>
                         </div>
@@ -588,18 +633,18 @@ pub fn ProfileView(
 
                 ProfileTab::Works => view! {
                     <div class="exo-card">
-                        <h2 class="exo-h2">"Authored & Forked Works"</h2>
+                        <h2 class="exo-h2">{move || i18n.tr("works_title", "Authored & Forked Works")}</h2>
                         <p class="exo-sub">
-                            "Every manuscript stores collaborative Loro CRDT edits alongside Willow Meadowcap capability paths anchored to your active persona."
+                            {move || i18n.tr("works_desc", "Every manuscript stores collaborative Loro CRDT edits alongside Willow Meadowcap capability paths anchored to your active persona.")}
                         </p>
                         <div class="exo-format-grid">
                             <div class="exo-format-tile">
-                                <h3>"Novels & Serials"</h3>
-                                <p>"LoroText chapters + paywalled or free public reader tiers configured in Wallet, Paywalls & Purchases."</p>
+                                <h3>{move || i18n.tr("works_novels_title", "Novels & Serials")}</h3>
+                                <p>{move || i18n.tr("works_novels_desc", "LoroText chapters + paywalled or free public reader tiers configured in Wallet, Paywalls & Purchases.")}</p>
                             </div>
                             <div class="exo-format-tile">
-                                <h3>"Screenplays & Poetry"</h3>
-                                <p>"Multi-language input composer (29 languages + RTL) with live collaborative cursors."</p>
+                                <h3>{move || i18n.tr("works_scripts_title", "Screenplays & Poetry")}</h3>
+                                <p>{move || i18n.tr("works_scripts_desc", "Multi-language input composer (29 languages + RTL) with live collaborative cursors.")}</p>
                             </div>
                         </div>
                     </div>
@@ -608,38 +653,38 @@ pub fn ProfileView(
                 ProfileTab::Groups => view! {
                     <div>
                         <div class="exo-card">
-                            <h2 class="exo-h2">"Groups & Managers"</h2>
+                            <h2 class="exo-h2">{move || i18n.tr("groups_title", "Groups & Managers")}</h2>
                             <InputLocaleBar
-                                context_label="Group Composer"
+                                context_label=i18n.tr("groups_composer_label", "Group Composer")
                                 pinned_codes=pinned_input.get()
                             />
                             <form on:submit=create_new_group style="margin-top: 12px;">
                                 <div class="exo-grid-2">
                                     <div class="exo-field">
-                                        <label class="exo-label">"Group Name"</label>
+                                        <label class="exo-label">{move || i18n.tr("groups_name_label", "Group Name")}</label>
                                         <input
                                             type="text"
                                             class="exo-input"
                                             dir=move || i18n.input_dir()
                                             required=true
-                                            placeholder="e.g. Anthology Editors"
+                                            placeholder=move || i18n.tr("groups_name_ph", "e.g. Anthology Editors")
                                             prop:value=move || new_group_name.get()
                                             on:input=move |ev| set_new_group_name.set(event_target_value(&ev))
                                         />
                                     </div>
                                     <div class="exo-field">
-                                        <label class="exo-label">"Description"</label>
+                                        <label class="exo-label">{move || i18n.tr("groups_desc_label", "Description")}</label>
                                         <input
                                             type="text"
                                             class="exo-input"
                                             dir=move || i18n.input_dir()
-                                            placeholder="What this group collaborates on"
+                                            placeholder=move || i18n.tr("groups_desc_ph", "What this group collaborates on")
                                             prop:value=move || new_group_desc.get()
                                             on:input=move |ev| set_new_group_desc.set(event_target_value(&ev))
                                         />
                                     </div>
                                 </div>
-                                <button type="submit" class="exo-btn exo-btn-primary">"Create Group"</button>
+                                <button type="submit" class="exo-btn exo-btn-primary">{move || i18n.tr("groups_create_btn", "Create Group")}</button>
                             </form>
 
                             {move || groups.get().into_iter().map(|g| {
@@ -655,7 +700,7 @@ pub fn ProfileView(
                                                 <div style="display: flex; align-items: center; gap: 10px;">
                                                     <h3 style="margin: 0;">{g.name}</h3>
                                                     <span class=if is_mgr { "exo-tag exo-tag-accent" } else { "exo-tag" }>
-                                                        {if is_mgr { "Manager" } else { "Member" }}
+                                                        {move || if is_mgr { i18n.tr("status_manager", "Manager") } else { i18n.tr("status_member", "Member") }}
                                                     </span>
                                                 </div>
                                                 {(!g.description.is_empty()).then(|| view! {
@@ -667,7 +712,7 @@ pub fn ProfileView(
                                                 class="exo-btn"
                                                 on:click=move |_| create_and_copy_invite(Some(gid_invite.clone()))
                                             >
-                                                "Invite to Group"
+                                                {move || i18n.tr("groups_invite_btn", "Invite to Group")}
                                             </button>
                                         </div>
 
@@ -692,7 +737,7 @@ pub fn ProfileView(
                                                             }}
                                                             <span>{m_name}</span>
                                                             <span class=if m_is_mgr { "exo-tag exo-tag-accent" } else { "exo-tag" }>
-                                                                {if m_is_mgr { "Manager" } else { "Member" }}
+                                                                {move || if m_is_mgr { i18n.tr("status_manager", "Manager") } else { i18n.tr("status_member", "Member") }}
                                                             </span>
                                                         </div>
                                                         {(is_mgr && !is_creator).then(|| view! {
@@ -702,7 +747,7 @@ pub fn ProfileView(
                                                                 style="min-height: 36px; font-size: 15px;"
                                                                 on:click=move |_| set_member_role(gid_role.clone(), m_did_action.clone(), next_role)
                                                             >
-                                                                {if m_is_mgr { "Set as Member" } else { "Assign Manager" }}
+                                                                {move || if m_is_mgr { i18n.tr("groups_set_member_btn", "Set as Member") } else { i18n.tr("groups_assign_mgr_btn", "Assign Manager") }}
                                                             </button>
                                                         })}
                                                     </div>
@@ -717,25 +762,25 @@ pub fn ProfileView(
                         <div class="exo-card">
                             <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
                                 <div>
-                                    <h2 class="exo-h2" style="margin-bottom: 4px;">"Invites & Referrals"</h2>
-                                    <p class="exo-sub" style="margin: 0;">"Invite writers and track joined referrals."</p>
+                                    <h2 class="exo-h2" style="margin-bottom: 4px;">{move || i18n.tr("invites_title", "Invites & Referrals")}</h2>
+                                    <p class="exo-sub" style="margin: 0;">{move || i18n.tr("invites_sub", "Invite writers and track joined referrals.")}</p>
                                 </div>
                                 <button
                                     type="button"
                                     class="exo-btn exo-btn-primary"
                                     on:click=move |_| create_and_copy_invite(None)
                                 >
-                                    "Create Invite Link"
+                                    {move || i18n.tr("invites_create_btn", "Create Invite Link")}
                                 </button>
                             </div>
                             <div style="overflow-x: auto; margin-top: 14px;">
                                 <table class="exo-table">
                                     <thead>
                                         <tr>
-                                            <th>"Invite Scope"</th>
-                                            <th>"Invite Link"</th>
-                                            <th>"Uses"</th>
-                                            <th>"Created"</th>
+                                            <th>{move || i18n.tr("invites_th_scope", "Invite Scope")}</th>
+                                            <th>{move || i18n.tr("invites_th_link", "Invite Link")}</th>
+                                            <th>{move || i18n.tr("invites_th_uses", "Uses")}</th>
+                                            <th>{move || i18n.tr("invites_th_created", "Created")}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -746,7 +791,7 @@ pub fn ProfileView(
                                                 let url = invite_url_for_code(&inv.code);
                                                 let url_copy = url.clone();
                                                 let inv_code = inv.code.clone();
-                                                let scope = inv.group_name.unwrap_or_else(|| "General ExoNovel Invite".to_string());
+                                                let scope = inv.group_name.unwrap_or_else(|| i18n.tr("invites_scope_general", "General ExoNovel Invite"));
                                                 view! {
                                                     <tr class=move || live.anim_class("invite", &inv_code)>
                                                         <td>{scope}</td>
@@ -757,7 +802,10 @@ pub fn ProfileView(
                                                                     class="exo-copy-btn"
                                                                     on:click=move |_| {
                                                                         copy_text_to_clipboard(&url_copy);
-                                                                        on_toast("Invite link copied".to_string());
+                                                                        on_toast(i18n.tr_untracked(
+                                                                            "profile_toast_invite_copied",
+                                                                            "Invite link copied",
+                                                                        ));
                                                                     }
                                                                 >
                                                                     <CopyIcon />
@@ -781,103 +829,115 @@ pub fn ProfileView(
                 ProfileTab::Wallet => view! {
                     <div>
                         <div class="exo-card">
-                            <h2 class="exo-h2">"Mode 3 Managed Willow Sync Subscription"</h2>
+                            <h2 class="exo-h2">{move || i18n.tr("wallet_title", "Mode 3 Managed Willow Sync Subscription")}</h2>
                             <p class="exo-sub">
-                                "Mode 1 (Web) and Mode 2 (Local Device Willow + Free ExoNovel Relay Discovery) are completely free. Subscribe here to register your did:peer IDs for blind encrypted Mode 3 server-to-device Meadowcap sync ($9/month or $90/year local currency equivalent)."
+                                {move || i18n.tr("wallet_sub", "Mode 1 (Web) and Mode 2 (Local Device Willow + Free ExoNovel Relay Discovery) are completely free. Subscribe here to register your did:peer IDs for blind encrypted Mode 3 server-to-device Meadowcap sync ($9/month or $90/year local currency equivalent).")}
                             </p>
                             <div class="exo-eyebrow" style="margin-top: 12px;">
-                                "ExoNovel Service Recipient Peer: "
+                                {move || i18n.tr("wallet_peer_prefix", "ExoNovel Service Recipient Peer:")} " "
                                 <span class="exo-mono">{move || exo_sync_peer_did.get()}</span>
                             </div>
 
                             <div class="exo-grid-2" style="margin-top: 16px;">
                                 <div class="exo-field">
-                                    <label class="exo-label">"Local Currency"</label>
+                                    <label class="exo-label">{move || i18n.tr("wallet_currency_label", "Local Currency")}</label>
                                     <select
                                         class="exo-input"
                                         prop:value=move || billing_currency.get()
                                         on:change=move |ev| set_billing_currency.set(event_target_value(&ev))
                                     >
-                                        <option value="USD">"USD ($9/mo · $90/yr)"</option>
-                                        <option value="EUR">"EUR (€9/mo · €90/yr)"</option>
-                                        <option value="GBP">"GBP (£7/mo · £70/yr)"</option>
-                                        <option value="PLN">"PLN (36 zł/mo · 360 zł/yr)"</option>
-                                        <option value="NGN">"NGN (₦13,500/mo · ₦135,000/yr)"</option>
-                                        <option value="KES">"KES (KSh 1,200/mo · KSh 12,000/yr)"</option>
-                                        <option value="INR">"INR (₹750/mo · ₹7,500/yr)"</option>
-                                        <option value="BRL">"BRL (R$45/mo · R$450/yr)"</option>
+                                        <option value="USD">{move || i18n.tr("wallet_cur_usd", "USD ($9/mo · $90/yr)")}</option>
+                                        <option value="EUR">{move || i18n.tr("wallet_cur_eur", "EUR (€9/mo · €90/yr)")}</option>
+                                        <option value="GBP">{move || i18n.tr("wallet_cur_gbp", "GBP (£7/mo · £70/yr)")}</option>
+                                        <option value="PLN">{move || i18n.tr("wallet_cur_pln", "PLN (36 zł/mo · 360 zł/yr)")}</option>
+                                        <option value="NGN">{move || i18n.tr("wallet_cur_ngn", "NGN (₦13,500/mo · ₦135,000/yr)")}</option>
+                                        <option value="KES">{move || i18n.tr("wallet_cur_kes", "KES (KSh 1,200/mo · KSh 12,000/yr)")}</option>
+                                        <option value="INR">{move || i18n.tr("wallet_cur_inr", "INR (₹750/mo · ₹7,500/yr)")}</option>
+                                        <option value="BRL">{move || i18n.tr("wallet_cur_brl", "BRL (R$45/mo · R$450/yr)")}</option>
                                     </select>
                                 </div>
                                 <div class="exo-field">
-                                    <label class="exo-label">"Payment Rail (AOTA)"</label>
+                                    <label class="exo-label">{move || i18n.tr("wallet_rail_label", "Payment Rail (AOTA)")}</label>
                                     <select
                                         class="exo-input"
                                         prop:value=move || billing_rail.get()
                                         on:change=move |ev| set_billing_rail.set(event_target_value(&ev))
                                     >
-                                        <option value="card-stripe">"Card / Local Currency Gateway"</option>
-                                        <option value="solana-usdc">"Solana Pay / USDC"</option>
-                                        <option value="bitcoin-lightning">"Bitcoin Lightning (L402)"</option>
-                                        <option value="ethereum-base">"Base / Arbitrum / Ethereum"</option>
-                                        <option value="mobile-money">"Mobile Money / PIX / UPI"</option>
+                                        <option value="card-stripe">{move || i18n.tr("wallet_rail_card", "Card / Local Currency Gateway")}</option>
+                                        <option value="solana-usdc">{move || i18n.tr("wallet_rail_solana", "Solana Pay / USDC")}</option>
+                                        <option value="bitcoin-lightning">{move || i18n.tr("wallet_rail_btc", "Bitcoin Lightning (L402)")}</option>
+                                        <option value="ethereum-base">{move || i18n.tr("wallet_rail_eth", "Base / Arbitrum / Ethereum")}</option>
+                                        <option value="mobile-money">{move || i18n.tr("wallet_rail_mobile", "Mobile Money / PIX / UPI")}</option>
                                     </select>
                                 </div>
                             </div>
 
                             <div class="exo-grid-3" style="margin-top: 14px;">
                                 <div class="exo-format-tile">
-                                    <h3>"Free Modes (1 & 2)"</h3>
-                                    <p>"Web Neon App or Device Local Willow Store + Free Discovery Relay"</p>
+                                    <h3>{move || i18n.tr("wallet_free_title", "Free Modes (1 & 2)")}</h3>
+                                    <p>{move || i18n.tr("wallet_free_desc", "Web Neon App or Device Local Willow Store + Free Discovery Relay")}</p>
                                     <button
                                         type="button"
                                         class="exo-btn"
                                         style="margin-top: 12px; width: 100%;"
                                         on:click=move |_| activate_sync_plan("free", 0)
                                     >
-                                        {move || if plan_badge() == "free" { "Current Plan (Free)" } else { "Switch to Free" }}
+                                        {move || if plan_badge() == "free" {
+                                            i18n.tr("wallet_free_current", "Current Plan (Free)")
+                                        } else {
+                                            i18n.tr("wallet_free_switch", "Switch to Free")
+                                        }}
                                     </button>
                                 </div>
                                 <div class="exo-format-tile" style="border-color: var(--accent);">
-                                    <h3>"Sync Monthly ($9/mo eq.)"</h3>
-                                    <p>"Authorizes Mode 3 Settings toggle & blind Meadowcap replication."</p>
+                                    <h3>{move || i18n.tr("wallet_mo_title", "Sync Monthly ($9/mo eq.)")}</h3>
+                                    <p>{move || i18n.tr("wallet_mo_desc", "Authorizes Mode 3 Settings toggle & blind Meadowcap replication.")}</p>
                                     <button
                                         type="button"
                                         class="exo-btn exo-btn-primary"
                                         style="margin-top: 12px; width: 100%;"
                                         on:click=move |_| activate_sync_plan("sync-monthly", 900)
                                     >
-                                        {move || if plan_badge() == "sync-monthly" { "Active Monthly" } else { "Activate $9/month" }}
+                                        {move || if plan_badge() == "sync-monthly" {
+                                            i18n.tr("wallet_mo_active", "Active Monthly")
+                                        } else {
+                                            i18n.tr("wallet_mo_activate", "Activate $9/month")
+                                        }}
                                     </button>
                                 </div>
                                 <div class="exo-format-tile" style="border-color: var(--accent);">
-                                    <h3>"Sync Annual ($90/yr eq.)"</h3>
-                                    <p>"2 months free · full blind Willow server-to-device sync."</p>
+                                    <h3>{move || i18n.tr("wallet_yr_title", "Sync Annual ($90/yr eq.)")}</h3>
+                                    <p>{move || i18n.tr("wallet_yr_desc", "2 months free · full blind Willow server-to-device sync.")}</p>
                                     <button
                                         type="button"
                                         class="exo-btn exo-btn-primary"
                                         style="margin-top: 12px; width: 100%;"
                                         on:click=move |_| activate_sync_plan("sync-annual", 9000)
                                     >
-                                        {move || if plan_badge() == "sync-annual" { "Active Annual" } else { "Activate $90/year" }}
+                                        {move || if plan_badge() == "sync-annual" {
+                                            i18n.tr("wallet_yr_active", "Active Annual")
+                                        } else {
+                                            i18n.tr("wallet_yr_activate", "Activate $90/year")
+                                        }}
                                     </button>
                                 </div>
                             </div>
                         </div>
 
                         <div class="exo-card">
-                            <h2 class="exo-h2">"Author Paywalls, Reader Purchases & Sync Ledger"</h2>
+                            <h2 class="exo-h2">{move || i18n.tr("ledger_title", "Author Paywalls, Reader Purchases & Sync Ledger")}</h2>
                             <p class="exo-sub">
-                                "All commercial records—connected wallets, paywall earnings, reader purchases of works you buy, and Sync receipts—live exclusively here in Profile."
+                                {move || i18n.tr("ledger_sub", "All commercial records—connected wallets, paywall earnings, reader purchases of works you buy, and Sync receipts—live exclusively here in Profile.")}
                             </p>
                             <div style="overflow-x: auto; margin-top: 14px;">
                                 <table class="exo-table">
                                     <thead>
                                         <tr>
-                                            <th>"Type"</th>
-                                            <th>"Amount"</th>
-                                            <th>"Cycle"</th>
-                                            <th>"Details"</th>
-                                            <th>"Date"</th>
+                                            <th>{move || i18n.tr("ledger_th_type", "Type")}</th>
+                                            <th>{move || i18n.tr("ledger_th_amount", "Amount")}</th>
+                                            <th>{move || i18n.tr("ledger_th_cycle", "Cycle")}</th>
+                                            <th>{move || i18n.tr("ledger_th_details", "Details")}</th>
+                                            <th>{move || i18n.tr("ledger_th_date", "Date")}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -907,9 +967,9 @@ pub fn ProfileView(
 
                 ProfileTab::Personas => view! {
                     <div class="exo-card">
-                        <h2 class="exo-h2">"Pen Names & Personas"</h2>
+                        <h2 class="exo-h2">{move || i18n.tr("personas_title", "Pen Names & Personas")}</h2>
                         <p class="exo-sub">
-                            "Each persona carries its own cryptographic subspace key and avatar while rolling up to your root identity."
+                            {move || i18n.tr("personas_sub", "Each persona carries its own cryptographic subspace key and avatar while rolling up to your root identity.")}
                         </p>
 
                         <div class="exo-persona-list">
@@ -922,7 +982,11 @@ pub fn ProfileView(
                                     let p_did_edit = p_did.clone();
                                     let p_did_copy = p_did.clone();
                                     let p_did_anim = p_did.clone();
-                                    let p_name = if p.display_name.is_empty() { "Writer".to_string() } else { p.display_name.clone() };
+                                    let p_name = if p.display_name.is_empty() {
+                                        i18n.tr("persona_default_writer", "Writer")
+                                    } else {
+                                        p.display_name.clone()
+                                    };
                                     let p_name_switch = p_name.clone();
                                     let p_name_form = p.display_name.clone();
                                     let p_handle_form = p.handle.clone();
@@ -946,7 +1010,7 @@ pub fn ProfileView(
                                                     </div>
                                                 </div>
                                                 {if is_act {
-                                                    view! { <span class="exo-tag exo-tag-accent">"Active"</span> }.into_any()
+                                                    view! { <span class="exo-tag exo-tag-accent">{move || i18n.tr("active_badge", "Active")}</span> }.into_any()
                                                 } else {
                                                     view! {
                                                         <button
@@ -955,7 +1019,7 @@ pub fn ProfileView(
                                                             style="min-height: 36px; font-size: 15px;"
                                                             on:click=move |_| switch_active_persona(p_did_switch.clone(), p_name_switch.clone())
                                                         >
-                                                            "Use"
+                                                            {move || i18n.tr("persona_use_btn", "Use")}
                                                         </button>
                                                     }.into_any()
                                                 }}
@@ -983,7 +1047,7 @@ pub fn ProfileView(
                                                     }
                                                 }
                                             >
-                                                "Edit Persona & Avatar"
+                                                {move || i18n.tr("persona_edit_btn", "Edit Persona & Avatar")}
                                             </button>
 
                                             <Show when=move || editing_persona_did.get().as_deref() == Some(p_did_val.get_value().as_str())>
@@ -991,21 +1055,21 @@ pub fn ProfileView(
                                                     <input
                                                         type="text"
                                                         class="exo-input"
-                                                        placeholder="Display name"
+                                                        placeholder=move || i18n.tr("persona_display_ph", "Display name")
                                                         prop:value=move || edit_p_name.get()
                                                         on:input=move |ev| set_edit_p_name.set(event_target_value(&ev))
                                                     />
                                                     <input
                                                         type="text"
                                                         class="exo-input"
-                                                        placeholder="Handle"
+                                                        placeholder=move || i18n.tr("persona_handle_ph", "Handle")
                                                         prop:value=move || edit_p_handle.get()
                                                         on:input=move |ev| set_edit_p_handle.set(event_target_value(&ev))
                                                     />
                                                     <input
                                                         type="text"
                                                         class="exo-input"
-                                                        placeholder="Bio"
+                                                        placeholder=move || i18n.tr("persona_bio_ph", "Bio")
                                                         prop:value=move || edit_p_bio.get()
                                                         on:input=move |ev| set_edit_p_bio.set(event_target_value(&ev))
                                                     />
@@ -1020,7 +1084,7 @@ pub fn ProfileView(
                                                         class="exo-btn exo-btn-primary"
                                                         on:click=move |_| save_persona_edits(p_did_val.get_value())
                                                     >
-                                                        "Save Persona"
+                                                        {move || i18n.tr("persona_save_btn", "Save Persona")}
                                                     </button>
                                                 </div>
                                             </Show>
@@ -1031,14 +1095,14 @@ pub fn ProfileView(
                         </div>
 
                         <form on:submit=create_new_persona style="margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border);">
-                            <div class="exo-label" style="font-size: 18px;">"Create New Persona"</div>
+                            <div class="exo-label" style="font-size: 18px;">{move || i18n.tr("persona_create_heading", "Create New Persona")}</div>
                             <InputLocaleBar
-                                context_label="Persona Composer"
+                                context_label=i18n.tr("persona_composer_label", "Persona Composer")
                                 pinned_codes=pinned_input.get()
                             />
                             <div class="exo-grid-2">
                                 <div class="exo-field">
-                                    <label class="exo-label">"Persona Display Name"</label>
+                                    <label class="exo-label">{move || i18n.tr("persona_display_label", "Persona Display Name")}</label>
                                     <input
                                         type="text"
                                         class="exo-input"
@@ -1049,7 +1113,7 @@ pub fn ProfileView(
                                     />
                                 </div>
                                 <div class="exo-field">
-                                    <label class="exo-label">"Handle"</label>
+                                    <label class="exo-label">{move || i18n.tr("persona_handle_label", "Handle")}</label>
                                     <input
                                         type="text"
                                         class="exo-input"
@@ -1060,7 +1124,7 @@ pub fn ProfileView(
                                 </div>
                             </div>
                             <div class="exo-field">
-                                <label class="exo-label">"Bio"</label>
+                                <label class="exo-label">{move || i18n.tr("persona_bio_label", "Bio")}</label>
                                 <input
                                     type="text"
                                     class="exo-input"
@@ -1069,7 +1133,7 @@ pub fn ProfileView(
                                     on:input=move |ev| set_new_persona_bio.set(event_target_value(&ev))
                                 />
                             </div>
-                            <button type="submit" class="exo-btn exo-btn-primary">"Create Persona"</button>
+                            <button type="submit" class="exo-btn exo-btn-primary">{move || i18n.tr("persona_create_btn", "Create Persona")}</button>
                         </form>
                     </div>
                 }.into_any(),
@@ -1077,19 +1141,20 @@ pub fn ProfileView(
                 ProfileTab::LanguagesAndAlerts => view! {
                     <div>
                         <div class="exo-card">
-                            <h2 class="exo-h2">"Personal Quick-Switch Languages"</h2>
+                            <h2 class="exo-h2">{move || i18n.tr("langs_quick_title", "Personal Quick-Switch Languages")}</h2>
                             <p class="exo-sub">
-                                "Choose which of the 29 supported languages appear in your compact top-bar UI switcher and your writing composer Input switcher. All 29 remain available in Settings."
+                                {move || i18n.tr("langs_quick_sub", "Choose which of the 29 supported languages appear in your compact top-bar UI switcher and your writing composer Input switcher. All 29 remain available in Settings.")}
                             </p>
 
                             <div class="exo-grid-2" style="margin-top: 16px;">
                                 <div>
-                                    <div class="exo-label">"Pinned Output UI Languages"</div>
+                                    <div class="exo-label">{move || i18n.tr("langs_pinned_ui_label", "Pinned Output UI Languages")}</div>
                                     <div class="exo-filter-bar">
                                         {move || i18n.catalog.get().into_iter().map(|loc| {
                                             let code = loc.code.clone();
                                             let code_cmp = code.clone();
                                             let code_clk = code.clone();
+                                            let code_flag = code.clone();
                                             view! {
                                                 <button
                                                     type="button"
@@ -1100,7 +1165,8 @@ pub fn ProfileView(
                                                     }
                                                     on:click=move |_| toggle_pin_code(set_pinned_ui, code_clk.clone())
                                                 >
-                                                    {loc.native_name} " (" {code} ")"
+                                                    <LocaleFlag code=code_flag />
+                                                    <span>{loc.native_name} " (" {code} ")"</span>
                                                 </button>
                                             }
                                         }).collect_view()}
@@ -1108,12 +1174,13 @@ pub fn ProfileView(
                                 </div>
 
                                 <div>
-                                    <div class="exo-label">"Pinned Composer Input Languages"</div>
+                                    <div class="exo-label">{move || i18n.tr("langs_pinned_input_label", "Pinned Composer Input Languages")}</div>
                                     <div class="exo-filter-bar">
                                         {move || i18n.catalog.get().into_iter().map(|loc| {
                                             let code = loc.code.clone();
                                             let code_cmp = code.clone();
                                             let code_clk = code.clone();
+                                            let code_flag = code.clone();
                                             view! {
                                                 <button
                                                     type="button"
@@ -1124,7 +1191,8 @@ pub fn ProfileView(
                                                     }
                                                     on:click=move |_| toggle_pin_code(set_pinned_input, code_clk.clone())
                                                 >
-                                                    {loc.native_name} " (" {code} ")"
+                                                    <LocaleFlag code=code_flag />
+                                                    <span>{loc.native_name} " (" {code} ")"</span>
                                                 </button>
                                             }
                                         }).collect_view()}
@@ -1138,14 +1206,14 @@ pub fn ProfileView(
                                 style="margin-top: 18px;"
                                 on:click=save_pinned_languages
                             >
-                                "Save Quick-Switch Language Lists"
+                                {move || i18n.tr("langs_save_btn", "Save Quick-Switch Language Lists")}
                             </button>
                         </div>
 
                         <div class="exo-card">
-                            <h2 class="exo-h2">"Activity, Collaboration & Commercial Notifications"</h2>
+                            <h2 class="exo-h2">{move || i18n.tr("activity_notif_title", "Activity, Collaboration & Commercial Notifications")}</h2>
                             <p class="exo-sub">
-                                "Choose which persona activity, group invitations, paywall earnings, and reader purchases generate notifications."
+                                {move || i18n.tr("activity_notif_sub", "Choose which persona activity, group invitations, paywall earnings, and reader purchases generate notifications.")}
                             </p>
 
                             {move || {
@@ -1161,7 +1229,7 @@ pub fn ProfileView(
                                                     set_notif_prefs.update(|np| np.notify_author_earnings = v);
                                                 }
                                             />
-                                            <span><strong>"Author Paywall Earnings"</strong> " — Notify when a reader unlocks your paid works."</span>
+                                            <span><strong>{move || i18n.tr("notif_earn_title", "Author Paywall Earnings")}</strong> " — " {move || i18n.tr("notif_earn_desc", "Notify when a reader unlocks your paid works.")}</span>
                                         </label>
                                         <label class="exo-check-row">
                                             <input
@@ -1172,7 +1240,7 @@ pub fn ProfileView(
                                                     set_notif_prefs.update(|np| np.notify_reader_purchases = v);
                                                 }
                                             />
-                                            <span><strong>"Reader Purchases & Receipts"</strong> " — Receipts when you purchase works or unlock paywalls from other authors."</span>
+                                            <span><strong>{move || i18n.tr("notif_purch_title", "Reader Purchases & Receipts")}</strong> " — " {move || i18n.tr("notif_purch_desc", "Receipts when you purchase works or unlock paywalls from other authors.")}</span>
                                         </label>
                                         <label class="exo-check-row">
                                             <input
@@ -1183,7 +1251,7 @@ pub fn ProfileView(
                                                     set_notif_prefs.update(|np| np.notify_group_invites = v);
                                                 }
                                             />
-                                            <span><strong>"Group Invitations & Role Changes"</strong> " — Invites and Manager assignments."</span>
+                                            <span><strong>{move || i18n.tr("notif_inv_title", "Group Invitations & Role Changes")}</strong> " — " {move || i18n.tr("notif_inv_desc", "Invites and Manager assignments.")}</span>
                                         </label>
                                         <label class="exo-check-row">
                                             <input
@@ -1194,7 +1262,7 @@ pub fn ProfileView(
                                                     set_notif_prefs.update(|np| np.notify_referral_signups = v);
                                                 }
                                             />
-                                            <span><strong>"Referral Signups"</strong> " — Alerts when a writer joins via your personal invite link."</span>
+                                            <span><strong>{move || i18n.tr("notif_ref_title", "Referral Signups")}</strong> " — " {move || i18n.tr("notif_ref_desc", "Alerts when a writer joins via your personal invite link.")}</span>
                                         </label>
                                         <label class="exo-check-row">
                                             <input
@@ -1205,7 +1273,7 @@ pub fn ProfileView(
                                                     set_notif_prefs.update(|np| np.notify_collaborator_comments = v);
                                                 }
                                             />
-                                            <span><strong>"Co-Author & Collaborator Notes"</strong> " — Inline edits and replies on shared works."</span>
+                                            <span><strong>{move || i18n.tr("notif_collab_title", "Co-Author & Collaborator Notes")}</strong> " — " {move || i18n.tr("notif_collab_desc", "Inline edits and replies on shared works.")}</span>
                                         </label>
                                         <label class="exo-check-row">
                                             <input
@@ -1216,7 +1284,7 @@ pub fn ProfileView(
                                                     set_notif_prefs.update(|np| np.notify_mentions_and_forks = v);
                                                 }
                                             />
-                                            <span><strong>"Mentions & Forks"</strong> " — Alerts when your building blocks are forked with attribution."</span>
+                                            <span><strong>{move || i18n.tr("notif_fork_title", "Mentions & Forks")}</strong> " — " {move || i18n.tr("notif_fork_desc", "Alerts when your building blocks are forked with attribution.")}</span>
                                         </label>
                                     </div>
                                 }
@@ -1228,7 +1296,7 @@ pub fn ProfileView(
                                 style="margin-top: 16px;"
                                 on:click=save_profile_notif_prefs
                             >
-                                "Save Activity Notification Rules"
+                                {move || i18n.tr("activity_notif_save_btn", "Save Activity Notification Rules")}
                             </button>
                         </div>
                     </div>

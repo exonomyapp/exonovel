@@ -2,6 +2,7 @@
 
 mod auth;
 mod cms;
+mod connected_apps;
 mod db;
 mod docs;
 mod i18n;
@@ -33,6 +34,12 @@ use crate::{
         api_cms_toggle_task, api_cms_tooling_and_notes, api_cms_update_note_status,
         api_cms_upsert_adr, api_cms_upsert_tool, ensure_cms_schema, seed_cms_from_disk,
     },
+    connected_apps::{
+        api_drive_backup_archive, api_drive_create_folder, api_drive_file_action,
+        api_drive_list_files, api_drive_read_content, api_drive_save_doc,
+        api_google_oauth_callback, api_google_oauth_revoke, api_google_oauth_start,
+        api_list_connected_apps, ensure_connected_apps_schema,
+    },
     db::{
         claim_invite, connect_pool, create_group, create_invite, create_persona,
         delete_allowlist_entry, ensure_schema, get_admin_email, list_allowlist,
@@ -42,8 +49,8 @@ use crate::{
         PersonaUpdateInput, ProfileUpdateInput,
     },
     docs::{
-        extract_title_and_headings, get_docs_tree, render_safe_gfm_html, resolve_safe_doc_path,
-        DocPayload,
+        extract_title_and_headings, get_docs_tree_for_locale, render_safe_gfm_html,
+        resolve_safe_doc_path_for_locale, DocPayload,
     },
     i18n::{api_i18n_catalog, api_i18n_pack},
     live::{
@@ -100,6 +107,9 @@ async fn main() {
         }
         if let Err(err) = ensure_cms_schema(pool).await {
             eprintln!("CMS schema warning: {err}");
+        }
+        if let Err(err) = ensure_connected_apps_schema(pool).await {
+            eprintln!("Connected apps schema warning: {err}");
         }
         seed_cms_from_disk(pool, &root_dir).await;
     }
@@ -174,6 +184,17 @@ async fn main() {
         .route("/api/cms/proposals/{id}", put(api_cms_update_note_status))
         .route("/api/cms/tasks", get(api_cms_list_tasks))
         .route("/api/cms/tasks/{task_key}/toggle", post(api_cms_toggle_task))
+        .route("/api/connected-apps", get(api_list_connected_apps))
+        .route("/api/oauth/google/start", post(api_google_oauth_start))
+        .route("/api/oauth/google/callback", get(api_google_oauth_callback))
+        .route("/api/oauth/google/callback/", get(api_google_oauth_callback))
+        .route("/api/oauth/google/revoke", post(api_google_oauth_revoke))
+        .route("/api/drive/files", get(api_drive_list_files))
+        .route("/api/drive/folders", post(api_drive_create_folder))
+        .route("/api/drive/files/{file_id}/content", get(api_drive_read_content))
+        .route("/api/drive/files/{file_id}/action", post(api_drive_file_action))
+        .route("/api/drive/save-doc", post(api_drive_save_doc))
+        .route("/api/drive/backup-archive", post(api_drive_backup_archive))
         .route(
             "/api/admin/allowlist",
             get(api_admin_list)
@@ -735,9 +756,16 @@ async fn api_claim_invite(
     Ok(Json(serde_json::json!({ "claimed": claimed })))
 }
 
+#[derive(Deserialize)]
+struct DocsQuery {
+    #[serde(default)]
+    locale: Option<String>,
+}
+
 async fn api_docs(
     State(state): State<AppState>,
     AuthUser(user): AuthUser,
+    Query(query): Query<DocsQuery>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     if !user.authorized {
         return Err((
@@ -745,13 +773,15 @@ async fn api_docs(
             Json(serde_json::json!({ "error": "Docs access denied." })),
         ));
     }
-    let tree = get_docs_tree(&state.root_dir);
+    let tree = get_docs_tree_for_locale(&state.root_dir, query.locale.as_deref().unwrap_or("en"));
     Ok(Json(serde_json::json!({ "tree": tree })))
 }
 
 #[derive(Deserialize)]
 struct DocQuery {
     path: String,
+    #[serde(default)]
+    locale: Option<String>,
 }
 
 async fn api_doc(
@@ -766,7 +796,11 @@ async fn api_doc(
         ));
     }
 
-    let Some(abs_path) = resolve_safe_doc_path(&state.root_dir, &query.path) else {
+    let Some((abs_path, rel_path)) = resolve_safe_doc_path_for_locale(
+        &state.root_dir,
+        &query.path,
+        query.locale.as_deref().unwrap_or("en"),
+    ) else {
         return Err((
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({ "error": "Document not found." })),
@@ -788,12 +822,6 @@ async fn api_doc(
     let (title, headings, word_count) = extract_title_and_headings(&markdown, &file_name);
     let reading_minutes = (word_count / 210).max(1);
     let html = render_safe_gfm_html(&markdown);
-
-    let rel_path = abs_path
-        .strip_prefix(fs::canonicalize(&state.root_dir).unwrap_or_else(|_| state.root_dir.clone()))
-        .unwrap_or(&abs_path)
-        .to_string_lossy()
-        .replace('\\', "/");
 
     Ok(Json(DocPayload {
         path: rel_path,

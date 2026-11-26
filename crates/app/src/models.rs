@@ -247,6 +247,10 @@ pub struct AdrRecord {
     pub headings: Vec<DocHeading>,
     pub author_did: String,
     pub dependencies: Vec<AdrToolDependencyView>,
+    #[serde(default)]
+    pub locale: String,
+    #[serde(default)]
+    pub translation_status: String,
     pub updated_at: String,
 }
 
@@ -515,9 +519,93 @@ pub enum ProfileTab {
     LanguagesAndAlerts,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SsoAccountSummary {
+    pub provider_id: String,
+    pub account_id: String,
+    pub scopes: String,
+    pub updated_at: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectedAppItem {
+    pub provider: String,
+    pub status: String,
+    pub provider_email: String,
+    pub provider_account_id: String,
+    pub scopes: String,
+    pub connected_at: String,
+    pub revoked_at: Option<String>,
+    pub willow_path: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectedAppsResponse {
+    pub sso_accounts: Vec<SsoAccountSummary>,
+    pub connected_apps: Vec<ConnectedAppItem>,
+    pub oauth_configured: bool,
+    pub redirect_uri: String,
+    pub recommended_scopes: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DriveFileItem {
+    pub id: String,
+    pub name: String,
+    pub mime_type: String,
+    pub modified_time: Option<String>,
+    pub size: Option<String>,
+    pub web_view_link: Option<String>,
+    pub trashed: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DriveFilesResponse {
+    pub files: Vec<DriveFileItem>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DriveFolderCreateResponse {
+    pub folder: DriveFileItem,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DriveContentResponse {
+    pub id: String,
+    pub content: String,
+    pub exported_mime_type: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DriveSaveResponse {
+    pub file: DriveFileItem,
+    pub action: String,
+    pub folder: Option<DriveFileItem>,
+    pub format: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DriveBackupResponse {
+    pub archive_folder: DriveFileItem,
+    pub created_count: usize,
+    pub updated_count: usize,
+    pub total: usize,
+    pub format: String,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SettingsSection {
     Account,
+    ConnectedApps,
     AppearanceAndLanguages,
     SyncAndStorage,
     NotificationChannels,
@@ -545,6 +633,14 @@ impl AppearanceMode {
             AppearanceMode::System => "System theme",
             AppearanceMode::Light => "Light theme",
             AppearanceMode::Dark => "Dark theme",
+        }
+    }
+
+    pub fn label_key(self) -> &'static str {
+        match self {
+            AppearanceMode::System => "theme_system_label",
+            AppearanceMode::Light => "theme_light_label",
+            AppearanceMode::Dark => "theme_dark_label",
         }
     }
 
@@ -683,6 +779,62 @@ pub async fn upload_avatar_file(
     resp.json::<AvatarUploadResponse>()
         .await
         .map_err(|e| e.to_string())
+}
+
+pub fn extract_api_error_message(raw: &str, fallback: &str) -> String {
+    #[derive(Deserialize)]
+    struct ErrObj {
+        error: Option<String>,
+    }
+    if let Ok(parsed) = serde_json::from_str::<ErrObj>(raw) {
+        if let Some(msg) = parsed.error {
+            if !msg.trim().is_empty() {
+                return msg;
+            }
+        }
+    }
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        fallback.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+pub async fn start_google_connect_flow(
+    auth_config: ReadSignal<Option<AuthConfigResponse>>,
+    initial_jwt: ReadSignal<Option<String>>,
+    return_tab: &str,
+    return_doc_path: Option<&str>,
+) -> Result<(), String> {
+    let Some(jwt) = resolve_fresh_jwt(auth_config, initial_jwt).await else {
+        return Err("Missing active session token. Please sign in again.".to_string());
+    };
+    let req = Request::post("/api/oauth/google/start")
+        .header("Authorization", &format!("Bearer {jwt}"))
+        .json(&serde_json::json!({
+            "returnTab": return_tab,
+            "returnDocPath": return_doc_path,
+        }))
+        .map_err(|e| e.to_string())?;
+    let resp = req.send().await.map_err(|e| e.to_string())?;
+    if !resp.ok() {
+        let txt = resp.text().await.unwrap_or_default();
+        return Err(extract_api_error_message(
+            &txt,
+            "Failed to start Google authorization.",
+        ));
+    }
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct StartRes {
+        auth_url: String,
+    }
+    let parsed = resp.json::<StartRes>().await.map_err(|e| e.to_string())?;
+    if let Some(win) = web_sys::window() {
+        let _ = win.location().assign(&parsed.auth_url);
+    }
+    Ok(())
 }
 
 // Pre-auth temporary invite persistence uses sessionStorage only (zero localStorage across the app)
@@ -849,11 +1001,38 @@ pub fn format_allowlist_status(status: &str) -> &'static str {
     }
 }
 
+pub fn allowlist_status_key(status: &str) -> &'static str {
+    match status {
+        "admin" => "role_admin",
+        "moderator" => "role_moderator",
+        "reader" => "status_reader",
+        "pending" => "status_pending",
+        "suspended" => "status_suspended",
+        _ => "status_reader",
+    }
+}
+
 pub fn format_account_role(role: &str) -> &'static str {
     match role {
         "admin" => "Admin",
         "moderator" => "Moderator",
         _ => "User",
+    }
+}
+
+pub fn account_role_key(role: &str) -> &'static str {
+    match role {
+        "admin" => "role_admin",
+        "moderator" => "role_moderator",
+        _ => "role_user",
+    }
+}
+
+pub fn account_status_key(status: &str) -> &'static str {
+    match status {
+        "restricted" => "status_restricted",
+        "suspended" => "status_suspended",
+        _ => "active_badge",
     }
 }
 
@@ -946,3 +1125,263 @@ pub fn MonitorIcon() -> impl IntoView {
         </svg>
     }
 }
+
+#[component]
+pub fn MenuIcon() -> impl IntoView {
+    view! {
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="4" x2="20" y1="6" y2="6"/>
+            <line x1="4" x2="20" y1="12" y2="12"/>
+            <line x1="4" x2="20" y1="18" y2="18"/>
+        </svg>
+    }
+}
+
+#[component]
+pub fn CloseIcon() -> impl IntoView {
+    view! {
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" x2="6" y1="6" y2="18"/>
+            <line x1="6" x2="18" y1="6" y2="18"/>
+        </svg>
+    }
+}
+
+#[component]
+pub fn GlobeIcon() -> impl IntoView {
+    view! {
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+            <path d="M2 12h20"/>
+        </svg>
+    }
+}
+
+pub fn locale_flag_emoji(code: &str) -> &'static str {
+    match code.trim() {
+        "en" => "🇬🇧",
+        "de" => "🇩🇪",
+        "pl" => "🇵🇱",
+        "fr" => "🇫🇷",
+        "es" => "🇪🇸",
+        "it" => "🇮🇹",
+        "nl" => "🇳🇱",
+        "pt" => "🇵🇹",
+        "hu" => "🇭🇺",
+        "ro" => "🇷🇴",
+        "uk" => "🇺🇦",
+        "ru" => "🇷🇺",
+        "sr" => "🇷🇸",
+        "el" => "🇬🇷",
+        "ar" => "🇸🇦",
+        "he" => "🇮🇱",
+        "zh-Hans" => "🇨🇳",
+        "zh-Hant" => "🇹🇼",
+        "hi" | "mr" | "te" | "ta" => "🇮🇳",
+        "bn" => "🇧🇩",
+        "sw" => "🇹🇿",
+        "ha" | "yo" | "ig" => "🇳🇬",
+        "am" => "🇪🇹",
+        "zu" => "🇿🇦",
+        _ => "🌐",
+    }
+}
+
+#[component]
+pub fn LocaleFlag(#[prop(into)] code: String) -> impl IntoView {
+    match code.trim() {
+        "en" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="14" fill="#012169"/>
+                <path d="M0 0 L20 14 M20 0 L0 14" stroke="#ffffff" stroke-width="2.6"/>
+                <path d="M0 0 L20 14 M20 0 L0 14" stroke="#c8102e" stroke-width="1.3"/>
+                <path d="M10 0 V14 M0 7 H20" stroke="#ffffff" stroke-width="4"/>
+                <path d="M10 0 V14 M0 7 H20" stroke="#c8102e" stroke-width="2.4"/>
+            </svg>
+        }.into_any(),
+        "de" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="4.67" y="0" fill="#111111"/>
+                <rect width="20" height="4.67" y="4.67" fill="#dd0000"/>
+                <rect width="20" height="4.67" y="9.33" fill="#ffce00"/>
+            </svg>
+        }.into_any(),
+        "pl" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="7" y="0" fill="#ffffff"/>
+                <rect width="20" height="7" y="7" fill="#dc143c"/>
+            </svg>
+        }.into_any(),
+        "fr" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="6.67" height="14" x="0" fill="#0055a4"/>
+                <rect width="6.67" height="14" x="6.67" fill="#ffffff"/>
+                <rect width="6.67" height="14" x="13.33" fill="#ef4135"/>
+            </svg>
+        }.into_any(),
+        "es" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="3.5" y="0" fill="#aa151b"/>
+                <rect width="20" height="7" y="3.5" fill="#f1bf00"/>
+                <rect width="20" height="3.5" y="10.5" fill="#aa151b"/>
+                <rect x="4.2" y="5.1" width="2.4" height="3.8" rx="0.5" fill="#aa151b"/>
+            </svg>
+        }.into_any(),
+        "it" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="6.67" height="14" x="0" fill="#009246"/>
+                <rect width="6.67" height="14" x="6.67" fill="#ffffff"/>
+                <rect width="6.67" height="14" x="13.33" fill="#ce2b37"/>
+            </svg>
+        }.into_any(),
+        "nl" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="4.67" y="0" fill="#ae1c28"/>
+                <rect width="20" height="4.67" y="4.67" fill="#ffffff"/>
+                <rect width="20" height="4.67" y="9.33" fill="#21468b"/>
+            </svg>
+        }.into_any(),
+        "pt" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="8" height="14" x="0" fill="#006600"/>
+                <rect width="12" height="14" x="8" fill="#ff0000"/>
+                <circle cx="8" cy="7" r="2.6" fill="#ffcc00"/>
+                <circle cx="8" cy="7" r="1.4" fill="#003399"/>
+            </svg>
+        }.into_any(),
+        "hu" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="4.67" y="0" fill="#cd2a3e"/>
+                <rect width="20" height="4.67" y="4.67" fill="#ffffff"/>
+                <rect width="20" height="4.67" y="9.33" fill="#436f4d"/>
+            </svg>
+        }.into_any(),
+        "ro" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="6.67" height="14" x="0" fill="#002b7f"/>
+                <rect width="6.67" height="14" x="6.67" fill="#fcd116"/>
+                <rect width="6.67" height="14" x="13.33" fill="#ce1126"/>
+            </svg>
+        }.into_any(),
+        "uk" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="7" y="0" fill="#0057b7"/>
+                <rect width="20" height="7" y="7" fill="#ffd700"/>
+            </svg>
+        }.into_any(),
+        "ru" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="4.67" y="0" fill="#ffffff"/>
+                <rect width="20" height="4.67" y="4.67" fill="#0039a6"/>
+                <rect width="20" height="4.67" y="9.33" fill="#d52b1e"/>
+            </svg>
+        }.into_any(),
+        "sr" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="4.67" y="0" fill="#c6363c"/>
+                <rect width="20" height="4.67" y="4.67" fill="#0c4076"/>
+                <rect width="20" height="4.67" y="9.33" fill="#ffffff"/>
+                <rect x="4.8" y="4" width="2.8" height="4.4" rx="0.6" fill="#edb92e"/>
+            </svg>
+        }.into_any(),
+        "el" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="14" fill="#0d5eaf"/>
+                <rect width="20" height="1.55" y="1.55" fill="#ffffff"/>
+                <rect width="20" height="1.55" y="4.66" fill="#ffffff"/>
+                <rect width="20" height="1.55" y="7.77" fill="#ffffff"/>
+                <rect width="20" height="1.55" y="10.88" fill="#ffffff"/>
+                <rect width="8" height="7.77" x="0" y="0" fill="#0d5eaf"/>
+                <rect width="1.6" height="7.77" x="3.2" y="0" fill="#ffffff"/>
+                <rect width="8" height="1.6" x="0" y="3.08" fill="#ffffff"/>
+            </svg>
+        }.into_any(),
+        "ar" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="14" fill="#006c35"/>
+                <path d="M4.5 5.4 H15.5 M5.5 7.4 H14.5" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round"/>
+                <path d="M5 10 H14.5" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round"/>
+            </svg>
+        }.into_any(),
+        "he" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="14" fill="#ffffff"/>
+                <rect width="20" height="2.2" y="1.4" fill="#0038b8"/>
+                <rect width="20" height="2.2" y="10.4" fill="#0038b8"/>
+                <polygon points="10,4.2 12.4,8.4 7.6,8.4" fill="none" stroke="#0038b8" stroke-width="0.9"/>
+                <polygon points="10,9.8 12.4,5.6 7.6,5.6" fill="none" stroke="#0038b8" stroke-width="0.9"/>
+            </svg>
+        }.into_any(),
+        "zh-Hans" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="14" fill="#de2910"/>
+                <polygon points="4.2,2.2 4.8,4 6.6,4 5.1,5 5.7,6.8 4.2,5.7 2.7,6.8 3.3,5 1.8,4 3.6,4" fill="#ffde00"/>
+                <circle cx="8" cy="2.5" r="0.65" fill="#ffde00"/>
+                <circle cx="9.2" cy="4" r="0.65" fill="#ffde00"/>
+                <circle cx="9.1" cy="5.8" r="0.65" fill="#ffde00"/>
+                <circle cx="7.8" cy="7.2" r="0.65" fill="#ffde00"/>
+            </svg>
+        }.into_any(),
+        "zh-Hant" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="14" fill="#fe0000"/>
+                <rect width="10" height="7" x="0" y="0" fill="#000095"/>
+                <circle cx="5" cy="3.5" r="1.9" fill="#ffffff"/>
+            </svg>
+        }.into_any(),
+        "hi" | "mr" | "te" | "ta" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="4.67" y="0" fill="#ff9933"/>
+                <rect width="20" height="4.67" y="4.67" fill="#ffffff"/>
+                <rect width="20" height="4.67" y="9.33" fill="#138808"/>
+                <circle cx="10" cy="7" r="1.7" fill="none" stroke="#000080" stroke-width="0.8"/>
+            </svg>
+        }.into_any(),
+        "bn" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="14" fill="#006a4e"/>
+                <circle cx="9" cy="7" r="3.8" fill="#f42a41"/>
+            </svg>
+        }.into_any(),
+        "sw" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <polygon points="0,0 20,0 0,14" fill="#1eb53a"/>
+                <polygon points="20,0 20,14 0,14" fill="#00a3dd"/>
+                <path d="M-2 15 L22 -1" stroke="#fcd116" stroke-width="4.6"/>
+                <path d="M-2 15 L22 -1" stroke="#111111" stroke-width="3"/>
+            </svg>
+        }.into_any(),
+        "ha" | "yo" | "ig" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="6.67" height="14" x="0" fill="#008751"/>
+                <rect width="6.67" height="14" x="6.67" fill="#ffffff"/>
+                <rect width="6.67" height="14" x="13.33" fill="#008751"/>
+            </svg>
+        }.into_any(),
+        "am" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="4.67" y="0" fill="#078930"/>
+                <rect width="20" height="4.67" y="4.67" fill="#fcdd09"/>
+                <rect width="20" height="4.67" y="9.33" fill="#da121a"/>
+                <circle cx="10" cy="7" r="2.7" fill="#0f47af"/>
+                <circle cx="10" cy="7" r="1.2" fill="#fcdd09"/>
+            </svg>
+        }.into_any(),
+        "zu" => view! {
+            <svg viewBox="0 0 20 14" width="20" height="14" class="exo-locale-flag" aria-hidden="true">
+                <rect width="20" height="7" y="0" fill="#e03c31"/>
+                <rect width="20" height="7" y="7" fill="#001489"/>
+                <path d="M0 0 L9 7 L0 14 Z" fill="#ffb81c"/>
+                <path d="M0 1.4 L7.2 7 L0 12.6 Z" fill="#111111"/>
+                <path d="M0 0 L9.5 7 L20 7 M0 14 L9.5 7" stroke="#ffffff" stroke-width="3.2" fill="none"/>
+                <path d="M0 0 L9.5 7 L20 7 M0 14 L9.5 7" stroke="#007749" stroke-width="2" fill="none"/>
+            </svg>
+        }.into_any(),
+        _ => view! {
+            <GlobeIcon />
+        }.into_any(),
+    }
+}
+
+

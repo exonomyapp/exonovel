@@ -3,15 +3,16 @@ use leptos::prelude::*;
 use wasm_bindgen::JsCast;
 
 use crate::{
+    connected_apps_ui::ConnectedAppsSettingsPanel,
     i18n::use_i18n,
     live::use_live_sync,
     models::{
-        detect_browser_timezone, display_name_for_user, format_account_role,
-        format_allowlist_status, is_safe_avatar_url, resolve_fresh_jwt, save_profile_patch,
-        upload_avatar_file, ActiveTab, AllowlistEntry, AllowlistResponse, AppearanceMode,
-        AuthConfigResponse, CopyIcon, IdentitiesResponse, IdentityRecord, NotificationDevice,
-        NotificationPreferences, NotificationPrefsResponse, ProfilePatchResponse, SettingsSection,
-        VerifiedUser,
+        account_role_key, account_status_key, allowlist_status_key, detect_browser_timezone,
+        display_name_for_user, is_safe_avatar_url, locale_flag_emoji, resolve_fresh_jwt,
+        save_profile_patch, upload_avatar_file, ActiveTab, AllowlistEntry, AllowlistResponse,
+        AppearanceMode, AuthConfigResponse, CopyIcon, IdentitiesResponse, IdentityRecord,
+        NotificationDevice, NotificationPreferences, NotificationPrefsResponse, ProfilePatchResponse,
+        SettingsSection, VerifiedUser,
     },
 };
 
@@ -51,6 +52,7 @@ pub fn SettingsView(
     on_open_profile_billing: impl Fn() + Copy + Send + Sync + 'static,
     on_profile_updated: impl Fn(ProfilePatchResponse) + Copy + Send + Sync + 'static,
     on_back: impl Fn() + Copy + Send + Sync + 'static,
+    #[prop(optional)] initial_section: Option<RwSignal<Option<SettingsSection>>>,
 ) -> impl IntoView {
     let live = use_live_sync();
     let i18n = use_i18n();
@@ -70,7 +72,19 @@ pub fn SettingsView(
     let can_enable_mode3 = sync_plan_tier_str != "free";
     let sync_plan_tier = StoredValue::new(sync_plan_tier_str);
 
-    let (active_section, set_active_section) = signal(SettingsSection::Account);
+    let (active_section, set_active_section) = signal(
+        initial_section
+            .and_then(|s| s.get_untracked())
+            .unwrap_or(SettingsSection::Account),
+    );
+    if let Some(ext_sig) = initial_section {
+        Effect::new(move |_| {
+            if let Some(sec) = ext_sig.get() {
+                set_active_section.set(sec);
+                ext_sig.set(None);
+            }
+        });
+    }
 
     // Account & Appearance Signals
     let (display_name, set_display_name) = signal(if prof.display_name.is_empty() {
@@ -203,7 +217,10 @@ pub fn SettingsView(
             if let Some(files) = input.files() {
                 if let Some(file) = files.get(0) {
                     if file.size() > 2_097_152.0 {
-                        set_profile_msg.set(Some("Avatar file must be 2 MB or smaller.".to_string()));
+                        set_profile_msg.set(Some(i18n.tr_untracked(
+                            "settings_msg_avatar_size",
+                            "Avatar file must be 2 MB or smaller.",
+                        )));
                         return;
                     }
                     let auth_url = auth_config.get_untracked().and_then(|c| c.auth_url);
@@ -214,7 +231,10 @@ pub fn SettingsView(
                         let cb = wasm_bindgen::closure::Closure::once_into_js(move || {
                             if let Ok(res) = reader_clone.result() {
                                 if let Some(data_url) = res.as_string() {
-                                    set_profile_msg.set(Some("Processing avatar derivatives...".to_string()));
+                                    set_profile_msg.set(Some(i18n.tr_untracked(
+                                        "settings_msg_avatar_processing",
+                                        "Processing avatar derivatives...",
+                                    )));
                                     leptos::task::spawn_local(async move {
                                         match upload_avatar_file(
                                             auth_url.as_deref(),
@@ -237,7 +257,10 @@ pub fn SettingsView(
                                                 {
                                                     on_profile_updated(updated);
                                                 }
-                                                set_profile_msg.set(Some("Avatar saved.".to_string()));
+                                                set_profile_msg.set(Some(i18n.tr_untracked(
+                                                    "settings_msg_avatar_saved",
+                                                    "Avatar saved.",
+                                                )));
                                             }
                                             Err(e) => set_profile_msg.set(Some(e)),
                                         }
@@ -283,8 +306,11 @@ pub fn SettingsView(
             match save_profile_patch(auth_url.as_deref(), fallback_jwt.as_deref(), patch).await {
                 Ok(updated) => {
                     on_profile_updated(updated);
-                    set_profile_msg.set(Some("Settings saved to Neon.".to_string()));
-                    on_toast("Settings saved".to_string());
+                    set_profile_msg.set(Some(i18n.tr_untracked(
+                        "settings_msg_saved",
+                        "Settings saved to Neon.",
+                    )));
+                    on_toast(i18n.tr_untracked("settings_toast_saved", "Settings saved"));
                 }
                 Err(e) => set_profile_msg.set(Some(e)),
             }
@@ -313,7 +339,10 @@ pub fn SettingsView(
             {
                 if let Ok(resp) = req.send().await {
                     if resp.ok() {
-                        on_toast("Notification channels updated".to_string());
+                        on_toast(i18n.tr_untracked(
+                            "settings_toast_notif_saved",
+                            "Notification channels updated",
+                        ));
                     }
                 }
             }
@@ -343,7 +372,10 @@ pub fn SettingsView(
                     if resp.ok() {
                         set_dev_token.set(String::new());
                         reload_channels_and_admin();
-                        on_toast("Push device registered".to_string());
+                        on_toast(i18n.tr_untracked(
+                            "settings_toast_device_reg",
+                            "Push device registered",
+                        ));
                     }
                 }
             }
@@ -361,7 +393,10 @@ pub fn SettingsView(
                 .await
             {
                 if resp.ok() {
-                    on_toast("Test notification & Brevo email dispatched".to_string());
+                    on_toast(i18n.tr_untracked(
+                        "settings_toast_test_sent",
+                        "Test notification & Brevo email dispatched",
+                    ));
                 } else {
                     let msg = resp.text().await.unwrap_or_default();
                     set_profile_msg.set(Some(msg));
@@ -396,7 +431,10 @@ pub fn SettingsView(
                     if resp.ok() {
                         set_grant_did.set(String::new());
                         set_new_note.set(String::new());
-                        set_admin_msg.set(Some("Allowlist updated.".to_string()));
+                        set_admin_msg.set(Some(i18n.tr_untracked(
+                            "settings_msg_allowlist_updated",
+                            "Allowlist updated.",
+                        )));
                         reload_channels_and_admin();
                     }
                 }
@@ -420,7 +458,10 @@ pub fn SettingsView(
                 if let Ok(resp) = req.send().await {
                     if resp.ok() {
                         reload_channels_and_admin();
-                        on_toast("Allowlist tier updated".to_string());
+                        on_toast(i18n.tr_untracked(
+                            "settings_toast_tier_updated",
+                            "Allowlist tier updated",
+                        ));
                     }
                 }
             }
@@ -447,7 +488,10 @@ pub fn SettingsView(
             {
                 if resp.ok() {
                     reload_channels_and_admin();
-                    on_toast("Allowlist entry removed".to_string());
+                    on_toast(i18n.tr_untracked(
+                        "settings_toast_entry_removed",
+                        "Allowlist entry removed",
+                    ));
                 }
             }
         });
@@ -474,7 +518,10 @@ pub fn SettingsView(
             {
                 if let Ok(resp) = req.send().await {
                     if resp.ok() {
-                        set_edit_msg.set(Some("Account updated.".to_string()));
+                        set_edit_msg.set(Some(i18n.tr_untracked(
+                            "settings_msg_account_updated",
+                            "Account updated.",
+                        )));
                         reload_channels_and_admin();
                     }
                 }
@@ -483,8 +530,8 @@ pub fn SettingsView(
     };
 
     let back_label = move || match return_tab.get() {
-        ActiveTab::Docs => "← Back to Docs & ADRs",
-        _ => "← Back to Workspace",
+        ActiveTab::Docs => format!("← {}", i18n.tr("nav_docs", "Docs & ADRs")),
+        _ => i18n.tr("back_to_workspace", "← Back to Workspace"),
     };
 
     view! {
@@ -493,7 +540,7 @@ pub fn SettingsView(
                 <div>
                     <h1 class="exo-h1">{move || i18n.tr("settings_title", "Settings")}</h1>
                     <p class="exo-sub" style="margin: 4px 0 0;">
-                        "Technical preferences, languages, operating modes, and delivery channels (all commercial purchases & subscriptions stay in Profile)."
+                        {move || i18n.tr("settings_subtitle", "Technical preferences, languages, operating modes, and delivery channels (all commercial purchases & subscriptions stay in Profile).")}
                     </p>
                 </div>
                 <button type="button" class="exo-btn" on:click=move |_| on_back()>
@@ -502,34 +549,41 @@ pub fn SettingsView(
             </div>
 
             <div class="exo-gh-settings">
-                <nav class="exo-gh-nav" aria-label="Settings sections">
+                <nav class="exo-gh-nav" aria-label=move || i18n.tr("settings_nav_aria", "Settings sections")>
                     <button
                         type="button"
                         class=move || if active_section.get() == SettingsSection::Account { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
                         on:click=move |_| set_active_section.set(SettingsSection::Account)
                     >
-                        <span>"Account & Security"</span>
+                        <span>{move || i18n.tr("sec_account", "Account & Security")}</span>
+                    </button>
+                    <button
+                        type="button"
+                        class=move || if active_section.get() == SettingsSection::ConnectedApps { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
+                        on:click=move |_| set_active_section.set(SettingsSection::ConnectedApps)
+                    >
+                        <span>{move || i18n.tr("sec_connected_apps", "Connected Apps & Google Docs")}</span>
                     </button>
                     <button
                         type="button"
                         class=move || if active_section.get() == SettingsSection::AppearanceAndLanguages { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
                         on:click=move |_| set_active_section.set(SettingsSection::AppearanceAndLanguages)
                     >
-                        <span>"Appearance & Languages (29)"</span>
+                        <span>{move || i18n.tr("sec_appearance_langs", "Appearance & Languages (29)")}</span>
                     </button>
                     <button
                         type="button"
                         class=move || if active_section.get() == SettingsSection::SyncAndStorage { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
                         on:click=move |_| set_active_section.set(SettingsSection::SyncAndStorage)
                     >
-                        <span>"Sync & Storage (3 Modes)"</span>
+                        <span>{move || i18n.tr("sec_sync_storage", "Sync & Storage (3 Modes)")}</span>
                     </button>
                     <button
                         type="button"
                         class=move || if active_section.get() == SettingsSection::NotificationChannels { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
                         on:click=move |_| set_active_section.set(SettingsSection::NotificationChannels)
                     >
-                        <span>"Notification Channels"</span>
+                        <span>{move || i18n.tr("sec_notifications", "Notification Channels")}</span>
                     </button>
                     <Show when=move || is_admin>
                         <button
@@ -537,7 +591,7 @@ pub fn SettingsView(
                             class=move || if active_section.get() == SettingsSection::AdminDocsAndMaturity { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
                             on:click=move |_| set_active_section.set(SettingsSection::AdminDocsAndMaturity)
                         >
-                            <span>"Docs Allowlist & Accounts"</span>
+                            <span>{move || i18n.tr("sec_admin_allowlist", "Docs Allowlist & Accounts")}</span>
                         </button>
                     </Show>
                 </nav>
@@ -547,18 +601,19 @@ pub fn SettingsView(
                         SettingsSection::Account => {
                             let avatar_preview = avatar_url.get();
                             let did_display = user_did.get_value();
-                            let av_init = display_name.get().chars().next().unwrap_or('W').to_uppercase().to_string();
+                            let av_alt = display_name.get();
+                            let av_init = av_alt.chars().next().unwrap_or('W').to_uppercase().to_string();
                             view! {
                                 <div class="exo-card">
-                                    <h2 class="exo-h2">"Account & Sovereign Identity"</h2>
+                                    <h2 class="exo-h2">{move || i18n.tr("account_title", "Account & Sovereign Identity")}</h2>
                                     <div class="exo-home-hero" style="margin: 14px 0 18px;">
                                         {if is_safe_avatar_url(&avatar_preview) {
-                                            view! { <img src=avatar_preview alt="Avatar" class="exo-avatar" /> }.into_any()
+                                            view! { <img src=avatar_preview alt=av_alt class="exo-avatar" /> }.into_any()
                                         } else {
                                             view! { <div class="exo-avatar">{av_init}</div> }.into_any()
                                         }}
                                         <div>
-                                            <label class="exo-label">"Upload Profile Photo (64px / 256px / 1024px WebP)"</label>
+                                            <label class="exo-label">{move || i18n.tr("upload_avatar_label", "Upload Profile Photo (64px / 256px / 1024px WebP)")}</label>
                                             <input
                                                 type="file"
                                                 accept="image/png,image/jpeg,image/webp,image/gif"
@@ -569,7 +624,7 @@ pub fn SettingsView(
                                     </div>
 
                                     <div class="exo-field">
-                                        <label class="exo-label">"Root Identity (did:peer)"</label>
+                                        <label class="exo-label">{move || i18n.tr("root_identity_label", "Root Identity (did:peer)")}</label>
                                         <div class="exo-id-cell">
                                             <button type="button" class="exo-copy-btn" on:click=move |_| on_copy_did(user_did.get_value())>
                                                 <CopyIcon />
@@ -580,7 +635,7 @@ pub fn SettingsView(
 
                                     <div class="exo-grid-2">
                                         <div class="exo-field">
-                                            <label class="exo-label">"Display Name"</label>
+                                            <label class="exo-label">{move || i18n.tr("display_name_label", "Display Name")}</label>
                                             <input
                                                 type="text"
                                                 class="exo-input"
@@ -589,7 +644,7 @@ pub fn SettingsView(
                                             />
                                         </div>
                                         <div class="exo-field">
-                                            <label class="exo-label">"Default Pen Name"</label>
+                                            <label class="exo-label">{move || i18n.tr("pen_name_field_label", "Default Pen Name")}</label>
                                             <input
                                                 type="text"
                                                 class="exo-input"
@@ -598,7 +653,7 @@ pub fn SettingsView(
                                             />
                                         </div>
                                         <div class="exo-field">
-                                            <label class="exo-label">"Website"</label>
+                                            <label class="exo-label">{move || i18n.tr("website_label", "Website")}</label>
                                             <input
                                                 type="text"
                                                 class="exo-input"
@@ -607,7 +662,7 @@ pub fn SettingsView(
                                             />
                                         </div>
                                         <div class="exo-field">
-                                            <label class="exo-label">"Location & Timezone"</label>
+                                            <label class="exo-label">{move || i18n.tr("location_label", "Location & Timezone")}</label>
                                             <input
                                                 type="text"
                                                 class="exo-input"
@@ -616,21 +671,21 @@ pub fn SettingsView(
                                             />
                                         </div>
                                         <div class="exo-field">
-                                            <label class="exo-label">"Preferred Writing Format"</label>
+                                            <label class="exo-label">{move || i18n.tr("preferred_format_label", "Preferred Writing Format")}</label>
                                             <select
                                                 class="exo-input"
                                                 prop:value=move || preferred_format.get()
                                                 on:change=move |ev| set_preferred_format.set(event_target_value(&ev))
                                             >
-                                                <option value="novel">"Novels"</option>
-                                                <option value="article">"Articles & Nonfiction"</option>
-                                                <option value="short-story">"Short Stories"</option>
-                                                <option value="screenplay">"Screenplays"</option>
-                                                <option value="poetry">"Poetry"</option>
+                                                <option value="novel">{move || i18n.tr("format_opt_novel", "Novels")}</option>
+                                                <option value="article">{move || i18n.tr("format_opt_article", "Articles & Nonfiction")}</option>
+                                                <option value="short-story">{move || i18n.tr("format_opt_short", "Short Stories")}</option>
+                                                <option value="screenplay">{move || i18n.tr("format_opt_screenplay", "Screenplays")}</option>
+                                                <option value="poetry">{move || i18n.tr("format_opt_poetry", "Poetry")}</option>
                                             </select>
                                         </div>
                                         <div class="exo-field">
-                                            <label class="exo-label">"Timezone"</label>
+                                            <label class="exo-label">{move || i18n.tr("timezone_label", "Timezone")}</label>
                                             <input
                                                 type="text"
                                                 class="exo-input"
@@ -641,7 +696,7 @@ pub fn SettingsView(
                                     </div>
 
                                     <div class="exo-field">
-                                        <label class="exo-label">"Author Bio"</label>
+                                        <label class="exo-label">{move || i18n.tr("author_bio_label", "Author Bio")}</label>
                                         <textarea
                                             class="exo-input exo-textarea"
                                             prop:value=move || bio.get()
@@ -656,56 +711,64 @@ pub fn SettingsView(
                                         disabled=move || saving_profile.get()
                                         on:click=move |_| save_settings_profile()
                                     >
-                                        "Save Account Settings"
+                                        {move || i18n.tr("save_account_btn", "Save Account Settings")}
                                     </button>
                                 </div>
                             }.into_any()
                         }
 
+                        SettingsSection::ConnectedApps => view! {
+                            <ConnectedAppsSettingsPanel
+                                auth_config=auth_config
+                                initial_jwt=initial_jwt
+                                on_toast=on_toast
+                            />
+                        }.into_any(),
+
                         SettingsSection::AppearanceAndLanguages => view! {
                             <div class="exo-card">
-                                <h2 class="exo-h2">"Theme & Dual Language Architecture"</h2>
+                                <h2 class="exo-h2">{move || i18n.tr("appearance_title", "Theme & Dual Language Architecture")}</h2>
                                 <p class="exo-sub">
-                                    "Output UI Language controls menus and layout direction (auto RTL for Arabic and Hebrew). Default Input Language controls composers independently. All preferences save directly to Neon (zero browser localStorage)."
+                                    {move || i18n.tr("appearance_desc", "Output UI Language controls menus and layout direction (auto RTL for Arabic and Hebrew). Default Input Language controls composers independently. All preferences save directly to Neon (zero browser localStorage).")}
                                 </p>
 
                                 <div class="exo-grid-2" style="margin-top: 16px;">
                                     <div class="exo-field">
-                                        <label class="exo-label">"Theme Appearance"</label>
+                                        <label class="exo-label">{move || i18n.tr("theme_label", "Theme Appearance")}</label>
                                         <select
                                             class="exo-input"
                                             prop:value=move || appearance.get().as_str().to_string()
                                             on:change=move |ev| set_appearance.set(AppearanceMode::from_str(&event_target_value(&ev)))
                                         >
-                                            <option value="system">"System"</option>
-                                            <option value="light">"Light"</option>
-                                            <option value="dark">"Dark"</option>
+                                            <option value="system">{move || i18n.tr("theme_opt_system", "System")}</option>
+                                            <option value="light">{move || i18n.tr("theme_opt_light", "Light")}</option>
+                                            <option value="dark">{move || i18n.tr("theme_opt_dark", "Dark")}</option>
                                         </select>
                                     </div>
 
                                     <div class="exo-field">
-                                        <label class="exo-label">"Output UI Language (29 Supported)"</label>
+                                        <label class="exo-label">{move || i18n.tr("ui_lang_label", "App Language")}</label>
                                         <select
                                             class="exo-input"
                                             prop:value=move || ui_loc.get()
                                             on:change=move |ev| set_ui_loc.set(event_target_value(&ev))
                                         >
                                             {move || i18n.catalog.get().into_iter().map(|loc| {
-                                                let lbl = format!("{} — {} [{}]", loc.native_name, loc.english_name, loc.dir.to_uppercase());
+                                                let lbl = format!("{} {} — {} [{}]", locale_flag_emoji(&loc.code), loc.native_name, loc.english_name, loc.dir.to_uppercase());
                                                 view! { <option value=loc.code>{lbl}</option> }
                                             }).collect_view()}
                                         </select>
                                     </div>
 
                                     <div class="exo-field">
-                                        <label class="exo-label">"Default Input Composer Language"</label>
+                                        <label class="exo-label">{move || i18n.tr("input_lang_label", "Writing Input")}</label>
                                         <select
                                             class="exo-input"
                                             prop:value=move || in_loc.get()
                                             on:change=move |ev| set_in_loc.set(event_target_value(&ev))
                                         >
                                             {move || i18n.catalog.get().into_iter().map(|loc| {
-                                                let lbl = format!("{} — {}", loc.native_name, loc.english_name);
+                                                let lbl = format!("{} {} — {}", locale_flag_emoji(&loc.code), loc.native_name, loc.english_name);
                                                 view! { <option value=loc.code>{lbl}</option> }
                                             }).collect_view()}
                                         </select>
@@ -713,9 +776,10 @@ pub fn SettingsView(
                                 </div>
 
                                 <div class="exo-format-tile" style="margin-top: 14px;">
-                                    <h3>"Decentralized Offline Language Packs"</h3>
+                                    <h3>{move || i18n.tr("offline_packs_title", "Decentralized Offline Language Packs")}</h3>
                                     <p>
-                                        "Decentralized Mode 2 installs download any selected language pack directly from ExoNovel's public read-only Willow namespace: "
+                                        {move || i18n.tr("offline_packs_desc", "Decentralized Mode 2 installs download any selected language pack directly from ExoNovel's public read-only Willow namespace: ")}
+                                        " "
                                         <span class="exo-mono">{move || i18n.willow_namespace.get()}</span>
                                     </p>
                                 </div>
@@ -726,37 +790,37 @@ pub fn SettingsView(
                                     style="margin-top: 18px;"
                                     on:click=move |_| save_settings_profile()
                                 >
-                                    "Save Theme & Language Defaults"
+                                    {move || i18n.tr("save_theme_lang_btn", "Save Theme & Language Defaults")}
                                 </button>
                             </div>
                         }.into_any(),
 
                         SettingsSection::SyncAndStorage => view! {
                             <div class="exo-card">
-                                <h2 class="exo-h2">"Three Operating Modes & Cryptographic Blindness"</h2>
+                                <h2 class="exo-h2">{move || i18n.tr("sync_title", "Three Operating Modes & Cryptographic Blindness")}</h2>
                                 <p class="exo-sub">
-                                    "Choose how ExoNovel stores and synchronizes your writing across Web and Device installs."
+                                    {move || i18n.tr("sync_sub", "Choose how ExoNovel stores and synchronizes your writing across Web and Device installs.")}
                                 </p>
 
                                 <div class="exo-grid-3" style="margin-top: 16px;">
                                     <div class="exo-format-tile">
-                                        <h3>"Mode 1 · ExoNovel on Web (Free)"</h3>
-                                        <p>"Cloud workspace backed by Neon Postgres with instant real-time updates across tabs."</p>
+                                        <h3>{move || i18n.tr("sync_m1_title", "Mode 1 · ExoNovel on Web (Free)")}</h3>
+                                        <p>{move || i18n.tr("sync_m1_desc", "Cloud workspace backed by Neon Postgres with instant real-time updates across tabs.")}</p>
                                     </div>
                                     <div class="exo-format-tile">
-                                        <h3>"Mode 2 · Sovereign Device (Free)"</h3>
-                                        <p>"100% local Willow store on Windows, macOS, Linux, Android, and iOS. Includes free ExoNovel iroh discovery & blind relay transit."</p>
+                                        <h3>{move || i18n.tr("sync_m2_title", "Mode 2 · Sovereign Device (Free)")}</h3>
+                                        <p>{move || i18n.tr("sync_m2_desc", "100% local Willow store on Windows, macOS, Linux, Android, and iOS. Includes free ExoNovel iroh discovery & blind relay transit.")}</p>
                                     </div>
                                     <div class="exo-format-tile" style="border-color: var(--accent);">
-                                        <h3>"Mode 3 · Web + Device Managed Sync"</h3>
-                                        <p>"Paid ($9/mo or $90/yr in Profile). Meadowcap-authorized blind backup and bidirectional Web-to-Device Willow sync."</p>
+                                        <h3>{move || i18n.tr("sync_m3_title", "Mode 3 · Web + Device Managed Sync")}</h3>
+                                        <p>{move || i18n.tr("sync_m3_desc", "Paid ($9/mo or $90/yr in Profile). Meadowcap-authorized blind backup and bidirectional Web-to-Device Willow sync.")}</p>
                                     </div>
                                 </div>
 
                                 <div class="exo-format-tile" style="margin-top: 16px;">
-                                    <h3>"Zero-Knowledge Cryptographic Blindness"</h3>
+                                    <h3>{move || i18n.tr("sync_zk_title", "Zero-Knowledge Cryptographic Blindness")}</h3>
                                     <p>
-                                        "In Modes 2 and 3, drafts and private synced Willow entries are end-to-end encrypted by the sender before touching ExoNovel's relay or storage. Only routing frames and Meadowcap capability tokens are visible."
+                                        {move || i18n.tr("sync_zk_desc", "In Modes 2 and 3, drafts and private synced Willow entries are end-to-end encrypted by the sender before touching ExoNovel's relay or storage. Only routing frames and Meadowcap capability tokens are visible.")}
                                     </p>
                                 </div>
 
@@ -769,8 +833,8 @@ pub fn SettingsView(
                                             on:change=move |ev| set_willow_sync_enabled.set(event_target_checked(&ev))
                                         />
                                         <span>
-                                            <strong>"Enable Mode 3 Managed Willow Sync on this account"</strong>
-                                            " — Current tier: "
+                                            <strong>{move || i18n.tr("sync_enable_m3", "Enable Mode 3 Managed Willow Sync on this account")}</strong>
+                                            " — " {move || i18n.tr("sync_current_tier", "Current tier:")} " "
                                             <span class="exo-mono">{sync_plan_tier.get_value()}</span>
                                         </span>
                                     </label>
@@ -778,13 +842,13 @@ pub fn SettingsView(
                                     {if !can_enable_mode3 {
                                         view! {
                                             <div class="exo-invite-banner" style="margin-top: 14px; justify-content: space-between; flex-wrap: wrap;">
-                                                <span>"Mode 3 Managed Sync requires an active subscription managed in Profile."</span>
+                                                <span>{move || i18n.tr("sync_requires_sub", "Mode 3 Managed Sync requires an active subscription managed in Profile.")}</span>
                                                 <button
                                                     type="button"
                                                     class="exo-btn exo-btn-primary"
                                                     on:click=move |_| on_open_profile_billing()
                                                 >
-                                                    "Manage Subscription in Profile →"
+                                                    {move || i18n.tr("sync_manage_in_profile", "Manage Subscription in Profile →")}
                                                 </button>
                                             </div>
                                         }.into_any()
@@ -796,7 +860,7 @@ pub fn SettingsView(
                                                 style="margin-top: 14px;"
                                                 on:click=move |_| save_settings_profile()
                                             >
-                                                "Save Sync Toggle"
+                                                {move || i18n.tr("sync_save_toggle", "Save Sync Toggle")}
                                             </button>
                                         }.into_any()
                                     }}
@@ -809,14 +873,19 @@ pub fn SettingsView(
                                 <div class="exo-card">
                                     <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
                                         <div>
-                                            <h2 class="exo-h2" style="margin: 0;">"Multi-Platform Delivery Channels"</h2>
+                                            <h2 class="exo-h2" style="margin: 0;">{move || i18n.tr("notif_channels_title", "Multi-Platform Delivery Channels")}</h2>
                                             <p class="exo-sub" style="margin: 4px 0 0;">
-                                                "Brevo Transactional Email (notes@exosystems.net) "
-                                                {move || if brevo_configured.get() { "· Brevo API Key Active" } else { "· Configure BREVO_API_KEY in server env" }}
+                                                {move || i18n.tr("notif_brevo_prefix", "Brevo Transactional Email (notes@exosystems.net)")}
+                                                " "
+                                                {move || if brevo_configured.get() {
+                                                    i18n.tr("notif_brevo_active", "· Brevo API Key Active")
+                                                } else {
+                                                    i18n.tr("notif_brevo_unset", "· Configure BREVO_API_KEY in server env")
+                                                }}
                                             </p>
                                         </div>
                                         <button type="button" class="exo-btn" on:click=send_test_notification>
-                                            "Send Test Notification & Brevo Email"
+                                            {move || i18n.tr("notif_send_test", "Send Test Notification & Brevo Email")}
                                         </button>
                                     </div>
 
@@ -833,7 +902,7 @@ pub fn SettingsView(
                                                             set_notif_prefs.update(|np| np.in_app_enabled = v);
                                                         }
                                                     />
-                                                    <span><strong>"In-App Live Feed & Bell"</strong> " — Instant delivery over the persistent SSE stream."</span>
+                                                    <span><strong>{move || i18n.tr("notif_in_app_title", "In-App Live Feed & Bell")}</strong> " — " {move || i18n.tr("notif_in_app_desc", "Instant delivery over the persistent SSE stream.")}</span>
                                                 </label>
                                                 <label class="exo-check-row">
                                                     <input
@@ -844,12 +913,12 @@ pub fn SettingsView(
                                                             set_notif_prefs.update(|np| np.web_push_enabled = v);
                                                             if v {
                                                                 request_browser_notification_permission(move |st| {
-                                                                    on_toast(format!("Browser notification permission: {st}"));
+                                                                    on_toast(format!("{} {st}", i18n.tr_untracked("settings_toast_perm", "Browser notification permission:")));
                                                                 });
                                                             }
                                                         }
                                                     />
-                                                    <span><strong>"Web Browser Notifications"</strong> " — Native OS banner via browser Notification API."</span>
+                                                    <span><strong>{move || i18n.tr("notif_web_push_title", "Web Browser Notifications")}</strong> " — " {move || i18n.tr("notif_web_push_desc", "Native OS banner via browser Notification API.")}</span>
                                                 </label>
                                                 <label class="exo-check-row">
                                                     <input
@@ -860,7 +929,7 @@ pub fn SettingsView(
                                                             set_notif_prefs.update(|np| np.native_push_enabled = v);
                                                         }
                                                     />
-                                                    <span><strong>"Native Push Devices (Android UnifiedPush + FCM, iOS/macOS APNs, Windows WNS, Linux)"</strong></span>
+                                                    <span><strong>{move || i18n.tr("notif_native_push_title", "Native Push Devices (Android UnifiedPush + FCM, iOS/macOS APNs, Windows WNS, Linux)")}</strong></span>
                                                 </label>
                                                 <label class="exo-check-row">
                                                     <input
@@ -871,10 +940,10 @@ pub fn SettingsView(
                                                             set_notif_prefs.update(|np| np.email_enabled = v);
                                                         }
                                                     />
-                                                    <span><strong>"Brevo Transactional Email (Notes from ExoNovel)"</strong></span>
+                                                    <span><strong>{move || i18n.tr("notif_email_title", "Brevo Transactional Email (Notes from ExoNovel)")}</strong></span>
                                                 </label>
                                                 <div class="exo-field" style="margin-top: 14px;">
-                                                    <label class="exo-label">"Email Digest Mode"</label>
+                                                    <label class="exo-label">{move || i18n.tr("notif_digest_label", "Email Digest Mode")}</label>
                                                     <select
                                                         class="exo-input"
                                                         style="max-width: 280px;"
@@ -884,9 +953,9 @@ pub fn SettingsView(
                                                             set_notif_prefs.update(|np| np.email_digest_mode = v);
                                                         }
                                                     >
-                                                        <option value="instant">"Instant Email"</option>
-                                                        <option value="daily">"Daily Digest"</option>
-                                                        <option value="off">"Email Disabled"</option>
+                                                        <option value="instant">{move || i18n.tr("notif_digest_instant", "Instant Email")}</option>
+                                                        <option value="daily">{move || i18n.tr("notif_digest_daily", "Daily Digest")}</option>
+                                                        <option value="off">{move || i18n.tr("notif_digest_off", "Email Disabled")}</option>
                                                     </select>
                                                 </div>
                                                 <label class="exo-check-row">
@@ -898,7 +967,7 @@ pub fn SettingsView(
                                                             set_notif_prefs.update(|np| np.notify_security_signins = v);
                                                         }
                                                     />
-                                                    <span><strong>"Security & Sign-In Alerts"</strong> " — Alert when your sovereign identity authenticates on a new device."</span>
+                                                    <span><strong>{move || i18n.tr("notif_security_title", "Security & Sign-In Alerts")}</strong> " — " {move || i18n.tr("notif_security_desc", "Alert when your sovereign identity authenticates on a new device.")}</span>
                                                 </label>
                                                 <label class="exo-check-row">
                                                     <input
@@ -909,7 +978,7 @@ pub fn SettingsView(
                                                             set_notif_prefs.update(|np| np.notify_maturity_releases = v);
                                                         }
                                                     />
-                                                    <span><strong>"Maturity Scanner Release Alerts"</strong> " — Notify when tracked dependencies ship new versions."</span>
+                                                    <span><strong>{move || i18n.tr("notif_maturity_title", "Maturity Scanner Release Alerts")}</strong> " — " {move || i18n.tr("notif_maturity_desc", "Notify when tracked dependencies ship new versions.")}</span>
                                                 </label>
                                             </div>
                                         }
@@ -921,48 +990,48 @@ pub fn SettingsView(
                                         style="margin-top: 16px;"
                                         on:click=move |_| save_notif_channels()
                                     >
-                                        "Save Channel Preferences"
+                                        {move || i18n.tr("notif_save_btn", "Save Channel Preferences")}
                                     </button>
                                 </div>
 
                                 <div class="exo-card">
-                                    <h2 class="exo-h2">"Registered Device Push Endpoints (AOTA)"</h2>
+                                    <h2 class="exo-h2">{move || i18n.tr("devices_title", "Registered Device Push Endpoints (AOTA)")}</h2>
                                     <p class="exo-sub">
-                                        "Register any native or web push transport including UnifiedPush (de-Googled Android/Linux), FCM (Google Play Android), APNs (iOS/macOS), or WNS (Windows)."
+                                        {move || i18n.tr("devices_sub", "Register any native or web push transport including UnifiedPush (de-Googled Android/Linux), FCM (Google Play Android), APNs (iOS/macOS), or WNS (Windows).")}
                                     </p>
                                     <form on:submit=register_device style="margin-top: 14px;">
                                         <div class="exo-grid-2">
                                             <div class="exo-field">
-                                                <label class="exo-label">"Platform"</label>
+                                                <label class="exo-label">{move || i18n.tr("device_platform_label", "Platform")}</label>
                                                 <select
                                                     class="exo-input"
                                                     prop:value=move || dev_platform.get()
                                                     on:change=move |ev| set_dev_platform.set(event_target_value(&ev))
                                                 >
-                                                    <option value="android">"Android"</option>
-                                                    <option value="ios">"iOS"</option>
-                                                    <option value="linux">"Linux"</option>
-                                                    <option value="macos">"macOS"</option>
-                                                    <option value="windows">"Windows"</option>
-                                                    <option value="web">"Web Browser"</option>
+                                                    <option value="android">{move || i18n.tr("device_plat_android", "Android")}</option>
+                                                    <option value="ios">{move || i18n.tr("device_plat_ios", "iOS")}</option>
+                                                    <option value="linux">{move || i18n.tr("device_plat_linux", "Linux")}</option>
+                                                    <option value="macos">{move || i18n.tr("device_plat_macos", "macOS")}</option>
+                                                    <option value="windows">{move || i18n.tr("device_plat_windows", "Windows")}</option>
+                                                    <option value="web">{move || i18n.tr("device_plat_web", "Web Browser")}</option>
                                                 </select>
                                             </div>
                                             <div class="exo-field">
-                                                <label class="exo-label">"Push Transport"</label>
+                                                <label class="exo-label">{move || i18n.tr("device_transport_label", "Push Transport")}</label>
                                                 <select
                                                     class="exo-input"
                                                     prop:value=move || dev_transport.get()
                                                     on:change=move |ev| set_dev_transport.set(event_target_value(&ev))
                                                 >
-                                                    <option value="unifiedpush">"UnifiedPush (Open Standard / ntfy)"</option>
-                                                    <option value="fcm">"FCM (Firebase Cloud Messaging)"</option>
-                                                    <option value="apns">"APNs (Apple Push Notification service)"</option>
-                                                    <option value="wns">"WNS (Windows Push Notification Services)"</option>
-                                                    <option value="web_push">"Web Push (VAPID)"</option>
+                                                    <option value="unifiedpush">{move || i18n.tr("device_tr_unifiedpush", "UnifiedPush (Open Standard / ntfy)")}</option>
+                                                    <option value="fcm">{move || i18n.tr("device_tr_fcm", "FCM (Firebase Cloud Messaging)")}</option>
+                                                    <option value="apns">{move || i18n.tr("device_tr_apns", "APNs (Apple Push Notification service)")}</option>
+                                                    <option value="wns">{move || i18n.tr("device_tr_wns", "WNS (Windows Push Notification Services)")}</option>
+                                                    <option value="web_push">{move || i18n.tr("device_tr_webpush", "Web Push (VAPID)")}</option>
                                                 </select>
                                             </div>
                                             <div class="exo-field">
-                                                <label class="exo-label">"Device Label"</label>
+                                                <label class="exo-label">{move || i18n.tr("device_label_field", "Device Label")}</label>
                                                 <input
                                                     type="text"
                                                     class="exo-input"
@@ -971,19 +1040,19 @@ pub fn SettingsView(
                                                 />
                                             </div>
                                             <div class="exo-field">
-                                                <label class="exo-label">"Endpoint URL or Device Token"</label>
+                                                <label class="exo-label">{move || i18n.tr("device_token_label", "Endpoint URL or Device Token")}</label>
                                                 <input
                                                     type="text"
                                                     class="exo-input exo-mono"
                                                     required=true
-                                                    placeholder="https://ntfy.sh/... or FCM/APNs token"
+                                                    placeholder=move || i18n.tr("device_token_ph", "https://ntfy.sh/... or FCM/APNs token")
                                                     prop:value=move || dev_token.get()
                                                     on:input=move |ev| set_dev_token.set(event_target_value(&ev))
                                                 />
                                             </div>
                                         </div>
                                         <button type="submit" class="exo-btn exo-btn-primary">
-                                            "Register Push Endpoint"
+                                            {move || i18n.tr("device_register_btn", "Register Push Endpoint")}
                                         </button>
                                     </form>
 
@@ -991,10 +1060,10 @@ pub fn SettingsView(
                                         <table class="exo-table">
                                             <thead>
                                                 <tr>
-                                                    <th>"Label"</th>
-                                                    <th>"Platform"</th>
-                                                    <th>"Transport"</th>
-                                                    <th>"Last Seen"</th>
+                                                    <th>{move || i18n.tr("device_th_label", "Label")}</th>
+                                                    <th>{move || i18n.tr("device_th_platform", "Platform")}</th>
+                                                    <th>{move || i18n.tr("device_th_transport", "Transport")}</th>
+                                                    <th>{move || i18n.tr("device_th_last_seen", "Last Seen")}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1023,9 +1092,9 @@ pub fn SettingsView(
                         SettingsSection::AdminDocsAndMaturity => view! {
                             <div>
                                 <div class="exo-card">
-                                    <h2 class="exo-h2">"Documentation Access Allowlist"</h2>
+                                    <h2 class="exo-h2">{move || i18n.tr("admin_allowlist_title", "Documentation Access Allowlist")}</h2>
                                     <p class="exo-sub">
-                                        "Controls who can view ExoNovel's MADR 4.0.0 CMS and at which tier. Click any did:peer below to populate."
+                                        {move || i18n.tr("admin_allowlist_sub", "Controls who can view ExoNovel's MADR 4.0.0 CMS and at which tier. Click any did:peer below to populate.")}
                                     </p>
                                     <form on:submit=add_reader style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px;">
                                         <input
@@ -1033,7 +1102,7 @@ pub fn SettingsView(
                                             class="exo-input"
                                             style="flex: 2; min-width: 240px;"
                                             required=true
-                                            placeholder="did:peer:0z... or email"
+                                            placeholder=move || i18n.tr("admin_grant_ph", "did:peer:0z... or email")
                                             prop:value=move || grant_did.get()
                                             on:input=move |ev| set_grant_did.set(event_target_value(&ev))
                                         />
@@ -1043,20 +1112,20 @@ pub fn SettingsView(
                                             prop:value=move || grant_status.get()
                                             on:change=move |ev| set_grant_status.set(event_target_value(&ev))
                                         >
-                                            <option value="reader">"Reader"</option>
-                                            <option value="moderator">"Moderator"</option>
-                                            <option value="pending">"Pending"</option>
-                                            <option value="suspended">"Suspended"</option>
+                                            <option value="reader">{move || i18n.tr("status_reader", "Reader")}</option>
+                                            <option value="moderator">{move || i18n.tr("role_moderator", "Moderator")}</option>
+                                            <option value="pending">{move || i18n.tr("status_pending", "Pending")}</option>
+                                            <option value="suspended">{move || i18n.tr("status_suspended", "Suspended")}</option>
                                         </select>
                                         <input
                                             type="text"
                                             class="exo-input"
                                             style="flex: 1; min-width: 160px;"
-                                            placeholder="Note"
+                                            placeholder=move || i18n.tr("admin_note_ph", "Note")
                                             prop:value=move || new_note.get()
                                             on:input=move |ev| set_new_note.set(event_target_value(&ev))
                                         />
-                                        <button type="submit" class="exo-btn exo-btn-primary">"Save Access"</button>
+                                        <button type="submit" class="exo-btn exo-btn-primary">{move || i18n.tr("admin_save_access_btn", "Save Access")}</button>
                                     </form>
                                     {move || admin_msg.get().map(|m| view! { <p class="exo-sub">{m}</p> })}
 
@@ -1064,10 +1133,10 @@ pub fn SettingsView(
                                         <table class="exo-table">
                                             <thead>
                                                 <tr>
-                                                    <th>"User"</th>
-                                                    <th>"Email"</th>
-                                                    <th>"Status"</th>
-                                                    <th>"Actions"</th>
+                                                    <th>{move || i18n.tr("admin_th_user", "User")}</th>
+                                                    <th>{move || i18n.tr("admin_th_email", "Email")}</th>
+                                                    <th>{move || i18n.tr("admin_th_status", "Status")}</th>
+                                                    <th>{move || i18n.tr("admin_th_actions", "Actions")}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1082,6 +1151,7 @@ pub fn SettingsView(
                                                         let email_del = entry.email.clone();
                                                         let did_copy = entry.did_peer.clone().unwrap_or_else(|| entry.email.clone());
                                                         let cur_status = entry.status.clone();
+                                                        let cur_status_lbl = cur_status.clone();
                                                         let anim_key = entry.email.clone();
                                                         view! {
                                                             <tr class=move || live.anim_class("allowlist", &anim_key)>
@@ -1096,7 +1166,7 @@ pub fn SettingsView(
                                                                 <td>{entry.email}</td>
                                                                 <td>
                                                                     {if is_admin_row {
-                                                                        view! { <span class="exo-tag exo-tag-accent">{format_allowlist_status(&cur_status)}</span> }.into_any()
+                                                                        view! { <span class="exo-tag exo-tag-accent">{move || i18n.tr(allowlist_status_key(&cur_status_lbl), &cur_status_lbl)}</span> }.into_any()
                                                                     } else {
                                                                         view! {
                                                                             <select
@@ -1105,10 +1175,10 @@ pub fn SettingsView(
                                                                                 prop:value=cur_status
                                                                                 on:change=move |ev| update_entry_status(did_toggle.clone(), email_toggle.clone(), event_target_value(&ev))
                                                                             >
-                                                                                <option value="reader">"Reader"</option>
-                                                                                <option value="moderator">"Moderator"</option>
-                                                                                <option value="pending">"Pending"</option>
-                                                                                <option value="suspended">"Suspended"</option>
+                                                                                <option value="reader">{move || i18n.tr("status_reader", "Reader")}</option>
+                                                                                <option value="moderator">{move || i18n.tr("role_moderator", "Moderator")}</option>
+                                                                                <option value="pending">{move || i18n.tr("status_pending", "Pending")}</option>
+                                                                                <option value="suspended">{move || i18n.tr("status_suspended", "Suspended")}</option>
                                                                             </select>
                                                                         }.into_any()
                                                                     }}
@@ -1117,11 +1187,11 @@ pub fn SettingsView(
                                                                     {if !is_admin_row {
                                                                         view! {
                                                                             <button type="button" class="exo-btn" on:click=move |_| remove_entry(did_del.clone(), email_del.clone())>
-                                                                                "Remove"
+                                                                                {move || i18n.tr("admin_remove_btn", "Remove")}
                                                                             </button>
                                                                         }.into_any()
                                                                     } else {
-                                                                        view! { <span class="exo-sub">"Owner"</span> }.into_any()
+                                                                        view! { <span class="exo-sub">{move || i18n.tr("admin_owner_badge", "Owner")}</span> }.into_any()
                                                                     }}
                                                                 </td>
                                                             </tr>
@@ -1134,15 +1204,15 @@ pub fn SettingsView(
                                 </div>
 
                                 <div class="exo-card">
-                                    <h2 class="exo-h2">"Registered Accounts & Roles"</h2>
+                                    <h2 class="exo-h2">{move || i18n.tr("admin_accounts_title", "Registered Accounts & Roles")}</h2>
                                     <div style="overflow-x: auto; margin-top: 14px;">
                                         <table class="exo-table">
                                             <thead>
                                                 <tr>
-                                                    <th>"Email"</th>
-                                                    <th>"Role"</th>
-                                                    <th>"did:peer (click to populate)"</th>
-                                                    <th>"Provider"</th>
+                                                    <th>{move || i18n.tr("admin_th_email", "Email")}</th>
+                                                    <th>{move || i18n.tr("admin_th_role", "Role")}</th>
+                                                    <th>{move || i18n.tr("admin_th_did_populate", "did:peer (click to populate)")}</th>
+                                                    <th>{move || i18n.tr("admin_th_provider", "Provider")}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1161,6 +1231,8 @@ pub fn SettingsView(
                                                         let prof_pop = id.profile.clone();
                                                         let role_pop = id.account_role.clone();
                                                         let st_pop = id.account_status.clone();
+                                                        let role_lbl = role_pop.clone();
+                                                        let st_lbl = st_pop.clone();
                                                         view! {
                                                             <>
                                                                 <tr class=move || live.anim_class("identity", &did_anim)>
@@ -1188,7 +1260,7 @@ pub fn SettingsView(
                                                                             <span>{email_label}</span>
                                                                         </button>
                                                                     </td>
-                                                                    <td><span class="exo-tag">{format!("{} ({})", format_account_role(&id.account_role), id.account_status)}</span></td>
+                                                                    <td><span class="exo-tag">{move || format!("{} ({})", i18n.tr(account_role_key(&role_lbl), &role_lbl), i18n.tr(account_status_key(&st_lbl), &st_lbl))}</span></td>
                                                                     <td>
                                                                         <div class="exo-id-cell">
                                                                             <button type="button" class="exo-copy-btn" on:click=move |_| on_copy_did(did_copy.clone())>
@@ -1206,21 +1278,21 @@ pub fn SettingsView(
                                                                         <td colspan="4">
                                                                             <div class="exo-grid-2">
                                                                                 <select class="exo-input" prop:value=move || edit_account_role.get() on:change=move |ev| set_edit_account_role.set(event_target_value(&ev))>
-                                                                                    <option value="user">"User"</option>
-                                                                                    <option value="moderator">"Moderator"</option>
-                                                                                    <option value="admin">"Admin"</option>
+                                                                                    <option value="user">{move || i18n.tr("role_user", "User")}</option>
+                                                                                    <option value="moderator">{move || i18n.tr("role_moderator", "Moderator")}</option>
+                                                                                    <option value="admin">{move || i18n.tr("role_admin", "Admin")}</option>
                                                                                 </select>
                                                                                 <select class="exo-input" prop:value=move || edit_account_status.get() on:change=move |ev| set_edit_account_status.set(event_target_value(&ev))>
-                                                                                    <option value="active">"Active"</option>
-                                                                                    <option value="restricted">"Restricted"</option>
-                                                                                    <option value="suspended">"Suspended"</option>
+                                                                                    <option value="active">{move || i18n.tr("active_badge", "Active")}</option>
+                                                                                    <option value="restricted">{move || i18n.tr("status_restricted", "Restricted")}</option>
+                                                                                    <option value="suspended">{move || i18n.tr("status_suspended", "Suspended")}</option>
                                                                                 </select>
-                                                                                <input type="text" class="exo-input" placeholder="Display Name" prop:value=move || edit_display_name.get() on:input=move |ev| set_edit_display_name.set(event_target_value(&ev)) />
-                                                                                <input type="text" class="exo-input" placeholder="Pen Name" prop:value=move || edit_pen_name.get() on:input=move |ev| set_edit_pen_name.set(event_target_value(&ev)) />
+                                                                                <input type="text" class="exo-input" placeholder=move || i18n.tr("admin_display_name_ph", "Display Name") prop:value=move || edit_display_name.get() on:input=move |ev| set_edit_display_name.set(event_target_value(&ev)) />
+                                                                                <input type="text" class="exo-input" placeholder=move || i18n.tr("admin_pen_name_ph", "Pen Name") prop:value=move || edit_pen_name.get() on:input=move |ev| set_edit_pen_name.set(event_target_value(&ev)) />
                                                                             </div>
                                                                             <div style="margin-top: 12px; display: flex; gap: 10px; align-items: center;">
                                                                                 <button type="button" class="exo-btn exo-btn-primary" on:click=move |_| save_identity_accordion(did_save.get_value())>
-                                                                                    "Save Account Changes"
+                                                                                    {move || i18n.tr("admin_save_account_btn", "Save Account Changes")}
                                                                                 </button>
                                                                                 {move || edit_msg.get().map(|m| view! { <span class="exo-sub">{m}</span> })}
                                                                             </div>

@@ -176,14 +176,45 @@ fn sort_nodes(nodes: &mut [DocNode]) {
     });
 }
 
-fn walk_dir(abs_dir: &Path, rel_dir: &str) -> Vec<DocNode> {
+pub fn normalize_doc_locale(raw: &str) -> &'static str {
+    let trimmed = raw.trim().to_ascii_lowercase();
+    if trimmed == "de" || trimmed.starts_with("de-") {
+        "de"
+    } else if trimmed == "pl" || trimmed.starts_with("pl-") {
+        "pl"
+    } else {
+        "en"
+    }
+}
+
+fn localized_title_override(root_dir: &Path, rel_path: &str, locale: &str, fallback_name: &str) -> Option<String> {
+    if locale == "en" {
+        return None;
+    }
+    let sub = if rel_path == "AGENTS.md" {
+        "AGENTS.md"
+    } else if let Some(rest) = rel_path.strip_prefix("docs/") {
+        rest
+    } else {
+        return None;
+    };
+    let loc_path = root_dir.join("docs").join("i18n").join(locale).join(sub);
+    if !loc_path.is_file() {
+        return None;
+    }
+    let content = fs::read_to_string(&loc_path).ok()?;
+    let (title, _, _) = extract_title_and_headings(&content, fallback_name);
+    Some(title)
+}
+
+fn walk_dir(root_dir: &Path, abs_dir: &Path, rel_dir: &str, locale: &str) -> Vec<DocNode> {
     let Ok(entries) = fs::read_dir(abs_dir) else {
         return Vec::new();
     };
     let mut collected = Vec::new();
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with('.') {
+        if name.starts_with('.') || name == "i18n" {
             continue;
         }
         let entry_path = entry.path();
@@ -193,7 +224,7 @@ fn walk_dir(abs_dir: &Path, rel_dir: &str) -> Vec<DocNode> {
             format!("{rel_dir}/{name}")
         };
         if entry_path.is_dir() {
-            let children = walk_dir(&entry_path, &rel_path);
+            let children = walk_dir(root_dir, &entry_path, &rel_path, locale);
             if !children.is_empty() {
                 collected.push(DocNode {
                     id: rel_path.clone(),
@@ -205,8 +236,12 @@ fn walk_dir(abs_dir: &Path, rel_dir: &str) -> Vec<DocNode> {
                 });
             }
         } else if entry_path.is_file() && name.to_lowercase().ends_with(".md") {
-            let content = fs::read_to_string(&entry_path).unwrap_or_default();
-            let (title, _, _) = extract_title_and_headings(&content, &name);
+            let title = localized_title_override(root_dir, &rel_path, locale, &name)
+                .unwrap_or_else(|| {
+                    let content = fs::read_to_string(&entry_path).unwrap_or_default();
+                    let (t, _, _) = extract_title_and_headings(&content, &name);
+                    t
+                });
             collected.push(DocNode {
                 id: rel_path.clone(),
                 name,
@@ -222,15 +257,24 @@ fn walk_dir(abs_dir: &Path, rel_dir: &str) -> Vec<DocNode> {
 }
 
 pub fn get_docs_tree(root_dir: &Path) -> Vec<DocNode> {
+    get_docs_tree_for_locale(root_dir, "en")
+}
+
+pub fn get_docs_tree_for_locale(root_dir: &Path, locale: &str) -> Vec<DocNode> {
+    let norm_locale = normalize_doc_locale(locale);
     let mut nodes = Vec::new();
     let docs_dir = root_dir.join("docs");
     if docs_dir.is_dir() {
-        nodes.extend(walk_dir(&docs_dir, "docs"));
+        nodes.extend(walk_dir(root_dir, &docs_dir, "docs", norm_locale));
     }
     let agents_file = root_dir.join("AGENTS.md");
     if agents_file.is_file() {
-        let content = fs::read_to_string(&agents_file).unwrap_or_default();
-        let (title, _, _) = extract_title_and_headings(&content, "AGENTS.md");
+        let title = localized_title_override(root_dir, "AGENTS.md", norm_locale, "AGENTS.md")
+            .unwrap_or_else(|| {
+                let content = fs::read_to_string(&agents_file).unwrap_or_default();
+                let (t, _, _) = extract_title_and_headings(&content, "AGENTS.md");
+                t
+            });
         nodes.push(DocNode {
             id: "AGENTS.md".to_string(),
             name: "AGENTS.md".to_string(),
@@ -273,6 +317,37 @@ pub fn resolve_safe_doc_path(root_dir: &Path, requested: &str) -> Option<PathBuf
     None
 }
 
+pub fn resolve_safe_doc_path_for_locale(
+    root_dir: &Path,
+    requested: &str,
+    locale: &str,
+) -> Option<(PathBuf, String)> {
+    let canonical_abs = resolve_safe_doc_path(root_dir, requested)?;
+    let root_canon = fs::canonicalize(root_dir).ok()?;
+    let canonical_rel = canonical_abs
+        .strip_prefix(&root_canon)
+        .unwrap_or(&canonical_abs)
+        .to_string_lossy()
+        .replace('\\', "/");
+
+    let norm_locale = normalize_doc_locale(locale);
+    if norm_locale != "en" {
+        let sub = if canonical_rel == "AGENTS.md" {
+            Some("AGENTS.md")
+        } else {
+            canonical_rel.strip_prefix("docs/")
+        };
+        if let Some(rel_sub) = sub {
+            let localized_rel = format!("docs/i18n/{norm_locale}/{rel_sub}");
+            if let Some(localized_abs) = resolve_safe_doc_path(root_dir, &localized_rel) {
+                return Some((localized_abs, canonical_rel));
+            }
+        }
+    }
+
+    Some((canonical_abs, canonical_rel))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -283,6 +358,18 @@ mod tests {
         let cwd = env::current_dir().unwrap();
         assert!(resolve_safe_doc_path(&cwd, "../Cargo.toml").is_none());
         assert!(resolve_safe_doc_path(&cwd, "Cargo.toml").is_none());
+    }
+
+    #[test]
+    fn excludes_i18n_folder_from_tree() {
+        let cwd = env::current_dir().unwrap();
+        let tree = get_docs_tree(&cwd);
+        fn contains_i18n(nodes: &[DocNode]) -> bool {
+            nodes.iter().any(|n| {
+                n.name == "i18n" || n.path.starts_with("docs/i18n") || contains_i18n(&n.children)
+            })
+        }
+        assert!(!contains_i18n(&tree));
     }
 
     #[test]

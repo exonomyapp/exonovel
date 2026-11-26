@@ -117,7 +117,15 @@ export function AuthGate({
         throw new Error(res.error.message || `Could not sign in with ${provider}.`);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Social sign-in failed.');
+      const msg = err instanceof Error ? err.message : 'Social sign-in failed.';
+      const inIframe = window.self !== window.top;
+      if (inIframe && msg.toLowerCase().includes('popup was closed')) {
+        setError(
+          'AI Studio preview popup could not return to this sandbox because the popup landed on your default Google account (/u/0/) instead of this tab (/u/1/). Use Email/Password below to test in preview, or open AI Studio in a separate browser profile/container where exonomyapp@gmail.com is the primary account. Production on exonovel.exosystems.net redirects directly without this proxy.'
+        );
+      } else {
+        setError(msg);
+      }
       setSubmitting(false);
     }
   };

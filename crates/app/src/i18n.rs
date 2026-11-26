@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use gloo_net::http::Request;
 use leptos::prelude::*;
 
-use crate::models::{I18nCatalogResponse, LocaleDescriptor};
+use crate::models::{locale_flag_emoji, I18nCatalogResponse, LocaleDescriptor};
 
 #[derive(Clone, Copy)]
 pub struct I18nState {
@@ -28,11 +28,27 @@ impl I18nState {
     }
 
     pub fn tr(&self, key: &str, fallback: &str) -> String {
-        self.dict
-            .get()
-            .get(key)
-            .cloned()
-            .unwrap_or_else(|| fallback.to_string())
+        let dict = self.dict.get();
+        if let Some(val) = dict.get(key) {
+            return val.clone();
+        }
+        let normalized = key.replace('-', "_");
+        if let Some(val) = dict.get(&normalized) {
+            return val.clone();
+        }
+        fallback.to_string()
+    }
+
+    pub fn tr_untracked(&self, key: &str, fallback: &str) -> String {
+        let dict = self.dict.get_untracked();
+        if let Some(val) = dict.get(key) {
+            return val.clone();
+        }
+        let normalized = key.replace('-', "_");
+        if let Some(val) = dict.get(&normalized) {
+            return val.clone();
+        }
+        fallback.to_string()
     }
 
     pub fn ui_dir(&self) -> &'static str {
@@ -75,7 +91,10 @@ pub fn parse_ftl(text: &str) -> HashMap<String, String> {
             continue;
         }
         if let Some((k, v)) = trimmed.split_once('=') {
-            map.insert(k.trim().to_string(), v.trim().to_string());
+            let key = k.trim();
+            let val = v.trim().to_string();
+            map.insert(key.to_string(), val.clone());
+            map.insert(key.replace('-', "_"), val);
         }
     }
     map
@@ -127,7 +146,7 @@ pub fn InputLocaleBar(
             <select
                 class="exo-input"
                 style="width: auto; min-width: 190px; padding: 6px 10px; font-size: 15px;"
-                aria-label="Writing Input Language"
+                aria-label=move || i18n.tr("input_lang_aria", "Writing Input Language")
                 prop:value=move || i18n.input_locale.get()
                 on:change=move |ev| {
                     i18n.input_locale.set(event_target_value(&ev));
@@ -151,7 +170,7 @@ pub fn InputLocaleBar(
                     filtered
                         .into_iter()
                         .map(|loc| {
-                            let label = format!("{} — {}", loc.native_name, loc.english_name);
+                            let label = format!("{} {} — {}", locale_flag_emoji(&loc.code), loc.native_name, loc.english_name);
                             view! {
                                 <option value=loc.code>{label}</option>
                             }

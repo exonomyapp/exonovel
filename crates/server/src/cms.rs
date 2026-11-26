@@ -1,7 +1,7 @@
 use std::{fs, path::Path};
 
 use axum::{
-    extract::{Path as AxumPath, State},
+    extract::{Path as AxumPath, Query, State},
     http::StatusCode,
     response::IntoResponse,
     Json,
@@ -58,6 +58,8 @@ pub struct AdrRecord {
     pub author_did: String,
     pub dependencies: Vec<AdrToolDependencyView>,
     pub updated_at: String,
+    pub locale: String,
+    pub translation_status: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -154,6 +156,28 @@ pub async fn ensure_cms_schema(pool: &PgPool) -> Result<(), sqlx::Error> {
             willow_timestamp_us BIGINT NOT NULL DEFAULT 0,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS adr_translations (
+            id SERIAL PRIMARY KEY,
+            adr_id INTEGER NOT NULL REFERENCES adr_records(id) ON DELETE CASCADE,
+            locale TEXT NOT NULL,
+            title TEXT NOT NULL,
+            context_problem TEXT NOT NULL DEFAULT '',
+            decision_drivers TEXT NOT NULL DEFAULT '',
+            decision_outcome TEXT NOT NULL DEFAULT '',
+            consequences_pros_cons TEXT NOT NULL DEFAULT '',
+            confirmation_criteria TEXT NOT NULL DEFAULT '',
+            raw_markdown TEXT NOT NULL DEFAULT '',
+            cms_edited BOOLEAN NOT NULL DEFAULT FALSE,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (adr_id, locale)
         );
         "#,
     )
@@ -352,7 +376,7 @@ fn collect_md_files(dir: &Path, rel_prefix: &str, out: &mut Vec<(String, String)
     sorted.sort_by_key(|e| e.file_name());
     for entry in sorted {
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with('.') {
+        if name.starts_with('.') || name == "i18n" {
             continue;
         }
         let path = entry.path();
@@ -462,6 +486,81 @@ pub async fn seed_cms_from_disk(pool: &PgPool, root_dir: &Path) {
         .await;
     }
 
+    let _ = sqlx::query("DELETE FROM adr_records WHERE rel_path LIKE 'docs/i18n/%'")
+        .execute(pool)
+        .await;
+
+    for loc in ["de", "pl"] {
+        let loc_dir = root_dir.join("docs").join("i18n").join(loc);
+        if !loc_dir.is_dir() {
+            continue;
+        }
+        let mut loc_files: Vec<(String, String)> = Vec::new();
+        let loc_prefix = format!("docs/i18n/{loc}");
+        collect_md_files(&loc_dir, &loc_prefix, &mut loc_files);
+        for (i18n_rel, md) in loc_files {
+            let Some(rest) = i18n_rel.strip_prefix(&format!("{loc_prefix}/")) else {
+                continue;
+            };
+            let canonical_rel = if rest == "AGENTS.md" {
+                "AGENTS.md".to_string()
+            } else {
+                format!("docs/{rest}")
+            };
+            let Ok(Some(adr_id)) = sqlx::query_scalar::<_, i32>(
+                "SELECT id FROM adr_records WHERE rel_path = $1 LIMIT 1",
+            )
+            .bind(&canonical_rel)
+            .fetch_optional(pool)
+            .await
+            else {
+                continue;
+            };
+            let file_name = Path::new(&canonical_rel)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("doc.md");
+            let (title, _, _) = extract_title_and_headings(&md, file_name);
+            let ctx = extract_madr_section(&md, "kontext");
+            let ctx_fb = if ctx.is_empty() { extract_madr_section(&md, "kontekst") } else { ctx };
+            let ctx_final = if ctx_fb.is_empty() { extract_madr_section(&md, "context") } else { ctx_fb };
+            let drivers = extract_madr_section(&md, "decision drivers");
+            let outcome = extract_madr_section(&md, "decision outcome");
+            let consequences = extract_madr_section(&md, "consequences");
+            let confirmation = extract_madr_section(&md, "confirmation");
+
+            let _ = sqlx::query(
+                r#"
+                INSERT INTO adr_translations (
+                    adr_id, locale, title, context_problem, decision_drivers,
+                    decision_outcome, consequences_pros_cons, confirmation_criteria, raw_markdown
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                ON CONFLICT (adr_id, locale) DO UPDATE
+                SET title = CASE WHEN adr_translations.cms_edited THEN adr_translations.title ELSE EXCLUDED.title END,
+                    context_problem = CASE WHEN adr_translations.cms_edited THEN adr_translations.context_problem ELSE EXCLUDED.context_problem END,
+                    decision_drivers = CASE WHEN adr_translations.cms_edited THEN adr_translations.decision_drivers ELSE EXCLUDED.decision_drivers END,
+                    decision_outcome = CASE WHEN adr_translations.cms_edited THEN adr_translations.decision_outcome ELSE EXCLUDED.decision_outcome END,
+                    consequences_pros_cons = CASE WHEN adr_translations.cms_edited THEN adr_translations.consequences_pros_cons ELSE EXCLUDED.consequences_pros_cons END,
+                    confirmation_criteria = CASE WHEN adr_translations.cms_edited THEN adr_translations.confirmation_criteria ELSE EXCLUDED.confirmation_criteria END,
+                    raw_markdown = CASE WHEN adr_translations.cms_edited THEN adr_translations.raw_markdown ELSE EXCLUDED.raw_markdown END,
+                    updated_at = NOW()
+                "#,
+            )
+            .bind(adr_id)
+            .bind(loc)
+            .bind(&title)
+            .bind(&ctx_final)
+            .bind(&drivers)
+            .bind(&outcome)
+            .bind(&consequences)
+            .bind(&confirmation)
+            .bind(&md)
+            .execute(pool)
+            .await;
+        }
+    }
+
     // Seed essential Tooling Catalog from ADR 006 / 002
     let seed_tools = [
         ("leptos", "Leptos", "crates.io", "leptos", "https://github.com/leptos-rs/leptos", "0.8.x", "0.8.x", "Reactive Rust SSR + WASM web framework"),
@@ -523,45 +622,90 @@ pub async fn seed_cms_from_disk(pool: &PgPool, root_dir: &Path) {
         }
     }
 
-    // Seed multi-provider free inference model catalog (ADR 005-004 — NO Alibaba)
-    let seed_models = [
-        ("google_ai_studio", "gemini-2.5-flash", "Gemini 2.5 Flash (AI Studio Free)", true, true),
-        ("google_ai_studio", "gemini-2.5-flash-lite", "Gemini 2.5 Flash-Lite (AI Studio Free)", true, true),
-        ("nvidia_nim", "meta/llama-3.3-70b-instruct", "Llama 3.3 70B Instruct (NVIDIA NIM)", true, true),
-        ("nvidia_nim", "qwen/qwen2.5-coder-32b-instruct", "Qwen 2.5 Coder 32B (NVIDIA NIM)", true, true),
-        ("openrouter", "deepseek/deepseek-chat-v3-0324:free", "DeepSeek V3 Free (OpenRouter)", true, true),
-        ("openrouter", "google/gemma-3-27b-it:free", "Gemma 3 27B Free (OpenRouter)", true, false),
-        ("groq", "llama-3.3-70b-versatile", "Llama 3.3 70B Versatile (Groq Free)", true, true),
-    ];
-    for (prov, model_id, display, free, tools) in seed_models {
-        let _ = sqlx::query(
-            r#"
-            INSERT INTO provider_models (provider, model_id, display_name, is_free, supports_tools, is_active)
-            VALUES ($1, $2, $3, $4, $5, TRUE)
-            ON CONFLICT (provider, model_id) DO NOTHING
-            "#,
-        )
-        .bind(prov)
-        .bind(model_id)
-        .bind(display)
-        .bind(free)
-        .bind(tools)
-        .execute(pool)
-        .await;
+    let _ = sqlx::query(
+        "DELETE FROM provider_models WHERE model_id LIKE 'gemini-2.5%' OR model_id LIKE '%qwen2.5%' OR model_id LIKE '%distill-qwen-32b%'",
+    )
+    .execute(pool)
+    .await;
+
+    for (prov_name, has_key) in [
+        ("openrouter", env_non_empty("OPENROUTER_API_KEY")),
+        ("groq", env_non_empty("GROQ_API_KEY")),
+        ("google_ai_studio", env_non_empty("GEMINI_API_KEY")),
+        ("nvidia_nim", nvidia_nim_key().is_some()),
+    ] {
+        if !has_key {
+            let _ = sqlx::query("DELETE FROM provider_models WHERE provider = $1")
+                .bind(prov_name)
+                .execute(pool)
+                .await;
+        }
     }
+
+    if nvidia_nim_key().is_some() {
+        let seed_nim_models = [
+            ("nvidia_nim", "nvidia/nemotron-3.5-lightning-30b-a3b", "Nemotron 3.5 Lightning 30B (NVIDIA NIM)", true, true),
+            ("nvidia_nim", "deepseek-ai/deepseek-r1", "DeepSeek R1 (NVIDIA NIM)", true, true),
+            ("nvidia_nim", "meta/llama-3.3-70b-instruct", "Llama 3.3 70B Instruct (NVIDIA NIM)", true, true),
+        ];
+        for (prov, model_id, display, free, tools) in seed_nim_models {
+            let _ = sqlx::query(
+                r#"
+                INSERT INTO provider_models (provider, model_id, display_name, is_free, supports_tools, is_active)
+                VALUES ($1, $2, $3, $4, $5, TRUE)
+                ON CONFLICT (provider, model_id) DO NOTHING
+                "#,
+            )
+            .bind(prov)
+            .bind(model_id)
+            .bind(display)
+            .bind(free)
+            .bind(tools)
+            .execute(pool)
+            .await;
+        }
+    }
+
+    // Migrate any legacy vendor-branded task keys/labels to vendor-neutral names
+    let _ = sqlx::query(
+        r#"
+        UPDATE owner_external_tasks
+        SET task_key = 'prod-iroh-udp-firewall'
+        WHERE task_key LIKE '%-iroh-udp-firewall'
+          AND task_key <> 'prod-iroh-udp-firewall'
+          AND NOT EXISTS (SELECT 1 FROM owner_external_tasks WHERE task_key = 'prod-iroh-udp-firewall')
+        "#,
+    )
+    .execute(pool)
+    .await;
+    let _ = sqlx::query(
+        "DELETE FROM owner_external_tasks WHERE task_key LIKE '%-iroh-udp-firewall' AND task_key <> 'prod-iroh-udp-firewall'",
+    )
+    .execute(pool)
+    .await;
+    let _ = sqlx::query(
+        r#"
+        UPDATE owner_external_tasks
+        SET completed_by = 'Production Server + Gmail Verified'
+        WHERE task_key = 'postfix-dkim-or-brevo-relay'
+          AND completed_by <> 'Production Server + Gmail Verified'
+        "#,
+    )
+    .execute(pool)
+    .await;
 
     // Seed external tasks only reachable outside AI Studio (preserves owner's is_done checkbox state)
     let external_tasks = [
         (
             "postfix-dkim-or-brevo-relay",
             "Mail Server (43.157.89.31)",
-            "Tencent Agent",
+            "Production Server",
             "Verified: Roundcube & Postfix outbound mail both relay via Brevo SMTP (Gmail Inbox & DMARC pass)",
             "Verified 2026-11-21: Roundcube submits directly to smtp-relay.brevo.com:587, and Postfix on 43.157.89.31 now also relays all outbound mail via [smtp-relay.brevo.com]:587 (SASL plain/login from /opt/exosystems_net/env, TLS encrypt). Live test from root@exosystems.net to Gmail landed in Inbox with mailed-by exomail.exosystems.net and signed-by exosystems.net.",
             "",
             20_i32,
             true,
-            "Tencent Agent + Gmail Verified",
+            "Production Server + Gmail Verified",
         ),
         (
             "brevo-verify-senders",
@@ -576,21 +720,21 @@ pub async fn seed_cms_from_disk(pool: &PgPool, root_dir: &Path) {
         ),
         (
             "opencode-ai-keys",
-            "Tencent Server (/opt/exonovel/env)",
+            "Production Server (/opt/exonovel/env)",
             "Owner",
-            "Install OpenCode CLI and add AI failover keys to /opt/exonovel/env",
-            "Install the opencode CLI on the Tencent instance and add GEMINI_API_KEY, NVIDIA_NIM_API_KEY, OPENROUTER_API_KEY (plus optional GROQ_API_KEY) to /opt/exonovel/env so Maturity Proposal generation has multi-provider failover.",
+            "Verify OpenCode CLI binary & NVIDIA NIM key in /opt/exonovel/env",
+            "Ensure opencode is executable by the server process (OPENCODE_BIN=/root/.opencode/bin/opencode or symlinked in /usr/local/bin/opencode) and set NVIDIA_NIM_API_KEY (or NVIDIA_API_KEY) in /opt/exonovel/env for Maturity Proposal generation.",
             "",
             40_i32,
             false,
             "",
         ),
         (
-            "tencent-iroh-udp-firewall",
-            "Tencent Firewall",
+            "prod-iroh-udp-firewall",
+            "Host Firewall",
             "Owner",
-            "Open UDP/QUIC port in Tencent Lighthouse Firewall (when enabling iroh P2P relays)",
-            "In Tencent Cloud Lighthouse Console -> click your instance -> Firewall tab -> Add Firewall Rule -> Type: Custom, Protocol: UDP, Source: 0.0.0.0/0, Port: 7842 (or your chosen iroh relay UDP port), Policy: Allow -> Save.",
+            "Open UDP/QUIC port in the production host firewall (when enabling iroh P2P relays)",
+            "In your production server firewall / security group console -> add an inbound Custom UDP rule allowing port 7842 (or your chosen iroh relay UDP port) from 0.0.0.0/0 -> Save.",
             "",
             50_i32,
             false,
@@ -660,9 +804,15 @@ pub async fn seed_cms_from_disk(pool: &PgPool, root_dir: &Path) {
     }
 }
 
+#[derive(Deserialize)]
+pub struct CmsLocaleQuery {
+    pub locale: Option<String>,
+}
+
 pub async fn api_cms_list_adrs(
     State(state): State<AppState>,
     AuthUser(user): AuthUser,
+    Query(query): Query<CmsLocaleQuery>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     if !user.authorized {
         return Err((
@@ -677,17 +827,36 @@ pub async fn api_cms_list_adrs(
         ));
     };
 
+    let req_locale = match query.locale.as_deref().map(str::trim) {
+        Some("de") => "de",
+        Some("pl") => "pl",
+        _ => "en",
+    };
+
     let rows = sqlx::query(
         r#"
-        SELECT id, adr_number, parent_adr_id, doc_kind, title, slug, rel_path, status, superseded_by_id,
-               context_problem, decision_drivers, considered_options_json, decision_outcome,
-               consequences_pros_cons, confirmation_criteria, decision_makers, consulted, informed,
-               raw_markdown, author_did,
-               to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at
-        FROM adr_records
-        ORDER BY rel_path ASC
+        SELECT a.id, a.adr_number, a.parent_adr_id, a.doc_kind,
+               COALESCE(NULLIF(t.title, ''), a.title) AS title,
+               a.slug, a.rel_path, a.status, a.superseded_by_id,
+               COALESCE(NULLIF(t.context_problem, ''), a.context_problem) AS context_problem,
+               COALESCE(NULLIF(t.decision_drivers, ''), a.decision_drivers) AS decision_drivers,
+               a.considered_options_json,
+               COALESCE(NULLIF(t.decision_outcome, ''), a.decision_outcome) AS decision_outcome,
+               COALESCE(NULLIF(t.consequences_pros_cons, ''), a.consequences_pros_cons) AS consequences_pros_cons,
+               COALESCE(NULLIF(t.confirmation_criteria, ''), a.confirmation_criteria) AS confirmation_criteria,
+               a.decision_makers, a.consulted, a.informed,
+               COALESCE(NULLIF(t.raw_markdown, ''), a.raw_markdown) AS raw_markdown,
+               a.author_did,
+               (t.id IS NOT NULL AND NULLIF(t.raw_markdown, '') IS NOT NULL) AS has_translation,
+               to_char(COALESCE(t.updated_at, a.updated_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at
+        FROM adr_records a
+        LEFT JOIN adr_translations t
+          ON t.adr_id = a.id AND t.locale = $1
+        WHERE a.rel_path NOT LIKE 'docs/i18n/%'
+        ORDER BY a.rel_path ASC
         "#,
     )
+    .bind(req_locale)
     .fetch_all(pool)
     .await
     .map_err(|e| {
@@ -736,6 +905,14 @@ pub async fn api_cms_list_adrs(
             let raw_markdown: String = r.try_get("raw_markdown").unwrap_or_default();
             let (_, headings, word_count) = extract_title_and_headings(&raw_markdown, &rel_path);
             let html = render_safe_gfm_html(&raw_markdown);
+            let has_translation: bool = r.try_get("has_translation").unwrap_or(false);
+            let translation_status = if req_locale == "en" {
+                "canonical".to_string()
+            } else if has_translation {
+                "translated".to_string()
+            } else {
+                "fallback-en".to_string()
+            };
             AdrRecord {
                 id,
                 adr_number: r.try_get("adr_number").unwrap_or(None),
@@ -765,6 +942,8 @@ pub async fn api_cms_list_adrs(
                 author_did: r.try_get("author_did").unwrap_or_default(),
                 dependencies: deps_by_adr.remove(&id).unwrap_or_default(),
                 updated_at: r.try_get("updated_at").unwrap_or_default(),
+                locale: req_locale.to_string(),
+                translation_status,
             }
         })
         .collect();
@@ -789,6 +968,7 @@ pub struct UpsertAdrBody {
     pub confirmation_criteria: Option<String>,
     pub decision_makers: Option<String>,
     pub raw_markdown: Option<String>,
+    pub locale: Option<String>,
 }
 
 pub async fn api_cms_upsert_adr(
@@ -833,6 +1013,12 @@ pub async fn api_cms_upsert_adr(
         ));
     }
 
+    let target_locale = match body.locale.as_deref().map(str::trim) {
+        Some("de") => "de",
+        Some("pl") => "pl",
+        _ => "en",
+    };
+
     let ctx_prob = body.context_problem.unwrap_or_default();
     let drivers = body.decision_drivers.unwrap_or_default();
     let outcome = body.decision_outcome.unwrap_or_default();
@@ -861,58 +1047,122 @@ pub async fn api_cms_upsert_adr(
     let author_did = user.did_peer.unwrap_or_default();
     let doc_kind = body.doc_kind.unwrap_or_else(|| "adr".to_string());
 
-    let row_id: i32 = sqlx::query_scalar(
-        r#"
-        INSERT INTO adr_records (
-            adr_number, parent_adr_id, doc_kind, title, slug, rel_path, status,
-            context_problem, decision_drivers, decision_outcome, consequences_pros_cons,
-            confirmation_criteria, decision_makers, raw_markdown, cms_edited, author_did,
-            willow_namespace, willow_subspace, willow_path, willow_timestamp_us
+    let row_id: i32 = if target_locale != "en" {
+        let existing_id: Option<i32> = if let Some(eid) = body.id {
+            sqlx::query_scalar("SELECT id FROM adr_records WHERE id = $1 OR rel_path = $2 LIMIT 1")
+                .bind(eid)
+                .bind(&clean_path)
+                .fetch_optional(pool)
+                .await
+                .unwrap_or(None)
+        } else {
+            sqlx::query_scalar("SELECT id FROM adr_records WHERE rel_path = $1 LIMIT 1")
+                .bind(&clean_path)
+                .fetch_optional(pool)
+                .await
+                .unwrap_or(None)
+        };
+
+        let Some(adr_id) = existing_id else {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "Canonical English document must exist before saving a localized translation." })),
+            ));
+        };
+
+        sqlx::query(
+            r#"
+            INSERT INTO adr_translations (
+                adr_id, locale, title, context_problem, decision_drivers,
+                decision_outcome, consequences_pros_cons, confirmation_criteria,
+                raw_markdown, cms_edited, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, NOW())
+            ON CONFLICT (adr_id, locale) DO UPDATE
+            SET title = EXCLUDED.title,
+                context_problem = EXCLUDED.context_problem,
+                decision_drivers = EXCLUDED.decision_drivers,
+                decision_outcome = EXCLUDED.decision_outcome,
+                consequences_pros_cons = EXCLUDED.consequences_pros_cons,
+                confirmation_criteria = EXCLUDED.confirmation_criteria,
+                raw_markdown = EXCLUDED.raw_markdown,
+                cms_edited = TRUE,
+                updated_at = NOW()
+            "#,
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, TRUE, $15, 'exonovel', $15, $16, $17)
-        ON CONFLICT (rel_path) DO UPDATE
-        SET title = EXCLUDED.title,
-            status = EXCLUDED.status,
-            doc_kind = EXCLUDED.doc_kind,
-            parent_adr_id = EXCLUDED.parent_adr_id,
-            context_problem = EXCLUDED.context_problem,
-            decision_drivers = EXCLUDED.decision_drivers,
-            decision_outcome = EXCLUDED.decision_outcome,
-            consequences_pros_cons = EXCLUDED.consequences_pros_cons,
-            confirmation_criteria = EXCLUDED.confirmation_criteria,
-            decision_makers = EXCLUDED.decision_makers,
-            raw_markdown = EXCLUDED.raw_markdown,
-            cms_edited = TRUE,
-            willow_timestamp_us = EXCLUDED.willow_timestamp_us,
-            updated_at = NOW()
-        RETURNING id
-        "#,
-    )
-    .bind(body.adr_number)
-    .bind(body.parent_adr_id)
-    .bind(&doc_kind)
-    .bind(clean_title)
-    .bind(&slug)
-    .bind(&clean_path)
-    .bind(&body.status)
-    .bind(&ctx_prob)
-    .bind(&drivers)
-    .bind(&outcome)
-    .bind(&consequences)
-    .bind(&confirm)
-    .bind(&makers)
-    .bind(&composed_md)
-    .bind(&author_did)
-    .bind(format!("/cms/{clean_path}"))
-    .bind(ts_us)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
+        .bind(adr_id)
+        .bind(target_locale)
+        .bind(clean_title)
+        .bind(&ctx_prob)
+        .bind(&drivers)
+        .bind(&outcome)
+        .bind(&consequences)
+        .bind(&confirm)
+        .bind(&composed_md)
+        .execute(pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+        adr_id
+    } else {
+        sqlx::query_scalar(
+            r#"
+            INSERT INTO adr_records (
+                adr_number, parent_adr_id, doc_kind, title, slug, rel_path, status,
+                context_problem, decision_drivers, decision_outcome, consequences_pros_cons,
+                confirmation_criteria, decision_makers, raw_markdown, cms_edited, author_did,
+                willow_namespace, willow_subspace, willow_path, willow_timestamp_us
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, TRUE, $15, 'exonovel', $15, $16, $17)
+            ON CONFLICT (rel_path) DO UPDATE
+            SET title = EXCLUDED.title,
+                status = EXCLUDED.status,
+                doc_kind = EXCLUDED.doc_kind,
+                parent_adr_id = EXCLUDED.parent_adr_id,
+                context_problem = EXCLUDED.context_problem,
+                decision_drivers = EXCLUDED.decision_drivers,
+                decision_outcome = EXCLUDED.decision_outcome,
+                consequences_pros_cons = EXCLUDED.consequences_pros_cons,
+                confirmation_criteria = EXCLUDED.confirmation_criteria,
+                decision_makers = EXCLUDED.decision_makers,
+                raw_markdown = EXCLUDED.raw_markdown,
+                cms_edited = TRUE,
+                willow_timestamp_us = EXCLUDED.willow_timestamp_us,
+                updated_at = NOW()
+            RETURNING id
+            "#,
         )
-    })?;
+        .bind(body.adr_number)
+        .bind(body.parent_adr_id)
+        .bind(&doc_kind)
+        .bind(clean_title)
+        .bind(&slug)
+        .bind(&clean_path)
+        .bind(&body.status)
+        .bind(&ctx_prob)
+        .bind(&drivers)
+        .bind(&outcome)
+        .bind(&consequences)
+        .bind(&confirm)
+        .bind(&makers)
+        .bind(&composed_md)
+        .bind(&author_did)
+        .bind(format!("/cms/{clean_path}"))
+        .bind(ts_us)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?
+    };
 
     emit_live_patch(
         Some(pool),
@@ -922,11 +1172,11 @@ pub async fn api_cms_upsert_adr(
         row_id.to_string(),
         if body.id.is_some() { "update" } else { "insert" },
         vec!["title".to_string(), "status".to_string(), "rawMarkdown".to_string()],
-        serde_json::json!({ "id": row_id, "relPath": clean_path, "title": clean_title, "status": body.status }),
+        serde_json::json!({ "id": row_id, "relPath": clean_path, "title": clean_title, "status": body.status, "locale": target_locale }),
     )
     .await;
 
-    Ok(Json(serde_json::json!({ "ok": true, "id": row_id, "relPath": clean_path })))
+    Ok(Json(serde_json::json!({ "ok": true, "id": row_id, "relPath": clean_path, "locale": target_locale })))
 }
 
 #[derive(Deserialize)]
@@ -1091,33 +1341,56 @@ pub async fn api_cms_tooling_and_notes(
     .await
     .unwrap_or_default();
 
-    let models: Vec<ProviderModelInfo> = m_rows
-        .into_iter()
-        .map(|r| {
-            let provider: String = r.try_get("provider").unwrap_or_default();
-            let key_configured = match provider.as_str() {
-                "google_ai_studio" => env_non_empty("GEMINI_API_KEY"),
-                "nvidia_nim" => env_non_empty("NVIDIA_NIM_API_KEY"),
-                "openrouter" => env_non_empty("OPENROUTER_API_KEY"),
-                "groq" => env_non_empty("GROQ_API_KEY"),
-                "cerebras" => env_non_empty("CEREBRAS_API_KEY"),
-                "mistral" => env_non_empty("MISTRAL_API_KEY"),
-                _ => false,
-            };
-            ProviderModelInfo {
-                provider,
-                model_id: r.try_get("model_id").unwrap_or_default(),
-                display_name: r.try_get("display_name").unwrap_or_default(),
-                is_free: r.try_get("is_free").unwrap_or(true),
-                supports_tools: r.try_get("supports_tools").unwrap_or(true),
-                is_active: r.try_get("is_active").unwrap_or(true),
-                key_configured,
-                cooldown_until: r.try_get("cooldown_until").unwrap_or(None),
-                deprecated_at: r.try_get("deprecated_at").unwrap_or(None),
-                last_verified_at: r.try_get("last_verified_at").unwrap_or_default(),
-            }
-        })
-        .collect();
+    let mut models: Vec<ProviderModelInfo> = Vec::new();
+    if resolve_opencode_bin().is_some() {
+        models.push(ProviderModelInfo {
+            provider: "opencode".to_string(),
+            model_id: "headless-cli".to_string(),
+            display_name: "OpenCode CLI (Headless)".to_string(),
+            is_free: true,
+            supports_tools: true,
+            is_active: true,
+            key_configured: true,
+            cooldown_until: None,
+            deprecated_at: None,
+            last_verified_at: "Runtime Ready".to_string(),
+        });
+    }
+
+    for r in m_rows {
+        let provider: String = r.try_get("provider").unwrap_or_default();
+        let model_id: String = r.try_get("model_id").unwrap_or_default();
+        if model_id.starts_with("gemini-2.5")
+            || model_id.contains("qwen2.5")
+            || model_id.contains("distill-qwen-32b")
+        {
+            continue;
+        }
+        let key_configured = match provider.as_str() {
+            "google_ai_studio" => env_non_empty("GEMINI_API_KEY"),
+            "nvidia_nim" => nvidia_nim_key().is_some(),
+            "openrouter" => env_non_empty("OPENROUTER_API_KEY"),
+            "groq" => env_non_empty("GROQ_API_KEY"),
+            "cerebras" => env_non_empty("CEREBRAS_API_KEY"),
+            "mistral" => env_non_empty("MISTRAL_API_KEY"),
+            _ => false,
+        };
+        if !key_configured {
+            continue;
+        }
+        models.push(ProviderModelInfo {
+            provider,
+            model_id,
+            display_name: r.try_get("display_name").unwrap_or_default(),
+            is_free: r.try_get("is_free").unwrap_or(true),
+            supports_tools: r.try_get("supports_tools").unwrap_or(true),
+            is_active: r.try_get("is_active").unwrap_or(true),
+            key_configured,
+            cooldown_until: r.try_get("cooldown_until").unwrap_or(None),
+            deprecated_at: r.try_get("deprecated_at").unwrap_or(None),
+            last_verified_at: r.try_get("last_verified_at").unwrap_or_default(),
+        });
+    }
 
     Ok(Json(serde_json::json!({
         "tools": tools,
@@ -1126,10 +1399,107 @@ pub async fn api_cms_tooling_and_notes(
     })))
 }
 
-fn env_non_empty(name: &str) -> bool {
+fn first_env(name: &str) -> Option<String> {
     std::env::var(name)
-        .map(|v| !v.trim().is_empty())
-        .unwrap_or(false)
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+fn env_non_empty(name: &str) -> bool {
+    first_env(name).is_some()
+}
+
+fn nvidia_nim_key() -> Option<String> {
+    first_env("NVIDIA_NIM_API_KEY").or_else(|| first_env("NVIDIA_API_KEY"))
+}
+
+fn resolve_opencode_bin() -> Option<std::path::PathBuf> {
+    if let Some(explicit) = first_env("OPENCODE_BIN") {
+        let p = std::path::PathBuf::from(explicit);
+        if p.is_file() {
+            return Some(p);
+        }
+    }
+    let mut candidates = vec![
+        std::path::PathBuf::from("/root/.opencode/bin/opencode"),
+        std::path::PathBuf::from("/root/.local/bin/opencode"),
+        std::path::PathBuf::from("/usr/local/bin/opencode"),
+        std::path::PathBuf::from("/usr/bin/opencode"),
+    ];
+    if let Some(home) = first_env("HOME") {
+        candidates.push(std::path::PathBuf::from(format!("{home}/.opencode/bin/opencode")));
+        candidates.push(std::path::PathBuf::from(format!("{home}/.local/bin/opencode")));
+    }
+    if let Ok(path_var) = std::env::var("PATH") {
+        for dir in std::env::split_paths(&path_var) {
+            candidates.push(dir.join("opencode"));
+        }
+    }
+    candidates.into_iter().find(|p| p.is_file())
+}
+
+fn parse_opencode_jsonl_output(raw: &str) -> Option<String> {
+    let mut parts = Vec::new();
+    let mut non_json_lines = Vec::new();
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
+            let txt = val
+                .get("part")
+                .and_then(|p| p.get("text"))
+                .and_then(|t| t.as_str())
+                .or_else(|| val.get("text").and_then(|t| t.as_str()))
+                .or_else(|| val.get("content").and_then(|t| t.as_str()))
+                .or_else(|| {
+                    val.get("message")
+                        .and_then(|m| m.get("content"))
+                        .and_then(|t| t.as_str())
+                });
+            if let Some(t) = txt.map(str::trim).filter(|t| !t.is_empty()) {
+                parts.push(t.to_string());
+            }
+        } else {
+            non_json_lines.push(trimmed.to_string());
+        }
+    }
+    if !parts.is_empty() {
+        return Some(parts.join("\n"));
+    }
+    if !non_json_lines.is_empty() {
+        return Some(non_json_lines.join("\n"));
+    }
+    None
+}
+
+fn is_nim_chat_model(id: &str) -> bool {
+    let low = id.to_lowercase();
+    if low.contains("embed")
+        || low.contains("rerank")
+        || low.contains("guard")
+        || low.contains("parse")
+        || low.contains("translate")
+        || low.contains("vila")
+        || low.contains("neva")
+        || low.contains("kosmos")
+        || low.contains("clip")
+        || low.contains("reward")
+        || low.contains("tts")
+        || low.contains("asr")
+        || low.contains("qwen2.5")
+        || low.contains("distill-qwen-32b")
+    {
+        return false;
+    }
+    low.contains("deepseek")
+        || low.contains("llama")
+        || low.contains("qwen")
+        || low.contains("mistral")
+        || low.contains("nemotron")
+        || low.contains("gemma")
 }
 
 #[derive(Deserialize)]
@@ -1355,23 +1725,49 @@ pub async fn api_cms_refresh_models(
         ));
     };
 
-    let client = reqwest::Client::new();
+    let _ = sqlx::query(
+        "DELETE FROM provider_models WHERE model_id LIKE 'gemini-2.5%' OR model_id LIKE '%qwen2.5%' OR model_id LIKE '%distill-qwen-32b%'",
+    )
+    .execute(pool)
+    .await;
+
+    for (prov_name, has_key) in [
+        ("openrouter", env_non_empty("OPENROUTER_API_KEY")),
+        ("groq", env_non_empty("GROQ_API_KEY")),
+        ("google_ai_studio", env_non_empty("GEMINI_API_KEY")),
+        ("nvidia_nim", nvidia_nim_key().is_some()),
+    ] {
+        if !has_key {
+            let _ = sqlx::query("DELETE FROM provider_models WHERE provider = $1")
+                .bind(prov_name)
+                .execute(pool)
+                .await;
+        }
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new());
     let mut verified_total = 0_usize;
 
     // 1. NVIDIA NIM live models
-    if let Ok(key) = std::env::var("NVIDIA_NIM_API_KEY") {
-        let key = key.trim();
-        if !key.is_empty() {
-            if let Ok(resp) = client
-                .get("https://integrate.api.nvidia.com/v1/models")
-                .bearer_auth(key)
-                .send()
-                .await
-            {
+    if let Some(key) = nvidia_nim_key() {
+        if let Ok(resp) = client
+            .get("https://integrate.api.nvidia.com/v1/models")
+            .bearer_auth(&key)
+            .send()
+            .await
+        {
+            if resp.status().is_success() {
                 if let Ok(json) = resp.json::<serde_json::Value>().await {
                     if let Some(arr) = json.get("data").and_then(|d| d.as_array()) {
                         let mut live_ids = Vec::new();
-                        for item in arr.iter().take(40) {
+                        for item in arr.iter().filter(|it| {
+                            it.get("id")
+                                .and_then(|s| s.as_str())
+                                .is_some_and(is_nim_chat_model)
+                        }).take(24) {
                             if let Some(id) = item.get("id").and_then(|s| s.as_str()) {
                                 live_ids.push(id.to_string());
                                 let _ = sqlx::query(
@@ -1403,15 +1799,14 @@ pub async fn api_cms_refresh_models(
     }
 
     // 2. OpenRouter live :free models
-    if let Ok(key) = std::env::var("OPENROUTER_API_KEY") {
-        let key = key.trim();
-        if !key.is_empty() {
-            if let Ok(resp) = client
-                .get("https://openrouter.ai/api/v1/models")
-                .bearer_auth(key)
-                .send()
-                .await
-            {
+    if let Some(key) = first_env("OPENROUTER_API_KEY") {
+        if let Ok(resp) = client
+            .get("https://openrouter.ai/api/v1/models")
+            .bearer_auth(&key)
+            .send()
+            .await
+        {
+            if resp.status().is_success() {
                 if let Ok(json) = resp.json::<serde_json::Value>().await {
                     if let Some(arr) = json.get("data").and_then(|d| d.as_array()) {
                         let mut live_ids = Vec::new();
@@ -1453,18 +1848,17 @@ pub async fn api_cms_refresh_models(
         }
     }
 
-    // 3. Google AI Studio live Gemini models
-    if let Ok(key) = std::env::var("GEMINI_API_KEY") {
-        let key = key.trim();
-        if !key.is_empty() {
-            let url = format!("https://generativelanguage.googleapis.com/v1beta/models?key={key}");
-            if let Ok(resp) = client.get(&url).send().await {
+    // 3. Google AI Studio live Gemini models (excluding retired 2.5 series)
+    if let Some(key) = first_env("GEMINI_API_KEY") {
+        let url = format!("https://generativelanguage.googleapis.com/v1beta/models?key={key}");
+        if let Ok(resp) = client.get(&url).send().await {
+            if resp.status().is_success() {
                 if let Ok(json) = resp.json::<serde_json::Value>().await {
                     if let Some(arr) = json.get("models").and_then(|d| d.as_array()) {
                         for item in arr.iter().take(25) {
                             if let Some(raw_name) = item.get("name").and_then(|s| s.as_str()) {
                                 let id = raw_name.trim_start_matches("models/");
-                                if id.contains("gemini") {
+                                if id.contains("gemini") && !id.starts_with("gemini-2.5") {
                                     let display = item
                                         .get("displayName")
                                         .and_then(|n| n.as_str())
@@ -1581,126 +1975,231 @@ pub async fn api_cms_generate_proposal(
     .await
     .unwrap_or_default();
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new());
     let mut chosen_provider = String::new();
     let mut chosen_model = String::new();
     let mut generated_text: Option<String> = None;
+    let mut diag_notes: Vec<String> = Vec::new();
 
-    for cand in candidates {
-        let prov: String = cand.try_get("provider").unwrap_or_default();
-        let mid: String = cand.try_get("model_id").unwrap_or_default();
+    // 1. Try installed headless OpenCode CLI if present on host
+    if let Some(opencode_bin) = resolve_opencode_bin() {
+        let mut cmd = tokio::process::Command::new(&opencode_bin);
+        cmd.args(["run", "--standalone", "--auto", "--format", "json", &prompt]);
+        match tokio::time::timeout(std::time::Duration::from_secs(40), cmd.output()).await {
+            Ok(Ok(output)) if output.status.success() => {
+                let raw_out = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if let Some(parsed_txt) = parse_opencode_jsonl_output(&raw_out) {
+                    chosen_provider = "opencode".to_string();
+                    chosen_model = "headless-cli".to_string();
+                    generated_text = Some(parsed_txt);
+                } else {
+                    diag_notes.push("OpenCode exited 0 but returned empty output.".to_string());
+                }
+            }
+            Ok(Ok(output)) => {
+                let code = output.status.code().unwrap_or(-1);
+                let err_snippet: String = String::from_utf8_lossy(&output.stderr)
+                    .trim()
+                    .chars()
+                    .take(180)
+                    .collect();
+                diag_notes.push(format!("OpenCode exit {code}: {err_snippet}"));
+            }
+            Ok(Err(e)) => {
+                diag_notes.push(format!("OpenCode spawn error: {e}"));
+            }
+            Err(_) => {
+                diag_notes.push("OpenCode CLI timed out after 40s.".to_string());
+            }
+        }
+    } else {
+        diag_notes.push("OpenCode CLI binary not found on host.".to_string());
+    }
 
-        let (endpoint_opt, api_key_opt, is_gemini) = match prov.as_str() {
-            "google_ai_studio" => (
-                Some(format!(
-                    "https://generativelanguage.googleapis.com/v1beta/models/{mid}:generateContent"
-                )),
-                std::env::var("GEMINI_API_KEY").ok(),
-                true,
-            ),
-            "nvidia_nim" => (
-                Some("https://integrate.api.nvidia.com/v1/chat/completions".to_string()),
-                std::env::var("NVIDIA_NIM_API_KEY").ok(),
-                false,
-            ),
-            "openrouter" => (
-                Some("https://openrouter.ai/api/v1/chat/completions".to_string()),
-                std::env::var("OPENROUTER_API_KEY").ok(),
-                false,
-            ),
-            "groq" => (
-                Some("https://api.groq.com/openai/v1/chat/completions".to_string()),
-                std::env::var("GROQ_API_KEY").ok(),
-                false,
-            ),
-            _ => (None, None, false),
-        };
+    // 2. Direct OpenAI-compatible & Gemini HTTP inference failover across configured providers
+    if generated_text.is_none() {
+        for cand in candidates {
+            let prov: String = cand.try_get("provider").unwrap_or_default();
+            let mid: String = cand.try_get("model_id").unwrap_or_default();
+            if mid.starts_with("gemini-2.5") || mid.contains("qwen2.5") || mid.contains("distill-qwen-32b") {
+                continue;
+            }
 
-        let (Some(url), Some(key)) = (endpoint_opt, api_key_opt.filter(|k| !k.trim().is_empty())) else {
-            continue;
-        };
+            let (endpoint_opt, api_key_opt, is_gemini) = match prov.as_str() {
+                "google_ai_studio" => (
+                    Some(format!(
+                        "https://generativelanguage.googleapis.com/v1beta/models/{mid}:generateContent"
+                    )),
+                    first_env("GEMINI_API_KEY"),
+                    true,
+                ),
+                "nvidia_nim" => (
+                    Some("https://integrate.api.nvidia.com/v1/chat/completions".to_string()),
+                    nvidia_nim_key(),
+                    false,
+                ),
+                "openrouter" => (
+                    Some("https://openrouter.ai/api/v1/chat/completions".to_string()),
+                    first_env("OPENROUTER_API_KEY"),
+                    false,
+                ),
+                "groq" => (
+                    Some("https://api.groq.com/openai/v1/chat/completions".to_string()),
+                    first_env("GROQ_API_KEY"),
+                    false,
+                ),
+                _ => (None, None, false),
+            };
 
-        let res = if is_gemini {
-            client
-                .post(&url)
-                .header("x-goog-api-key", key.trim())
-                .json(&serde_json::json!({
-                    "contents": [{ "parts": [{ "text": &prompt }] }]
-                }))
-                .send()
-                .await
-        } else {
-            client
-                .post(&url)
-                .bearer_auth(key.trim())
-                .json(&serde_json::json!({
-                    "model": mid,
-                    "messages": [{ "role": "user", "content": &prompt }],
-                    "max_tokens": 350
-                }))
-                .send()
-                .await
-        };
+            let (Some(url), Some(key)) = (endpoint_opt, api_key_opt) else {
+                continue;
+            };
 
-        match res {
-            Ok(resp) if resp.status().is_success() => {
-                if let Ok(json) = resp.json::<serde_json::Value>().await {
-                    let txt = if is_gemini {
-                        json.get("candidates")
-                            .and_then(|c| c.get(0))
-                            .and_then(|c| c.get("content"))
-                            .and_then(|c| c.get("parts"))
-                            .and_then(|p| p.get(0))
-                            .and_then(|p| p.get("text"))
-                            .and_then(|t| t.as_str())
-                            .map(str::to_string)
-                    } else {
-                        json.get("choices")
-                            .and_then(|c| c.get(0))
-                            .and_then(|c| c.get("message"))
-                            .and_then(|m| m.get("content"))
-                            .and_then(|t| t.as_str())
-                            .map(str::to_string)
-                    };
-                    if let Some(clean_txt) = txt.filter(|t| !t.trim().is_empty()) {
-                        chosen_provider = prov;
-                        chosen_model = mid;
-                        generated_text = Some(clean_txt);
-                        break;
+            let res = if is_gemini {
+                client
+                    .post(&url)
+                    .header("x-goog-api-key", key.trim())
+                    .json(&serde_json::json!({
+                        "contents": [{ "parts": [{ "text": &prompt }] }]
+                    }))
+                    .send()
+                    .await
+            } else {
+                client
+                    .post(&url)
+                    .bearer_auth(key.trim())
+                    .json(&serde_json::json!({
+                        "model": mid,
+                        "messages": [{ "role": "user", "content": &prompt }],
+                        "max_tokens": 350
+                    }))
+                    .send()
+                    .await
+            };
+
+            match res {
+                Ok(resp) if resp.status().is_success() => {
+                    if let Ok(json) = resp.json::<serde_json::Value>().await {
+                        let txt = if is_gemini {
+                            json.get("candidates")
+                                .and_then(|c| c.get(0))
+                                .and_then(|c| c.get("content"))
+                                .and_then(|c| c.get("parts"))
+                                .and_then(|p| p.get(0))
+                                .and_then(|p| p.get("text"))
+                                .and_then(|t| t.as_str())
+                                .map(str::to_string)
+                        } else {
+                            json.get("choices")
+                                .and_then(|c| c.get(0))
+                                .and_then(|c| c.get("message"))
+                                .and_then(|m| m.get("content"))
+                                .and_then(|t| t.as_str())
+                                .map(str::to_string)
+                        };
+                        if let Some(clean_txt) = txt.filter(|t| !t.trim().is_empty()) {
+                            chosen_provider = prov;
+                            chosen_model = mid;
+                            generated_text = Some(clean_txt);
+                            break;
+                        }
                     }
                 }
-            }
-            Ok(resp) => {
-                let code = resp.status().as_u16();
-                if code == 404 || code == 410 {
-                    let _ = sqlx::query(
-                        "UPDATE provider_models SET is_active = FALSE, deprecated_at = NOW() WHERE provider = $1 AND model_id = $2",
-                    )
-                    .bind(&prov)
-                    .bind(&mid)
-                    .execute(pool)
-                    .await;
-                } else if code == 429 {
-                    let _ = sqlx::query(
-                        "UPDATE provider_models SET cooldown_until = NOW() + INTERVAL '5 minutes' WHERE provider = $1 AND model_id = $2",
-                    )
-                    .bind(&prov)
-                    .bind(&mid)
-                    .execute(pool)
-                    .await;
+                Ok(resp) => {
+                    let code = resp.status().as_u16();
+                    diag_notes.push(format!("{prov} ({mid}) HTTP {code}"));
+                    if code == 404 || code == 410 {
+                        let _ = sqlx::query(
+                            "UPDATE provider_models SET is_active = FALSE, deprecated_at = NOW() WHERE provider = $1 AND model_id = $2",
+                        )
+                        .bind(&prov)
+                        .bind(&mid)
+                        .execute(pool)
+                        .await;
+                    } else if code == 429 {
+                        let _ = sqlx::query(
+                            "UPDATE provider_models SET cooldown_until = NOW() + INTERVAL '5 minutes' WHERE provider = $1 AND model_id = $2",
+                        )
+                        .bind(&prov)
+                        .bind(&mid)
+                        .execute(pool)
+                        .await;
+                    }
+                }
+                Err(e) => {
+                    diag_notes.push(format!("{prov} ({mid}) request error: {e}"));
+                    continue;
                 }
             }
-            Err(_) => continue,
         }
     }
 
+    // 3. Direct NVIDIA NIM fallback when NVIDIA_NIM_API_KEY or NVIDIA_API_KEY is present
+    if generated_text.is_none() {
+        if let Some(nim_key) = nvidia_nim_key() {
+            for nim_model in [
+                "nvidia/nemotron-3.5-lightning-30b-a3b",
+                "deepseek-ai/deepseek-r1",
+                "meta/llama-3.3-70b-instruct",
+            ] {
+                match client
+                    .post("https://integrate.api.nvidia.com/v1/chat/completions")
+                    .bearer_auth(&nim_key)
+                    .json(&serde_json::json!({
+                        "model": nim_model,
+                        "messages": [{ "role": "user", "content": &prompt }],
+                        "max_tokens": 350
+                    }))
+                    .send()
+                    .await
+                {
+                    Ok(resp) if resp.status().is_success() => {
+                        if let Ok(json) = resp.json::<serde_json::Value>().await {
+                            if let Some(txt) = json
+                                .get("choices")
+                                .and_then(|c| c.get(0))
+                                .and_then(|c| c.get("message"))
+                                .and_then(|m| m.get("content"))
+                                .and_then(|t| t.as_str())
+                                .map(str::to_string)
+                                .filter(|t| !t.trim().is_empty())
+                            {
+                                chosen_provider = "nvidia_nim".to_string();
+                                chosen_model = nim_model.to_string();
+                                generated_text = Some(txt);
+                                break;
+                            }
+                        }
+                    }
+                    Ok(resp) => {
+                        diag_notes.push(format!("nvidia_nim fallback ({nim_model}) HTTP {}", resp.status().as_u16()));
+                    }
+                    Err(e) => {
+                        diag_notes.push(format!("nvidia_nim fallback ({nim_model}) error: {e}"));
+                    }
+                }
+            }
+        } else {
+            diag_notes.push("NVIDIA_NIM_API_KEY / NVIDIA_API_KEY is not set.".to_string());
+        }
+    }
+
+    let diag_summary = diag_notes.join(" | ");
     let proposal_body = generated_text.unwrap_or_else(|| {
         chosen_provider = "deterministic".to_string();
         chosen_model = "none-configured".to_string();
         format!(
-            "No active remote inference keys answered right now. Deterministic recommendation: audit {tool_name} changelog between {inst_v} and {lat_v}, verify tests on upgrade branch, and review blocked ADRs."
+            "No active inference runtime answered ({diag_summary}). Deterministic summary: audit {tool_name} changelog between {inst_v} and {lat_v}, verify tests on an upgrade branch, and review linked ADRs."
         )
     });
+    let rationale_text = if diag_summary.is_empty() || chosen_provider == "opencode" {
+        format!("Generated via {chosen_provider} ({chosen_model}).")
+    } else {
+        format!("Generated via {chosen_provider} ({chosen_model}). Diagnostics: {diag_summary}")
+    };
 
     let note_id: i32 = sqlx::query_scalar(
         r#"
@@ -1716,7 +2215,7 @@ pub async fn api_cms_generate_proposal(
     .bind(body.tool_key.trim())
     .bind(&lat_v)
     .bind(format!("{tool_name} {lat_v}: Feature Opportunity Proposal"))
-    .bind(format!("Generated via OpenCode failover pipeline ({chosen_provider} / {chosen_model})."))
+    .bind(&rationale_text)
     .bind(&proposal_body)
     .bind(&chosen_provider)
     .bind(&chosen_model)
@@ -1746,6 +2245,7 @@ pub async fn api_cms_generate_proposal(
         "noteId": note_id,
         "provider": chosen_provider,
         "model": chosen_model,
+        "diagnostics": diag_notes,
     })))
 }
 

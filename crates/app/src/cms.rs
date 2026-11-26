@@ -1,3 +1,5 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use gloo_net::http::Request;
 use leptos::prelude::*;
 
@@ -5,9 +7,11 @@ use crate::{
     i18n::{use_i18n, InputLocaleBar},
     live::use_live_sync,
     models::{
-        copy_text_to_clipboard, resolve_fresh_jwt, AdrRecord, AuthConfigResponse, CmsAdrsResponse,
-        CmsTasksResponse, CmsToolingResponse, MaturityNoteItem, OwnerExternalTask,
-        ProviderModelInfo, ToolCatalogItem, VerifiedUser,
+        copy_text_to_clipboard, extract_api_error_message, resolve_fresh_jwt,
+        start_google_connect_flow, AdrRecord, AuthConfigResponse, CmsAdrsResponse,
+        CmsTasksResponse, CmsToolingResponse, ConnectedAppsResponse, DriveBackupResponse,
+        DriveSaveResponse, MaturityNoteItem, OwnerExternalTask, ProviderModelInfo, ToolCatalogItem,
+        VerifiedUser,
     },
 };
 
@@ -15,8 +19,85 @@ use crate::{
 enum CmsMode {
     ReadAdr,
     CreateOrEditAdr,
-    MaturityAndAi,
+    ToolingAndProposals,
+    InferenceRuntimes,
     OwnerTasks,
+}
+
+#[derive(Clone, Debug)]
+enum TreeRow {
+    Folder {
+        folder_path: String,
+        name: String,
+        depth: usize,
+        expanded: bool,
+        file_count: usize,
+    },
+    File {
+        adr: AdrRecord,
+        depth: usize,
+    },
+}
+
+#[derive(Default)]
+struct FolderDir {
+    files: Vec<AdrRecord>,
+    subdirs: BTreeMap<String, FolderDir>,
+}
+
+impl FolderDir {
+    fn insert(&mut self, parts: &[&str], adr: AdrRecord) {
+        if parts.len() <= 1 {
+            self.files.push(adr);
+        } else {
+            self.subdirs
+                .entry(parts[0].to_string())
+                .or_default()
+                .insert(&parts[1..], adr);
+        }
+    }
+
+    fn total_files(&self) -> usize {
+        self.files.len()
+            + self
+                .subdirs
+                .values()
+                .map(FolderDir::total_files)
+                .sum::<usize>()
+    }
+
+    fn flatten(
+        &mut self,
+        prefix: &str,
+        depth: usize,
+        expanded_folders: &BTreeSet<String>,
+        auto_expand: bool,
+        out: &mut Vec<TreeRow>,
+    ) {
+        for (name, sub) in &mut self.subdirs {
+            let folder_path = if prefix.is_empty() {
+                name.clone()
+            } else {
+                format!("{prefix}/{name}")
+            };
+            let expanded = auto_expand || expanded_folders.contains(&folder_path);
+            let file_count = sub.total_files();
+            out.push(TreeRow::Folder {
+                folder_path: folder_path.clone(),
+                name: name.clone(),
+                depth,
+                expanded,
+                file_count,
+            });
+            if expanded {
+                sub.flatten(&folder_path, depth + 1, expanded_folders, auto_expand, out);
+            }
+        }
+        self.files.sort_by(|a, b| a.rel_path.cmp(&b.rel_path));
+        for adr in self.files.drain(..) {
+            out.push(TreeRow::File { adr, depth });
+        }
+    }
 }
 
 #[component]
@@ -38,7 +119,12 @@ pub fn DocsCmsView(
     let (tasks, set_tasks) = signal::<Vec<OwnerExternalTask>>(Vec::new());
 
     let (status_filter, set_status_filter) = signal("all".to_string());
+    let (proposal_filter, set_proposal_filter) = signal("all".to_string());
     let (search_query, set_search_query) = signal(String::new());
+    let (expanded_folders, set_expanded_folders) = signal(BTreeSet::from([
+        "docs".to_string(),
+        "docs/adr".to_string(),
+    ]));
     let (cms_mode, set_cms_mode) = signal(CmsMode::ReadAdr);
     let (sidebar_collapsed, set_sidebar_collapsed) = signal(false);
     let (sidebar_width, set_sidebar_width) = signal(320_i32);
@@ -75,12 +161,55 @@ pub fn DocsCmsView(
 
     let (selected_scan_tool, set_selected_scan_tool) = signal("loro".to_string());
 
-    let reload_cms = move || {
+    // Google Docs & Drive Integration State
+    let (google_connected, set_google_connected) = signal(false);
+    let (google_email, set_google_email) = signal(String::new());
+    let (drive_link, set_drive_link) = signal::<Option<(String, String)>>(None);
+    let (backup_panel_open, set_backup_panel_open) = signal(false);
+    let (backup_format, set_backup_format) = signal("google-doc".to_string());
+    let (drive_busy, set_drive_busy) = signal(false);
+
+    let reload_google_status = move || {
         leptos::task::spawn_local(async move {
             let Some(jwt) = resolve_fresh_jwt(auth_config, initial_jwt).await else {
                 return;
             };
-            if let Ok(resp) = Request::get("/api/cms/adrs")
+            if let Ok(resp) = Request::get("/api/connected-apps")
+                .header("Authorization", &format!("Bearer {jwt}"))
+                .send()
+                .await
+            {
+                if resp.ok() {
+                    if let Ok(parsed) = resp.json::<ConnectedAppsResponse>().await {
+                        if let Some(app) = parsed
+                            .connected_apps
+                            .into_iter()
+                            .find(|a| a.provider == "google_drive" && a.status == "connected")
+                        {
+                            set_google_connected.set(true);
+                            set_google_email.set(app.provider_email);
+                        } else {
+                            set_google_connected.set(false);
+                            set_google_email.set(String::new());
+                        }
+                    }
+                }
+            }
+        });
+    };
+
+    let reload_cms_for_locale = move |loc: String| {
+        reload_google_status();
+        let encoded_loc = js_sys::encode_uri_component(loc.trim())
+            .as_string()
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "en".to_string());
+        leptos::task::spawn_local(async move {
+            let Some(jwt) = resolve_fresh_jwt(auth_config, initial_jwt).await else {
+                return;
+            };
+            let adrs_url = format!("/api/cms/adrs?locale={encoded_loc}");
+            if let Ok(resp) = Request::get(&adrs_url)
                 .header("Authorization", &format!("Bearer {jwt}"))
                 .send()
                 .await
@@ -129,17 +258,155 @@ pub fn DocsCmsView(
         });
     };
 
-    Effect::new(move |_| reload_cms());
+    Effect::new(move |_| {
+        let loc = i18n.ui_locale.get();
+        reload_cms_for_locale(loc);
+    });
 
-    // Global Live UI reaction for ADR / Tooling / Maturity Notes / Owner Task mutations
+    // Global Live UI reaction for ADR / Tooling / Maturity Notes / Owner Task / Connected Apps mutations
     Effect::new(move |_| {
         let _seq = live.pulse_seq.get();
-        if live.matches_kind(&["adr", "tooling", "maturity_note", "task", "system"]) {
-            reload_cms();
+        if live.matches_kind(&["adr", "tooling", "maturity_note", "task", "connected_app", "system"])
+        {
+            reload_cms_for_locale(i18n.ui_locale.get_untracked());
         }
     });
 
+    let connect_google_from_docs = move |_| {
+        let cur_doc = active_doc_path.get_untracked();
+        set_busy_msg.set(Some(i18n.tr_untracked(
+            "cms_msg_redirecting_google",
+            "Redirecting to Google consent screen...",
+        )));
+        leptos::task::spawn_local(async move {
+            let doc_opt = if cur_doc.trim().is_empty() {
+                None
+            } else {
+                Some(cur_doc.as_str())
+            };
+            if let Err(err) =
+                start_google_connect_flow(auth_config, initial_jwt, "docs", doc_opt).await
+            {
+                set_busy_msg.set(Some(err));
+            }
+        });
+    };
+
+    let save_active_doc_to_drive = move |rel_path: String, format: &'static str| {
+        set_drive_busy.set(true);
+        set_busy_msg.set(Some(if format == "google-doc" {
+            i18n.tr_untracked(
+                "cms_msg_saving_gdoc",
+                "Saving active ADR to Google Docs...",
+            )
+        } else {
+            i18n.tr_untracked(
+                "cms_msg_saving_md",
+                "Backing up active ADR as .md to Google Drive...",
+            )
+        }));
+        let fail_fallback = i18n.tr_untracked("cms_msg_save_failed", "Save failed.");
+        let saved_toast = i18n.tr_untracked("cms_toast_saved_drive", "Saved to Google Docs / Drive");
+        leptos::task::spawn_local(async move {
+            let Some(jwt) = resolve_fresh_jwt(auth_config, initial_jwt).await else {
+                set_drive_busy.set(false);
+                return;
+            };
+            if let Ok(req) = Request::post("/api/drive/save-doc")
+                .header("Authorization", &format!("Bearer {jwt}"))
+                .json(&serde_json::json!({
+                    "relPath": rel_path,
+                    "folderName": "ExoNovel Docs",
+                    "format": format,
+                }))
+            {
+                match req.send().await {
+                    Ok(resp) if resp.ok() => {
+                        if let Ok(saved) = resp.json::<DriveSaveResponse>().await {
+                            let link = saved.file.web_view_link.clone().unwrap_or_default();
+                            if link.starts_with("https://") {
+                                set_drive_link.set(Some((saved.file.name.clone(), link)));
+                            }
+                            set_busy_msg.set(Some(format!(
+                                "{}: {} ({})",
+                                saved_toast, saved.file.name, saved.action
+                            )));
+                            on_toast(saved_toast);
+                        }
+                    }
+                    Ok(resp) => {
+                        let txt = resp.text().await.unwrap_or_default();
+                        set_busy_msg.set(Some(extract_api_error_message(&txt, &fail_fallback)));
+                    }
+                    Err(e) => set_busy_msg.set(Some(e.to_string())),
+                }
+            }
+            set_drive_busy.set(false);
+        });
+    };
+
+    let run_archive_backup = move |_| {
+        let fmt = backup_format.get_untracked();
+        set_backup_panel_open.set(false);
+        set_drive_busy.set(true);
+        set_busy_msg.set(Some(i18n.tr_untracked(
+            "cms_msg_backing_up_archive",
+            "Backing up full ExoNovel Docs & ADR archive to Google Drive (this may take a moment)...",
+        )));
+        let fail_fallback = i18n.tr_untracked("cms_msg_archive_failed", "Archive backup failed.");
+        let ok_toast = i18n.tr_untracked(
+            "cms_toast_archive_backed_up",
+            "Archive backed up to Google Drive",
+        );
+        leptos::task::spawn_local(async move {
+            let Some(jwt) = resolve_fresh_jwt(auth_config, initial_jwt).await else {
+                set_drive_busy.set(false);
+                return;
+            };
+            if let Ok(req) = Request::post("/api/drive/backup-archive")
+                .header("Authorization", &format!("Bearer {jwt}"))
+                .json(&serde_json::json!({
+                    "rootFolderName": "ExoNovel Docs",
+                    "format": fmt,
+                }))
+            {
+                match req.send().await {
+                    Ok(resp) if resp.ok() => {
+                        if let Ok(res) = resp.json::<DriveBackupResponse>().await {
+                            let link = res.archive_folder.web_view_link.clone().unwrap_or_default();
+                            if link.starts_with("https://") {
+                                set_drive_link
+                                    .set(Some((res.archive_folder.name.clone(), link)));
+                            }
+                            set_busy_msg.set(Some(format!(
+                                "{}: {} ({}/{} · +{}/~{})",
+                                ok_toast,
+                                res.archive_folder.name,
+                                res.total,
+                                res.total,
+                                res.created_count,
+                                res.updated_count
+                            )));
+                            on_toast(ok_toast);
+                        }
+                    }
+                    Ok(resp) => {
+                        let txt = resp.text().await.unwrap_or_default();
+                        set_busy_msg
+                            .set(Some(extract_api_error_message(&txt, &fail_fallback)));
+                    }
+                    Err(e) => set_busy_msg.set(Some(e.to_string())),
+                }
+            }
+            set_drive_busy.set(false);
+        });
+    };
+
     let toggle_owner_task = move |task_key: String, next_done: bool| {
+        let done_toast = i18n.tr_untracked("cms_toast_task_done", "Task marked complete in Neon");
+        let reopened_toast = i18n.tr_untracked("cms_toast_task_reopened", "Task reopened");
+        let failed_toast = i18n.tr_untracked("cms_toast_task_failed", "Failed to update task");
+        let loc = i18n.ui_locale.get_untracked();
         leptos::task::spawn_local(async move {
             let Some(jwt) = resolve_fresh_jwt(auth_config, initial_jwt).await else {
                 return;
@@ -151,14 +418,10 @@ pub fn DocsCmsView(
             {
                 if let Ok(resp) = req.send().await {
                     if resp.ok() {
-                        reload_cms();
-                        on_toast(if next_done {
-                            "Task marked complete in Neon".to_string()
-                        } else {
-                            "Task reopened".to_string()
-                        });
+                        reload_cms_for_locale(loc);
+                        on_toast(if next_done { done_toast } else { reopened_toast });
                     } else {
-                        on_toast("Failed to update task".to_string());
+                        on_toast(failed_toast);
                     }
                 }
             }
@@ -201,7 +464,14 @@ pub fn DocsCmsView(
 
     let submit_adr_form = move |ev: web_sys::SubmitEvent| {
         ev.prevent_default();
-        set_busy_msg.set(Some("Saving MADR 4.0.0 record to Neon...".to_string()));
+        let active_locale = i18n.ui_locale.get_untracked();
+        set_busy_msg.set(Some(i18n.tr_untracked(
+            "cms_msg_saving_adr",
+            "Saving MADR 4.0.0 record to Neon...",
+        )));
+        let missing_tok = i18n.tr_untracked("cms_msg_missing_token", "Missing session token.");
+        let saved_toast = i18n.tr_untracked("cms_toast_adr_saved", "ADR saved to Neon CMS");
+        let save_failed = i18n.tr_untracked("cms_msg_save_failed", "Save failed.");
         let payload = serde_json::json!({
             "id": form_id.get_untracked(),
             "adrNumber": if form_adr_num.get_untracked().trim().is_empty() { None } else { Some(form_adr_num.get_untracked()) },
@@ -216,11 +486,12 @@ pub fn DocsCmsView(
             "confirmationCriteria": form_confirmation.get_untracked(),
             "decisionMakers": form_makers.get_untracked(),
             "rawMarkdown": if form_raw_md.get_untracked().trim().is_empty() { None } else { Some(form_raw_md.get_untracked()) },
+            "locale": active_locale,
         });
         let saved_path = form_rel_path.get_untracked();
         leptos::task::spawn_local(async move {
             let Some(jwt) = resolve_fresh_jwt(auth_config, initial_jwt).await else {
-                set_busy_msg.set(Some("Missing session token.".to_string()));
+                set_busy_msg.set(Some(missing_tok));
                 return;
             };
             if let Ok(req) = Request::post("/api/cms/adrs")
@@ -232,10 +503,10 @@ pub fn DocsCmsView(
                         set_active_doc_path.set(saved_path);
                         set_cms_mode.set(CmsMode::ReadAdr);
                         set_busy_msg.set(None);
-                        reload_cms();
-                        on_toast("ADR saved to Neon CMS".to_string());
+                        reload_cms_for_locale(active_locale);
+                        on_toast(saved_toast);
                     } else {
-                        let msg = resp.text().await.unwrap_or_else(|_| "Save failed.".to_string());
+                        let msg = resp.text().await.unwrap_or(save_failed);
                         set_busy_msg.set(Some(msg));
                     }
                 }
@@ -248,6 +519,11 @@ pub fn DocsCmsView(
         let constraint = dep_constraint.get_untracked();
         let capability = dep_capability.get_untracked();
         let satisfied = dep_satisfied.get_untracked();
+        let linked_toast = i18n.tr_untracked(
+            "cms_toast_dep_linked",
+            "Tooling dependency linked to ADR",
+        );
+        let loc = i18n.ui_locale.get_untracked();
         leptos::task::spawn_local(async move {
             let Some(jwt) = resolve_fresh_jwt(auth_config, initial_jwt).await else {
                 return;
@@ -265,8 +541,8 @@ pub fn DocsCmsView(
                 if let Ok(resp) = req.send().await {
                     if resp.ok() {
                         set_dep_capability.set(String::new());
-                        reload_cms();
-                        on_toast("Tooling dependency linked to ADR".to_string());
+                        reload_cms_for_locale(loc);
+                        on_toast(linked_toast);
                     }
                 }
             }
@@ -274,7 +550,16 @@ pub fn DocsCmsView(
     };
 
     let run_crates_scan = move |_| {
-        set_busy_msg.set(Some("Running deterministic crates.io release scan...".to_string()));
+        set_busy_msg.set(Some(i18n.tr_untracked(
+            "cms_msg_scanning_crates",
+            "Running deterministic crates.io release scan...",
+        )));
+        let scan_done = i18n.tr_untracked(
+            "cms_toast_scan_done",
+            "crates.io release catalog updated",
+        );
+        let scan_failed = i18n.tr_untracked("cms_msg_scan_failed", "Scan failed.");
+        let loc = i18n.ui_locale.get_untracked();
         leptos::task::spawn_local(async move {
             let Some(jwt) = resolve_fresh_jwt(auth_config, initial_jwt).await else {
                 return;
@@ -286,17 +571,25 @@ pub fn DocsCmsView(
             {
                 set_busy_msg.set(None);
                 if resp.ok() {
-                    reload_cms();
-                    on_toast("crates.io release catalog updated".to_string());
+                    reload_cms_for_locale(loc);
+                    on_toast(scan_done);
                 } else {
-                    set_busy_msg.set(Some("Scan failed.".to_string()));
+                    set_busy_msg.set(Some(scan_failed));
                 }
             }
         });
     };
 
     let refresh_models = move |_| {
-        set_busy_msg.set(Some("Refreshing live /v1/models across AI Studio, NVIDIA NIM & OpenRouter...".to_string()));
+        set_busy_msg.set(Some(i18n.tr_untracked(
+            "cms_msg_refreshing_models",
+            "Refreshing live /v1/models across configured inference runtimes...",
+        )));
+        let ok_toast = i18n.tr_untracked(
+            "cms_toast_models_refreshed",
+            "Live provider models refreshed",
+        );
+        let loc = i18n.ui_locale.get_untracked();
         leptos::task::spawn_local(async move {
             let Some(jwt) = resolve_fresh_jwt(auth_config, initial_jwt).await else {
                 return;
@@ -308,8 +601,8 @@ pub fn DocsCmsView(
             {
                 set_busy_msg.set(None);
                 if resp.ok() {
-                    reload_cms();
-                    on_toast("Live provider models refreshed".to_string());
+                    reload_cms_for_locale(loc);
+                    on_toast(ok_toast);
                 }
             }
         });
@@ -317,9 +610,16 @@ pub fn DocsCmsView(
 
     let generate_proposal = move |_| {
         let tool_key = selected_scan_tool.get_untracked();
-        set_busy_msg.set(Some(format!(
-            "Running OpenCode cross-provider proposal for {tool_key}..."
-        )));
+        let gen_prefix = i18n.tr_untracked(
+            "cms_msg_generating_proposal",
+            "Running OpenCode & active inference proposal analysis...",
+        );
+        set_busy_msg.set(Some(format!("{gen_prefix} ({tool_key})")));
+        let gen_toast = i18n.tr_untracked(
+            "cms_toast_proposal_generated",
+            "Maturity proposal note generated",
+        );
+        let loc = i18n.ui_locale.get_untracked();
         leptos::task::spawn_local(async move {
             let Some(jwt) = resolve_fresh_jwt(auth_config, initial_jwt).await else {
                 return;
@@ -331,8 +631,8 @@ pub fn DocsCmsView(
                 if let Ok(resp) = req.send().await {
                     set_busy_msg.set(None);
                     if resp.ok() {
-                        reload_cms();
-                        on_toast("Maturity proposal note generated".to_string());
+                        reload_cms_for_locale(loc);
+                        on_toast(gen_toast);
                     } else {
                         let msg = resp.text().await.unwrap_or_default();
                         set_busy_msg.set(Some(msg));
@@ -343,6 +643,8 @@ pub fn DocsCmsView(
     };
 
     let update_note_status = move |note_id: i32, status: &'static str| {
+        let upd_toast = i18n.tr_untracked("cms_toast_proposal_updated", "Proposal status updated");
+        let loc = i18n.ui_locale.get_untracked();
         leptos::task::spawn_local(async move {
             let Some(jwt) = resolve_fresh_jwt(auth_config, initial_jwt).await else {
                 return;
@@ -354,8 +656,8 @@ pub fn DocsCmsView(
             {
                 if let Ok(resp) = req.send().await {
                     if resp.ok() {
-                        reload_cms();
-                        on_toast(format!("Proposal marked {status}"));
+                        reload_cms_for_locale(loc);
+                        on_toast(upd_toast);
                     }
                 }
             }
@@ -369,6 +671,11 @@ pub fn DocsCmsView(
         let pkg = new_tool_pkg.get_untracked();
         let ver = new_tool_ver.get_untracked();
         let purpose = new_tool_purpose.get_untracked();
+        let added_toast = i18n.tr_untracked(
+            "cms_toast_tool_added",
+            "Tool added to Maturity Catalog",
+        );
+        let loc = i18n.ui_locale.get_untracked();
         leptos::task::spawn_local(async move {
             let Some(jwt) = resolve_fresh_jwt(auth_config, initial_jwt).await else {
                 return;
@@ -390,8 +697,8 @@ pub fn DocsCmsView(
                         set_new_tool_name.set(String::new());
                         set_new_tool_pkg.set(String::new());
                         set_new_tool_purpose.set(String::new());
-                        reload_cms();
-                        on_toast("Tool added to Maturity Catalog".to_string());
+                        reload_cms_for_locale(loc);
+                        on_toast(added_toast);
                     }
                 }
             }
@@ -411,6 +718,24 @@ pub fn DocsCmsView(
                 status_ok && query_ok
             })
             .collect::<Vec<_>>()
+    };
+
+    let visible_tree_rows = move || {
+        let list = filtered_adrs();
+        let expanded = expanded_folders.get();
+        let auto_expand = !search_query.get().trim().is_empty() || status_filter.get() != "all";
+        let mut root = FolderDir::default();
+        for adr in list {
+            let parts: Vec<&str> = adr
+                .rel_path
+                .split('/')
+                .filter(|s| !s.is_empty())
+                .collect();
+            root.insert(&parts, adr);
+        }
+        let mut out = Vec::new();
+        root.flatten("", 0, &expanded, auto_expand, &mut out);
+        out
     };
 
     let active_adr = move || {
@@ -448,9 +773,15 @@ pub fn DocsCmsView(
                 >
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                         <div>
-                            <div class="exo-label" style="margin: 0;">"MADR 4.0.0 CMS"</div>
+                            <div class="exo-label" style="margin: 0;">
+                                {move || i18n.tr("cms_sidebar_title", "MADR 4.0.0 CMS")}
+                            </div>
                             <div class="exo-eyebrow tabular-nums" style="margin: 2px 0 0;">
-                                {move || format!("{} records in Neon", adrs.get().len())}
+                                {move || format!(
+                                    "{} {}",
+                                    adrs.get().len(),
+                                    i18n.tr("cms_records_count_suffix", "records in Neon")
+                                )}
                             </div>
                         </div>
                         <button
@@ -459,7 +790,7 @@ pub fn DocsCmsView(
                             style="min-height: 34px; padding: 0 10px; font-size: 14px;"
                             on:click=move |_| set_sidebar_collapsed.set(true)
                         >
-                            "Hide"
+                            {move || i18n.tr("cms_hide", "Hide")}
                         </button>
                     </div>
 
@@ -467,13 +798,6 @@ pub fn DocsCmsView(
                         {["all", "on-hold", "ready-to-build", "accepted", "proposed"]
                             .into_iter()
                             .map(|st| {
-                                let label = match st {
-                                    "all" => "All",
-                                    "on-hold" => "On Hold",
-                                    "ready-to-build" => "Ready",
-                                    "accepted" => "Accepted",
-                                    _ => "Proposed",
-                                };
                                 view! {
                                     <button
                                         type="button"
@@ -484,7 +808,13 @@ pub fn DocsCmsView(
                                         }
                                         on:click=move |_| set_status_filter.set(st.to_string())
                                     >
-                                        {label}
+                                        {move || match st {
+                                            "all" => i18n.tr("cms_all", "All"),
+                                            "on-hold" => i18n.tr("cms_on_hold", "On Hold"),
+                                            "ready-to-build" => i18n.tr("cms_ready", "Ready"),
+                                            "accepted" => i18n.tr("cms_accepted", "Accepted"),
+                                            _ => i18n.tr("cms_proposed", "Proposed"),
+                                        }}
                                     </button>
                                 }
                             })
@@ -494,50 +824,105 @@ pub fn DocsCmsView(
                     <input
                         type="search"
                         class="exo-input"
-                        placeholder="Search ADRs..."
+                        placeholder=move || i18n.tr("cms_search_placeholder", "Search ADRs...")
                         prop:value=move || search_query.get()
                         on:input=move |ev| set_search_query.set(event_target_value(&ev))
                     />
 
                     <nav>
                         <For
-                            each=filtered_adrs
-                            key=|a| format!("{}-{}-{}", a.id, a.status, a.updated_at)
-                            children=move |adr| {
-                                let path_cmp = adr.rel_path.clone();
-                                let path_click = adr.rel_path.clone();
-                                let id_str = adr.id.to_string();
-                                let status_str = adr.status.clone();
-                                let status_cls = if status_str == "on-hold" {
-                                    "exo-tag exo-tag-warn"
-                                } else if status_str == "accepted" || status_str == "ready-to-build" {
-                                    "exo-tag exo-tag-ok"
-                                } else {
-                                    "exo-tag"
-                                };
-                                view! {
-                                    <button
-                                        type="button"
-                                        class=move || {
-                                            let base = if active_doc_path.get() == path_cmp {
-                                                "exo-tree-file-btn exo-tree-file-active"
-                                            } else {
-                                                "exo-tree-file-btn"
-                                            };
-                                            format!("{base} {}", live.anim_class("adr", &id_str))
-                                        }
-                                        on:click=move |_| {
-                                            set_active_doc_path.set(path_click.clone());
-                                            set_cms_mode.set(CmsMode::ReadAdr);
-                                        }
-                                    >
-                                        <span style="overflow: hidden; text-overflow: ellipsis;">
-                                            {adr.title.clone()}
-                                        </span>
-                                        <span class=status_cls>
-                                            {status_str}
-                                        </span>
-                                    </button>
+                            each=visible_tree_rows
+                            key=|row| match row {
+                                TreeRow::Folder {
+                                    folder_path,
+                                    expanded,
+                                    file_count,
+                                    ..
+                                } => format!("dir:{folder_path}:{expanded}:{file_count}"),
+                                TreeRow::File { adr, .. } => format!(
+                                    "file:{}-{}-{}-{}",
+                                    adr.id, adr.status, adr.translation_status, adr.updated_at
+                                ),
+                            }
+                            children=move |row| match row {
+                                TreeRow::Folder {
+                                    folder_path,
+                                    name,
+                                    depth,
+                                    expanded,
+                                    file_count,
+                                } => {
+                                    let fp_click = folder_path.clone();
+                                    let indent_style = format!("padding-inline-start: {}px;", 10 + depth * 14);
+                                    let caret = if expanded { "▾" } else { "▸" };
+                                    view! {
+                                        <button
+                                            type="button"
+                                            class="exo-tree-folder-btn"
+                                            style=indent_style
+                                            on:click=move |_| {
+                                                let target = fp_click.clone();
+                                                set_expanded_folders.update(|set| {
+                                                    if set.contains(&target) {
+                                                        set.remove(&target);
+                                                    } else {
+                                                        set.insert(target);
+                                                    }
+                                                });
+                                            }
+                                        >
+                                            <span class="exo-tree-caret">{caret}</span>
+                                            <span class="exo-tree-folder-name">{name}</span>
+                                            <span class="exo-tree-count tabular-nums">{file_count}</span>
+                                        </button>
+                                    }
+                                    .into_any()
+                                }
+                                TreeRow::File { adr, depth } => {
+                                    let path_cmp = adr.rel_path.clone();
+                                    let path_click = adr.rel_path.clone();
+                                    let id_str = adr.id.to_string();
+                                    let status_str = adr.status.clone();
+                                    let status_cls = if status_str == "on-hold" {
+                                        "exo-tag exo-tag-warn"
+                                    } else if status_str == "accepted" || status_str == "ready-to-build" {
+                                        "exo-tag exo-tag-ok"
+                                    } else {
+                                        "exo-tag"
+                                    };
+                                    let indent_style = format!("padding-inline-start: {}px;", 12 + depth * 14);
+                                    view! {
+                                        <button
+                                            type="button"
+                                            style=indent_style
+                                            class=move || {
+                                                let base = if active_doc_path.get() == path_cmp {
+                                                    "exo-tree-file-btn exo-tree-file-active"
+                                                } else {
+                                                    "exo-tree-file-btn"
+                                                };
+                                                format!("{base} {}", live.anim_class("adr", &id_str))
+                                            }
+                                            on:click=move |_| {
+                                                set_active_doc_path.set(path_click.clone());
+                                                set_cms_mode.set(CmsMode::ReadAdr);
+                                            }
+                                        >
+                                            <span style="overflow: hidden; text-overflow: ellipsis;">
+                                                {adr.title.clone()}
+                                            </span>
+                                            <span class=status_cls>
+                                                {move || match status_str.as_str() {
+                                                    "on-hold" => i18n.tr("cms_on_hold", "On Hold"),
+                                                    "ready-to-build" => i18n.tr("cms_ready", "Ready"),
+                                                    "accepted" => i18n.tr("cms_accepted", "Accepted"),
+                                                    "proposed" => i18n.tr("cms_proposed", "Proposed"),
+                                                    other => other.to_string(),
+                                                }}
+                                            </span>
+                                        </button>
+                                    }
+                                    .into_any()
                                 }
                             }
                         />
@@ -560,7 +945,7 @@ pub fn DocsCmsView(
                                     style="min-height: 36px; padding: 0 12px; font-size: 15px;"
                                     on:click=move |_| set_sidebar_collapsed.set(false)
                                 >
-                                    "Show Explorer"
+                                    {move || i18n.tr("cms_show_explorer", "Show Explorer")}
                                 </button>
                             </Show>
                             <button
@@ -573,7 +958,7 @@ pub fn DocsCmsView(
                                 style="min-height: 36px; font-size: 15px;"
                                 on:click=move |_| set_cms_mode.set(CmsMode::ReadAdr)
                             >
-                                "Read ADR"
+                                {move || i18n.tr("cms_read_adr", "Read ADR")}
                             </button>
                             <Show when=is_admin>
                                 <button
@@ -586,20 +971,32 @@ pub fn DocsCmsView(
                                     style="min-height: 36px; font-size: 15px;"
                                     on:click=move |_| start_blank_adr()
                                 >
-                                    "+ New MADR 4.0"
+                                    {move || i18n.tr("cms_new_madr", "+ New MADR 4.0")}
                                 </button>
                             </Show>
                             <button
                                 type="button"
-                                class=move || if cms_mode.get() == CmsMode::MaturityAndAi {
+                                class=move || if cms_mode.get() == CmsMode::ToolingAndProposals {
                                     "exo-btn exo-btn-primary"
                                 } else {
                                     "exo-btn"
                                 }
                                 style="min-height: 36px; font-size: 15px;"
-                                on:click=move |_| set_cms_mode.set(CmsMode::MaturityAndAi)
+                                on:click=move |_| set_cms_mode.set(CmsMode::ToolingAndProposals)
                             >
-                                "Tooling Maturity & OpenCode AI"
+                                {move || i18n.tr("cms_tooling_proposals", "Tooling & Proposals")}
+                            </button>
+                            <button
+                                type="button"
+                                class=move || if cms_mode.get() == CmsMode::InferenceRuntimes {
+                                    "exo-btn exo-btn-primary"
+                                } else {
+                                    "exo-btn"
+                                }
+                                style="min-height: 36px; font-size: 15px;"
+                                on:click=move |_| set_cms_mode.set(CmsMode::InferenceRuntimes)
+                            >
+                                {move || i18n.tr("cms_inference_runtimes", "Inference Runtimes")}
                             </button>
                             <button
                                 type="button"
@@ -611,21 +1008,100 @@ pub fn DocsCmsView(
                                 style="min-height: 36px; font-size: 15px;"
                                 on:click=move |_| set_cms_mode.set(CmsMode::OwnerTasks)
                             >
-                                "Owner & Ops Tasks ("
+                                {move || i18n.tr("cms_owner_tasks", "Owner & Ops Tasks")}
+                                " ("
                                 {move || tasks.get().iter().filter(|t| !t.is_done).count()}
                                 ")"
                             </button>
                         </div>
 
-                        <button
-                            type="button"
-                            class="exo-btn"
-                            style="min-height: 36px; font-size: 15px;"
-                            on:click=move |_| reload_cms()
-                        >
-                            "Refresh"
-                        </button>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            {move || if google_connected.get() {
+                                view! {
+                                    <button
+                                        type="button"
+                                        class="exo-btn"
+                                        style="min-height: 36px; font-size: 14px;"
+                                        disabled=move || drive_busy.get()
+                                        on:click=move |_| set_backup_panel_open.update(|v| *v = !*v)
+                                    >
+                                        {move || i18n.tr("cms_backup_drive", "Backup Archive to Drive")}
+                                    </button>
+                                }.into_any()
+                            } else {
+                                view! {
+                                    <button
+                                        type="button"
+                                        class="exo-btn"
+                                        style="min-height: 36px; font-size: 14px;"
+                                        on:click=connect_google_from_docs
+                                    >
+                                        {move || i18n.tr("cms_connect_google_docs", "Connect Google Docs")}
+                                    </button>
+                                }.into_any()
+                            }}
+                            <button
+                                type="button"
+                                class="exo-btn"
+                                style="min-height: 36px; font-size: 15px;"
+                                on:click=move |_| reload_cms_for_locale(i18n.ui_locale.get_untracked())
+                            >
+                                {move || i18n.tr("refresh_label", "Refresh")}
+                            </button>
+                        </div>
                     </div>
+
+                    <Show when=move || backup_panel_open.get()>
+                        <div class="exo-invite-banner" style="justify-content: space-between; flex-wrap: wrap;">
+                            <div>
+                                <strong>{move || i18n.tr("cms_backup_title", "Back up all ExoNovel Docs to Google Drive")}</strong>
+                                <div class="exo-sub" style="margin: 2px 0 0;">
+                                    {move || {
+                                        let acct = google_email.get();
+                                        if acct.is_empty() {
+                                            i18n.tr("cms_backup_dest_default", "Destination: ExoNovel Docs/")
+                                        } else {
+                                            format!(
+                                                "{} {}",
+                                                i18n.tr("cms_backup_dest_prefix", "Destination: ExoNovel Docs/ on"),
+                                                acct
+                                            )
+                                        }
+                                    }}
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                <select
+                                    class="exo-input"
+                                    style="min-width: 190px;"
+                                    prop:value=move || backup_format.get()
+                                    on:change=move |ev| set_backup_format.set(event_target_value(&ev))
+                                >
+                                    <option value="google-doc">
+                                        {move || i18n.tr("cms_backup_fmt_gdoc", "Google Docs (Editable)")}
+                                    </option>
+                                    <option value="markdown">
+                                        {move || i18n.tr("cms_backup_fmt_md", "Markdown (.md)")}
+                                    </option>
+                                </select>
+                                <button
+                                    type="button"
+                                    class="exo-btn exo-btn-primary"
+                                    disabled=move || drive_busy.get()
+                                    on:click=run_archive_backup
+                                >
+                                    {move || i18n.tr("cms_backup_start", "Start Backup")}
+                                </button>
+                                <button
+                                    type="button"
+                                    class="exo-btn"
+                                    on:click=move |_| set_backup_panel_open.set(false)
+                                >
+                                    {move || i18n.tr("cancel_label", "Cancel")}
+                                </button>
+                            </div>
+                        </div>
+                    </Show>
 
                     {move || busy_msg.get().map(|m| view! {
                         <div class="exo-invite-banner">
@@ -633,45 +1109,120 @@ pub fn DocsCmsView(
                         </div>
                     })}
 
+                    {move || drive_link.get().map(|(label, url)| view! {
+                        <div class="exo-invite-banner" style="justify-content: space-between; flex-wrap: wrap;">
+                            <span>
+                                <strong>{label}</strong>
+                                " "
+                                {move || i18n.tr("cms_drive_synced_suffix", "is synced in Google Drive.")}
+                            </span>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <a href=url target="_blank" rel="noopener noreferrer" class="exo-btn exo-btn-primary">
+                                    {move || i18n.tr("cms_open_drive_btn", "Open in Google Docs / Drive ↗")}
+                                </a>
+                                <button
+                                    type="button"
+                                    class="exo-btn"
+                                    on:click=move |_| set_drive_link.set(None)
+                                >
+                                    {move || i18n.tr("dismiss_label", "Dismiss")}
+                                </button>
+                            </div>
+                        </div>
+                    })}
+
                     {move || match cms_mode.get() {
                         CmsMode::ReadAdr => {
                             let Some(doc) = active_adr() else {
-                                return view! { <p class="exo-sub">"Select a record from the left explorer."</p> }.into_any();
+                                return view! {
+                                    <p class="exo-sub">
+                                        {move || i18n.tr("cms_select_adr_prompt", "Select a record from the left explorer.")}
+                                    </p>
+                                }.into_any();
                             };
                             let doc_for_edit = StoredValue::new(doc.clone());
+                            let doc_path_gdoc = StoredValue::new(doc.rel_path.clone());
+                            let doc_path_md = StoredValue::new(doc.rel_path.clone());
                             let doc_id_for_dep = doc.id;
                             let doc_id_str = doc.id.to_string();
                             let dep_list = doc.dependencies.clone();
+                            let trans_status = doc.translation_status.clone();
+                            let trans_badge_cls = match trans_status.as_str() {
+                                "canonical" => "exo-trans-badge exo-trans-canonical",
+                                "translated" => "exo-trans-badge exo-trans-translated",
+                                _ => "exo-trans-badge exo-trans-fallback",
+                            };
 
                             view! {
                                 <div class=move || live.anim_class("adr", &doc_id_str)>
                                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;">
-                                        <div class="exo-eyebrow tabular-nums" style="margin: 0;">
-                                            {doc.rel_path.clone()}
-                                            " · "
-                                            {doc.status.clone()}
-                                            " · "
-                                            {doc.word_count} " words · "
-                                            {doc.reading_minutes} " min read"
+                                        <div class="exo-eyebrow tabular-nums" style="margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                            <span>
+                                                {doc.rel_path.clone()}
+                                                " · "
+                                                {doc.status.clone()}
+                                                " · "
+                                                {doc.word_count} " " {move || i18n.tr("cms_words_suffix", "words")} " · "
+                                                {doc.reading_minutes} " " {move || i18n.tr("cms_min_read_suffix", "min read")}
+                                            </span>
+                                            <span class=trans_badge_cls>
+                                                {move || match trans_status.as_str() {
+                                                    "canonical" => i18n.tr("cms_trans_canonical", "Canonical (EN)"),
+                                                    "translated" => i18n.tr("cms_trans_translated", "Translated"),
+                                                    _ => i18n.tr("cms_trans_fallback_en", "English Fallback"),
+                                                }}
+                                            </span>
                                         </div>
-                                        <Show when=is_admin>
-                                            <button
-                                                type="button"
-                                                class="exo-btn"
-                                                style="min-height: 34px; font-size: 14px;"
-                                                on:click=move |_| doc_for_edit.with_value(|d| load_adr_into_form(d))
-                                            >
-                                                "Edit in MADR CMS"
-                                            </button>
-                                        </Show>
+                                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                            {move || if google_connected.get() {
+                                                view! {
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            class="exo-btn exo-btn-primary"
+                                                            style="min-height: 34px; font-size: 14px;"
+                                                            disabled=move || drive_busy.get()
+                                                            on:click=move |_| save_active_doc_to_drive(doc_path_gdoc.get_value(), "google-doc")
+                                                        >
+                                                            {move || i18n.tr("cms_save_gdoc_btn", "Save to Google Docs")}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            class="exo-btn"
+                                                            style="min-height: 34px; font-size: 14px;"
+                                                            disabled=move || drive_busy.get()
+                                                            on:click=move |_| save_active_doc_to_drive(doc_path_md.get_value(), "markdown")
+                                                        >
+                                                            {move || i18n.tr("cms_save_md_btn", "Save .md to Drive")}
+                                                        </button>
+                                                    </>
+                                                }.into_any()
+                                            } else {
+                                                view! { <span /> }.into_any()
+                                            }}
+                                            <Show when=is_admin>
+                                                <button
+                                                    type="button"
+                                                    class="exo-btn"
+                                                    style="min-height: 34px; font-size: 14px;"
+                                                    on:click=move |_| doc_for_edit.with_value(|d| load_adr_into_form(d))
+                                                >
+                                                    {move || i18n.tr("cms_edit_adr_btn", "Edit in MADR CMS")}
+                                                </button>
+                                            </Show>
+                                        </div>
                                     </div>
 
                                     <div class="exo-card" style="margin-bottom: 22px; padding: 18px 20px;">
                                         <div class="exo-label" style="margin-bottom: 4px;">
-                                            "Underlying Tooling Dependencies & Blockers"
+                                            {move || i18n.tr("cms_deps_title", "Underlying Tooling Dependencies & Blockers")}
                                         </div>
                                         {if dep_list.is_empty() {
-                                            view! { <p class="exo-sub" style="margin: 4px 0 0;">"No blocking tooling dependencies attached to this ADR."</p> }.into_any()
+                                            view! {
+                                                <p class="exo-sub" style="margin: 4px 0 0;">
+                                                    {move || i18n.tr("cms_deps_empty", "No blocking tooling dependencies attached to this ADR.")}
+                                                </p>
+                                            }.into_any()
                                         } else {
                                             dep_list
                                                 .into_iter()
@@ -686,7 +1237,11 @@ pub fn DocsCmsView(
                                                             <div style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
                                                                 <strong>{d.tool_name} " (" {d.tool_key} ")"</strong>
                                                                 <span class="exo-mono tabular-nums">
-                                                                    "installed " {d.installed_version} " · latest " {d.latest_version} " · req " {d.required_constraint}
+                                                                    {move || i18n.tr("cms_deps_installed", "installed")} " " {d.installed_version}
+                                                                    " · "
+                                                                    {move || i18n.tr("cms_deps_latest", "latest")} " " {d.latest_version}
+                                                                    " · "
+                                                                    {move || i18n.tr("cms_deps_req", "req")} " " {d.required_constraint}
                                                                 </span>
                                                             </div>
                                                             <div class="exo-sub" style="margin-top: 4px;">
@@ -715,7 +1270,7 @@ pub fn DocsCmsView(
                                                     type="text"
                                                     class="exo-input"
                                                     style="flex: 1; min-width: 120px;"
-                                                    placeholder=">=0.4.0"
+                                                    placeholder=move || i18n.tr("cms_deps_constraint_ph", ">=0.4.0")
                                                     prop:value=move || dep_constraint.get()
                                                     on:input=move |ev| set_dep_constraint.set(event_target_value(&ev))
                                                 />
@@ -723,7 +1278,7 @@ pub fn DocsCmsView(
                                                     type="text"
                                                     class="exo-input"
                                                     style="flex: 2; min-width: 200px;"
-                                                    placeholder="Blocking capability..."
+                                                    placeholder=move || i18n.tr("cms_deps_cap_ph", "Blocking capability...")
                                                     prop:value=move || dep_capability.get()
                                                     on:input=move |ev| set_dep_capability.set(event_target_value(&ev))
                                                 />
@@ -733,7 +1288,7 @@ pub fn DocsCmsView(
                                                         prop:checked=move || dep_satisfied.get()
                                                         on:change=move |ev| set_dep_satisfied.set(event_target_checked(&ev))
                                                     />
-                                                    "Satisfied"
+                                                    {move || i18n.tr("cms_deps_satisfied", "Satisfied")}
                                                 </label>
                                                 <button
                                                     type="button"
@@ -741,7 +1296,7 @@ pub fn DocsCmsView(
                                                     style="min-height: 40px;"
                                                     on:click=move |_| link_dep_to_adr(doc_id_for_dep)
                                                 >
-                                                    "Link Dependency"
+                                                    {move || i18n.tr("cms_deps_link_btn", "Link Dependency")}
                                                 </button>
                                             </div>
                                         </Show>
@@ -752,19 +1307,26 @@ pub fn DocsCmsView(
                             }.into_any()
                         }
                         CmsMode::CreateOrEditAdr => {
+                            let ctx_lbl = i18n.tr_untracked("cms_editor_context_label", "MADR Editor");
                             view! {
                                 <div class="exo-card">
                                     <h2 class="exo-h2">
-                                        {move || if form_id.get().is_some() { "Edit MADR 4.0.0 Record" } else { "Create New MADR 4.0.0 ADR" }}
+                                        {move || if form_id.get().is_some() {
+                                            i18n.tr("cms_editor_title_edit", "Edit MADR 4.0.0 Record")
+                                        } else {
+                                            i18n.tr("cms_editor_title_new", "Create New MADR 4.0.0 ADR")
+                                        }}
                                     </h2>
                                     <InputLocaleBar
-                                        context_label="MADR Editor"
+                                        context_label=ctx_lbl
                                         pinned_codes=pinned_input()
                                     />
                                     <form on:submit=submit_adr_form>
                                         <div class="exo-grid-2">
                                             <div class="exo-field">
-                                                <label class="exo-label">"Title"</label>
+                                                <label class="exo-label">
+                                                    {move || i18n.tr("cms_field_title", "Title")}
+                                                </label>
                                                 <input
                                                     type="text"
                                                     class="exo-input"
@@ -775,7 +1337,9 @@ pub fn DocsCmsView(
                                                 />
                                             </div>
                                             <div class="exo-field">
-                                                <label class="exo-label">"Relative Path (e.g. docs/adr/010-short.md)"</label>
+                                                <label class="exo-label">
+                                                    {move || i18n.tr("cms_field_rel_path", "Relative Path (e.g. docs/adr/010-short.md)")}
+                                                </label>
                                                 <input
                                                     type="text"
                                                     class="exo-input exo-mono"
@@ -785,23 +1349,27 @@ pub fn DocsCmsView(
                                                 />
                                             </div>
                                             <div class="exo-field">
-                                                <label class="exo-label">"Status"</label>
+                                                <label class="exo-label">
+                                                    {move || i18n.tr("cms_field_status", "Status")}
+                                                </label>
                                                 <select
                                                     class="exo-input"
                                                     prop:value=move || form_status.get()
                                                     on:change=move |ev| set_form_status.set(event_target_value(&ev))
                                                 >
-                                                    <option value="proposed">"proposed"</option>
-                                                    <option value="on-hold">"on-hold (awaiting tooling)"</option>
-                                                    <option value="ready-to-build">"ready-to-build"</option>
-                                                    <option value="accepted">"accepted"</option>
-                                                    <option value="deprecated">"deprecated"</option>
-                                                    <option value="superseded">"superseded"</option>
-                                                    <option value="rejected">"rejected"</option>
+                                                    <option value="proposed">{move || i18n.tr("cms_status_opt_proposed", "proposed")}</option>
+                                                    <option value="on-hold">{move || i18n.tr("cms_status_opt_on_hold", "on-hold (awaiting tooling)")}</option>
+                                                    <option value="ready-to-build">{move || i18n.tr("cms_status_opt_ready", "ready-to-build")}</option>
+                                                    <option value="accepted">{move || i18n.tr("cms_status_opt_accepted", "accepted")}</option>
+                                                    <option value="deprecated">{move || i18n.tr("cms_status_opt_deprecated", "deprecated")}</option>
+                                                    <option value="superseded">{move || i18n.tr("cms_status_opt_superseded", "superseded")}</option>
+                                                    <option value="rejected">{move || i18n.tr("cms_status_opt_rejected", "rejected")}</option>
                                                 </select>
                                             </div>
                                             <div class="exo-field">
-                                                <label class="exo-label">"Decision Makers"</label>
+                                                <label class="exo-label">
+                                                    {move || i18n.tr("cms_field_makers", "Decision Makers")}
+                                                </label>
                                                 <input
                                                     type="text"
                                                     class="exo-input"
@@ -813,7 +1381,9 @@ pub fn DocsCmsView(
                                         </div>
 
                                         <div class="exo-field">
-                                            <label class="exo-label">"Context and Problem Statement"</label>
+                                            <label class="exo-label">
+                                                {move || i18n.tr("cms_field_context", "Context and Problem Statement")}
+                                            </label>
                                             <textarea
                                                 class="exo-input exo-textarea"
                                                 dir=move || i18n.input_dir()
@@ -822,7 +1392,9 @@ pub fn DocsCmsView(
                                             />
                                         </div>
                                         <div class="exo-field">
-                                            <label class="exo-label">"Decision Drivers"</label>
+                                            <label class="exo-label">
+                                                {move || i18n.tr("cms_field_drivers", "Decision Drivers")}
+                                            </label>
                                             <textarea
                                                 class="exo-input exo-textarea"
                                                 dir=move || i18n.input_dir()
@@ -831,7 +1403,9 @@ pub fn DocsCmsView(
                                             />
                                         </div>
                                         <div class="exo-field">
-                                            <label class="exo-label">"Decision Outcome"</label>
+                                            <label class="exo-label">
+                                                {move || i18n.tr("cms_field_outcome", "Decision Outcome")}
+                                            </label>
                                             <textarea
                                                 class="exo-input exo-textarea"
                                                 dir=move || i18n.input_dir()
@@ -840,7 +1414,9 @@ pub fn DocsCmsView(
                                             />
                                         </div>
                                         <div class="exo-field">
-                                            <label class="exo-label">"Full Markdown (optional override)"</label>
+                                            <label class="exo-label">
+                                                {move || i18n.tr("cms_field_raw_md", "Full Markdown (optional override)")}
+                                            </label>
                                             <textarea
                                                 class="exo-input exo-textarea exo-mono"
                                                 style="min-height: 180px;"
@@ -851,40 +1427,48 @@ pub fn DocsCmsView(
                                         </div>
                                         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                                             <button type="submit" class="exo-btn exo-btn-primary">
-                                                "Save ADR to Neon"
+                                                {move || i18n.tr("cms_save_adr_btn", "Save ADR to Neon")}
                                             </button>
                                             <button
                                                 type="button"
                                                 class="exo-btn"
                                                 on:click=move |_| set_cms_mode.set(CmsMode::ReadAdr)
                                             >
-                                                "Cancel"
+                                                {move || i18n.tr("cancel_label", "Cancel")}
                                             </button>
                                         </div>
                                     </form>
                                 </div>
                             }.into_any()
                         }
-                        CmsMode::MaturityAndAi => {
+                        CmsMode::ToolingAndProposals => {
+                            let filtered_notes = move || {
+                                let pf = proposal_filter.get();
+                                notes
+                                    .get()
+                                    .into_iter()
+                                    .filter(|n| pf == "all" || n.status == pf)
+                                    .collect::<Vec<_>>()
+                            };
                             view! {
                                 <div>
                                     <div class="exo-card">
                                         <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
                                             <div>
-                                                <h2 class="exo-h2" style="margin: 0;">"Tooling Catalog & Release Scanner"</h2>
+                                                <h2 class="exo-h2" style="margin: 0;">
+                                                    {move || i18n.tr("cms_tooling_catalog_title", "Tooling Catalog & Release Scanner")}
+                                                </h2>
                                                 <p class="exo-sub" style="margin: 4px 0 0;">
-                                                    "Deterministic crates.io version monitoring paired with OpenCode cross-provider opportunistic notes."
+                                                    {move || i18n.tr(
+                                                        "cms_tooling_catalog_sub",
+                                                        "Deterministic crates.io version monitoring linked to architectural decision records."
+                                                    )}
                                                 </p>
                                             </div>
                                             <Show when=is_admin>
-                                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                                    <button type="button" class="exo-btn exo-btn-primary" on:click=run_crates_scan>
-                                                        "Run crates.io Scan"
-                                                    </button>
-                                                    <button type="button" class="exo-btn" on:click=refresh_models>
-                                                        "Refresh Live /v1/models"
-                                                    </button>
-                                                </div>
+                                                <button type="button" class="exo-btn exo-btn-primary" on:click=run_crates_scan>
+                                                    {move || i18n.tr("cms_run_scan", "Run crates.io Scan")}
+                                                </button>
                                             </Show>
                                         </div>
 
@@ -892,10 +1476,10 @@ pub fn DocsCmsView(
                                             <table class="exo-table">
                                                 <thead>
                                                     <tr>
-                                                        <th>"Tool"</th>
-                                                        <th>"Installed"</th>
-                                                        <th>"Latest"</th>
-                                                        <th>"Purpose"</th>
+                                                        <th>{move || i18n.tr("cms_th_tool", "Tool")}</th>
+                                                        <th>{move || i18n.tr("cms_th_installed", "Installed")}</th>
+                                                        <th>{move || i18n.tr("cms_th_latest", "Latest")}</th>
+                                                        <th>{move || i18n.tr("cms_th_purpose", "Purpose")}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -920,13 +1504,15 @@ pub fn DocsCmsView(
 
                                         <Show when=is_admin>
                                             <form on:submit=add_tool_catalog style="margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border);">
-                                                <div class="exo-label">"Track Another Underlying Crate / Tool"</div>
+                                                <div class="exo-label">
+                                                    {move || i18n.tr("cms_add_tool_heading", "Track Another Underlying Crate / Tool")}
+                                                </div>
                                                 <div class="exo-grid-3">
                                                     <input
                                                         type="text"
                                                         class="exo-input"
                                                         required=true
-                                                        placeholder="Key (e.g. reqwest)"
+                                                        placeholder=move || i18n.tr("cms_add_tool_key_ph", "Key (e.g. reqwest)")
                                                         prop:value=move || new_tool_key.get()
                                                         on:input=move |ev| set_new_tool_key.set(event_target_value(&ev))
                                                     />
@@ -934,7 +1520,7 @@ pub fn DocsCmsView(
                                                         type="text"
                                                         class="exo-input"
                                                         required=true
-                                                        placeholder="Display Name"
+                                                        placeholder=move || i18n.tr("cms_add_tool_name_ph", "Display Name")
                                                         prop:value=move || new_tool_name.get()
                                                         on:input=move |ev| set_new_tool_name.set(event_target_value(&ev))
                                                     />
@@ -942,26 +1528,26 @@ pub fn DocsCmsView(
                                                         type="text"
                                                         class="exo-input"
                                                         required=true
-                                                        placeholder="crates.io package"
+                                                        placeholder=move || i18n.tr("cms_add_tool_pkg_ph", "crates.io package")
                                                         prop:value=move || new_tool_pkg.get()
                                                         on:input=move |ev| set_new_tool_pkg.set(event_target_value(&ev))
                                                     />
                                                     <input
                                                         type="text"
                                                         class="exo-input"
-                                                        placeholder="Installed version"
+                                                        placeholder=move || i18n.tr("cms_add_tool_ver_ph", "Installed version")
                                                         prop:value=move || new_tool_ver.get()
                                                         on:input=move |ev| set_new_tool_ver.set(event_target_value(&ev))
                                                     />
                                                     <input
                                                         type="text"
                                                         class="exo-input"
-                                                        placeholder="Why ExoNovel depends on it"
+                                                        placeholder=move || i18n.tr("cms_add_tool_purpose_ph", "Why ExoNovel depends on it")
                                                         prop:value=move || new_tool_purpose.get()
                                                         on:input=move |ev| set_new_tool_purpose.set(event_target_value(&ev))
                                                     />
                                                     <button type="submit" class="exo-btn exo-btn-primary">
-                                                        "Add Tool"
+                                                        {move || i18n.tr("cms_add_tool_btn", "Add Tool")}
                                                     </button>
                                                 </div>
                                             </form>
@@ -971,9 +1557,14 @@ pub fn DocsCmsView(
                                     <div class="exo-card">
                                         <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
                                             <div>
-                                                <h2 class="exo-h2" style="margin: 0;">"OpenCode Multi-Provider Failover & Maturity Proposals"</h2>
+                                                <h2 class="exo-h2" style="margin: 0;">
+                                                    {move || i18n.tr("cms_maturity_proposals_title", "Maturity Proposals")}
+                                                </h2>
                                                 <p class="exo-sub" style="margin: 4px 0 0;">
-                                                    "Automatic 404/429 failover across Google AI Studio, NVIDIA NIM, OpenRouter (:free), and Groq (zero Alibaba)."
+                                                    {move || i18n.tr(
+                                                        "cms_maturity_proposals_sub",
+                                                        "Generate upgrade recommendations for tracked dependencies and accept or dismiss proposals."
+                                                    )}
                                                 </p>
                                             </div>
                                             <Show when=is_admin>
@@ -989,82 +1580,200 @@ pub fn DocsCmsView(
                                                         }).collect_view()}
                                                     </select>
                                                     <button type="button" class="exo-btn exo-btn-primary" on:click=generate_proposal>
-                                                        "Generate Proposal Note"
+                                                        {move || i18n.tr("cms_generate_proposal", "Generate Proposal Note")}
                                                     </button>
                                                 </div>
                                             </Show>
                                         </div>
 
-                                        <div class="exo-grid-2">
-                                            {move || models.get().into_iter().map(|m| {
-                                                let st_tag = if m.deprecated_at.is_some() {
-                                                    view! { <span class="exo-tag">"Deprecated"</span> }.into_any()
-                                                } else if !m.key_configured {
-                                                    view! { <span class="exo-tag">"Key Unset"</span> }.into_any()
-                                                } else if m.cooldown_until.is_some() {
-                                                    view! { <span class="exo-tag exo-tag-warn">"Cooldown"</span> }.into_any()
-                                                } else {
-                                                    view! { <span class="exo-tag exo-tag-ok">"Healthy"</span> }.into_any()
-                                                };
-                                                view! {
-                                                    <div class="exo-dep-card">
-                                                        <div style="display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
-                                                            <strong>{m.display_name}</strong>
-                                                            {st_tag}
-                                                        </div>
-                                                        <div class="exo-eyebrow exo-mono" style="margin: 4px 0 0;">
-                                                            {m.provider} " · " {m.model_id}
-                                                        </div>
-                                                    </div>
-                                                }
-                                            }).collect_view()}
+                                        <div class="exo-filter-bar" style="margin-top: 14px;">
+                                            {["all", "open", "accepted", "dismissed"]
+                                                .into_iter()
+                                                .map(|pf| {
+                                                    view! {
+                                                        <button
+                                                            type="button"
+                                                            class=move || if proposal_filter.get() == pf {
+                                                                "exo-filter-chip exo-filter-chip-active"
+                                                            } else {
+                                                                "exo-filter-chip"
+                                                            }
+                                                            on:click=move |_| set_proposal_filter.set(pf.to_string())
+                                                        >
+                                                            {move || match pf {
+                                                                "all" => i18n.tr("cms_proposal_filter_all", "All"),
+                                                                "open" => i18n.tr("cms_proposal_filter_open", "Open"),
+                                                                "accepted" => i18n.tr("cms_proposal_filter_accepted", "Accepted"),
+                                                                _ => i18n.tr("cms_proposal_filter_dismissed", "Dismissed"),
+                                                            }}
+                                                        </button>
+                                                    }
+                                                })
+                                                .collect_view()}
                                         </div>
 
-                                        <div style="margin-top: 20px;">
-                                            <For
-                                                each=move || notes.get()
-                                                key=|n| format!("{}-{}", n.id, n.status)
-                                                children=move |n| {
-                                                    let n_id_str = n.id.to_string();
-                                                    let n_id = n.id;
-                                                    view! {
-                                                        <div class=move || format!("exo-proposal-card {}", live.anim_class("maturity_note", &n_id_str))>
-                                                            <div style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
-                                                                <strong>{n.title}</strong>
-                                                                <span class="exo-tag">{n.status.clone()}</span>
-                                                            </div>
-                                                            <div class="exo-eyebrow" style="margin: 4px 0;">
-                                                                {n.tool_key} " " {n.target_version} " · " {n.provider_used} " / " {n.model_used}
-                                                            </div>
-                                                            <p class="exo-sub" style="color: var(--text); white-space: pre-wrap;">
-                                                                {n.proposed_feature_changes}
-                                                            </p>
-                                                            <Show when=is_admin>
-                                                                <div style="display: flex; gap: 8px; margin-top: 10px;">
-                                                                    <button
-                                                                        type="button"
-                                                                        class="exo-btn"
-                                                                        style="min-height: 36px; font-size: 15px;"
-                                                                        on:click=move |_| update_note_status(n_id, "accepted")
-                                                                    >
-                                                                        "Accept Proposal"
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        class="exo-btn"
-                                                                        style="min-height: 36px; font-size: 15px;"
-                                                                        on:click=move |_| update_note_status(n_id, "dismissed")
-                                                                    >
-                                                                        "Dismiss"
-                                                                    </button>
+                                        <div style="margin-top: 16px;">
+                                            {move || if filtered_notes().is_empty() {
+                                                view! {
+                                                    <p class="exo-sub">
+                                                        {move || i18n.tr(
+                                                            "cms_proposals_empty",
+                                                            "No proposal notes in this filter yet. Select a tool above and click Generate Proposal Note."
+                                                        )}
+                                                    </p>
+                                                }.into_any()
+                                            } else {
+                                                view! {
+                                                    <For
+                                                        each=filtered_notes
+                                                        key=|n| format!("{}-{}", n.id, n.status)
+                                                        children=move |n| {
+                                                            let n_id_str = n.id.to_string();
+                                                            let n_id = n.id;
+                                                            let cur_status = n.status.clone();
+                                                            let cur_status_lbl = cur_status.clone();
+                                                            let has_rationale = !n.rationale.trim().is_empty();
+                                                            let rationale_text = n.rationale.clone();
+                                                            view! {
+                                                                <div class=move || format!("exo-proposal-card {}", live.anim_class("maturity_note", &n_id_str))>
+                                                                    <div style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: baseline;">
+                                                                        <strong>{n.title}</strong>
+                                                                        <span class="exo-eyebrow" style="margin: 0;">
+                                                                            {move || i18n.tr("cms_proposal_status_prefix", "Status:")}
+                                                                            " "
+                                                                            {move || match cur_status_lbl.as_str() {
+                                                                                "accepted" => i18n.tr("cms_proposal_filter_accepted", "Accepted"),
+                                                                                "dismissed" => i18n.tr("cms_proposal_filter_dismissed", "Dismissed"),
+                                                                                _ => i18n.tr("cms_proposal_filter_open", "Open"),
+                                                                            }}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div class="exo-eyebrow" style="margin: 4px 0;">
+                                                                        {n.tool_key} " " {n.target_version} " · " {n.provider_used} " / " {n.model_used}
+                                                                    </div>
+                                                                    <p class="exo-sub" style="color: var(--text); white-space: pre-wrap;">
+                                                                        {n.proposed_feature_changes}
+                                                                    </p>
+                                                                    {has_rationale.then(|| view! {
+                                                                        <div class="exo-sub" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); white-space: pre-wrap;">
+                                                                            <strong>{move || i18n.tr("cms_proposal_rationale", "Diagnostics / Rationale:")}</strong>
+                                                                            " "
+                                                                            {rationale_text}
+                                                                        </div>
+                                                                    })}
+                                                                    <Show when=is_admin>
+                                                                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
+                                                                            {(cur_status != "accepted").then(|| view! {
+                                                                                <button
+                                                                                    type="button"
+                                                                                    class="exo-btn"
+                                                                                    style="min-height: 36px; font-size: 15px;"
+                                                                                    on:click=move |_| update_note_status(n_id, "accepted")
+                                                                                >
+                                                                                    {move || i18n.tr("cms_proposal_accept", "Accept Proposal")}
+                                                                                </button>
+                                                                            })}
+                                                                            {(cur_status != "dismissed").then(|| view! {
+                                                                                <button
+                                                                                    type="button"
+                                                                                    class="exo-btn"
+                                                                                    style="min-height: 36px; font-size: 15px;"
+                                                                                    on:click=move |_| update_note_status(n_id, "dismissed")
+                                                                                >
+                                                                                    {move || i18n.tr("cms_proposal_dismiss", "Dismiss")}
+                                                                                </button>
+                                                                            })}
+                                                                            {(cur_status != "open").then(|| view! {
+                                                                                <button
+                                                                                    type="button"
+                                                                                    class="exo-btn"
+                                                                                    style="min-height: 36px; font-size: 15px;"
+                                                                                    on:click=move |_| update_note_status(n_id, "open")
+                                                                                >
+                                                                                    {move || i18n.tr("cms_proposal_reopen", "Reopen")}
+                                                                                </button>
+                                                                            })}
+                                                                        </div>
+                                                                    </Show>
                                                                 </div>
-                                                            </Show>
-                                                        </div>
-                                                    }
-                                                }
-                                            />
+                                                            }
+                                                        }
+                                                    />
+                                                }.into_any()
+                                            }}
                                         </div>
                                     </div>
+                                </div>
+                            }.into_any()
+                        }
+
+                        CmsMode::InferenceRuntimes => {
+                            view! {
+                                <div class="exo-card">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                                        <div>
+                                            <h2 class="exo-h2" style="margin: 0;">
+                                                {move || i18n.tr("cms_ai_providers_title", "AI Inference Providers & Active Models")}
+                                            </h2>
+                                            <p class="exo-sub" style="margin: 4px 0 0;">
+                                                {move || i18n.tr(
+                                                    "cms_ai_providers_sub",
+                                                    "Configured OpenCode CLI runtime and verified active provider models available in this environment."
+                                                )}
+                                            </p>
+                                        </div>
+                                        <Show when=is_admin>
+                                            <button type="button" class="exo-btn" on:click=refresh_models>
+                                                {move || i18n.tr("cms_refresh_models", "Refresh Live Models")}
+                                            </button>
+                                        </Show>
+                                    </div>
+
+                                    {move || {
+                                        let configured: Vec<_> = models
+                                            .get()
+                                            .into_iter()
+                                            .filter(|m| m.key_configured)
+                                            .collect();
+                                        if configured.is_empty() {
+                                            view! {
+                                                <p class="exo-sub" style="margin-top: 14px;">
+                                                    {move || i18n.tr(
+                                                        "cms_ai_empty",
+                                                        "No active inference providers configured in this environment."
+                                                    )}
+                                                </p>
+                                            }.into_any()
+                                        } else {
+                                            view! {
+                                                <div class="exo-grid-2" style="margin-top: 16px;">
+                                                    {configured.into_iter().map(|m| {
+                                                        let is_dep = m.deprecated_at.is_some();
+                                                        let is_cool = m.cooldown_until.is_some();
+                                                        view! {
+                                                            <div class="exo-dep-card">
+                                                                <div style="display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: baseline;">
+                                                                    <strong>{m.display_name}</strong>
+                                                                    <span class="exo-eyebrow" style="margin: 0;">
+                                                                        {move || if is_dep {
+                                                                            i18n.tr("cms_model_deprecated", "Deprecated")
+                                                                        } else if is_cool {
+                                                                            i18n.tr("cms_model_cooldown", "Cooldown")
+                                                                        } else {
+                                                                            i18n.tr("cms_model_active", "Active")
+                                                                        }}
+                                                                    </span>
+                                                                </div>
+                                                                <div class="exo-eyebrow exo-mono" style="margin: 4px 0 0;">
+                                                                    {m.provider} " · " {m.model_id}
+                                                                </div>
+                                                            </div>
+                                                        }
+                                                    }).collect_view()}
+                                                </div>
+                                            }.into_any()
+                                        }
+                                    }}
                                 </div>
                             }.into_any()
                         }
@@ -1072,9 +1781,14 @@ pub fn DocsCmsView(
                         CmsMode::OwnerTasks => {
                             view! {
                                 <div class="exo-card">
-                                    <h2 class="exo-h2" style="margin: 0;">"External Owner & Ops Checklist"</h2>
+                                    <h2 class="exo-h2" style="margin: 0;">
+                                        {move || i18n.tr("cms_owner_tasks_title", "External Owner & Ops Checklist")}
+                                    </h2>
                                     <p class="exo-sub" style="margin: 6px 0 18px;">
-                                        "Tasks that require external consoles or Tencent server access outside AI Studio. Check a box when done—state persists directly in Neon PostgreSQL so ExoNovel always tracks what remains."
+                                        {move || i18n.tr(
+                                            "cms_owner_tasks_sub",
+                                            "Tasks that require external consoles or production server access outside AI Studio. Check a box when done—state persists directly in Neon PostgreSQL so ExoNovel always tracks what remains."
+                                        )}
                                     </p>
 
                                     <For
@@ -1086,7 +1800,7 @@ pub fn DocsCmsView(
                                             let has_snippet = !t.copy_snippet.trim().is_empty();
                                             let snippet_sv = StoredValue::new(t.copy_snippet.clone());
                                             let done_now = t.is_done;
-                                            let actor_badge = if t.owner_actor == "Tencent Agent" {
+                                            let actor_badge = if t.owner_actor == "Production Server" || t.owner_actor.contains("Agent") {
                                                 "exo-tag exo-tag-warn"
                                             } else {
                                                 "exo-tag"
@@ -1116,9 +1830,9 @@ pub fn DocsCmsView(
                                                             <span class=actor_badge>{t.owner_actor.clone()}</span>
                                                             <span class="exo-tag">{t.category.clone()}</span>
                                                             {if done_now {
-                                                                view! { <span class="exo-tag exo-tag-ok">"Done"</span> }.into_any()
+                                                                view! { <span class="exo-tag exo-tag-ok">{move || i18n.tr("cms_task_done", "Done")}</span> }.into_any()
                                                             } else {
-                                                                view! { <span class="exo-tag exo-tag-warn">"Pending"</span> }.into_any()
+                                                                view! { <span class="exo-tag exo-tag-warn">{move || i18n.tr("cms_task_pending", "Pending")}</span> }.into_any()
                                                             }}
                                                         </div>
                                                     </div>
@@ -1139,10 +1853,10 @@ pub fn DocsCmsView(
                                                                     style="min-height: 32px; font-size: 13px; padding: 0 12px;"
                                                                     on:click=move |_| {
                                                                         snippet_sv.with_value(|s| copy_text_to_clipboard(s));
-                                                                        on_toast("Copied text to clipboard".to_string());
+                                                                        on_toast(i18n.tr_untracked("cms_toast_copied", "Copied text to clipboard"));
                                                                     }
                                                                 >
-                                                                    "Copy Text"
+                                                                    {move || i18n.tr("copy_text_label", "Copy Text")}
                                                                 </button>
                                                             </div>
                                                         }.into_any()
@@ -1165,7 +1879,7 @@ pub fn DocsCmsView(
                     } else {
                         view! {
                             <aside class="exo-toc">
-                                <div class="exo-toc-title">"On this page"</div>
+                                <div class="exo-toc-title">{move || i18n.tr("cms_on_this_page", "On this page")}</div>
                                 {doc.headings.into_iter().map(|h| {
                                     let cls = if h.level >= 3 {
                                         "exo-toc-link exo-toc-link-h3"

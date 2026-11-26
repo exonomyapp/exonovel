@@ -568,6 +568,64 @@ fn wrapping_key_bytes() -> [u8; 32] {
     hasher.finalize().into()
 }
 
+pub fn random_hex_token(num_bytes: usize) -> String {
+    let mut bytes = vec![0_u8; num_bytes];
+    OsRng.fill_bytes(&mut bytes);
+    let mut out = String::with_capacity(num_bytes * 2);
+    for b in bytes {
+        out.push_str(&format!("{b:02x}"));
+    }
+    out
+}
+
+pub fn seal_secret(plaintext: &str) -> Result<String, String> {
+    let key = wrapping_key_bytes();
+    let cipher = Aes256Gcm::new_from_slice(&key)
+        .map_err(|e| format!("Invalid encryption key length: {e}"))?;
+    let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+    let sealed = cipher
+        .encrypt(&nonce, plaintext.as_bytes())
+        .map_err(|e| format!("Failed to seal secret: {e}"))?;
+    let tag_split = sealed.len().saturating_sub(16);
+    let (ciphertext, tag) = sealed.split_at(tag_split);
+    Ok(format!(
+        "{}.{}.{}",
+        B64.encode(nonce.as_slice()),
+        B64.encode(tag),
+        B64.encode(ciphertext)
+    ))
+}
+
+pub fn open_secret(sealed_str: &str) -> Result<String, String> {
+    let parts: Vec<&str> = sealed_str.trim().split('.').collect();
+    if parts.len() != 3 {
+        return Err("Malformed sealed payload.".to_string());
+    }
+    let nonce_bytes = B64
+        .decode(parts[0])
+        .map_err(|_| "Invalid sealed nonce.".to_string())?;
+    let tag_bytes = B64
+        .decode(parts[1])
+        .map_err(|_| "Invalid sealed tag.".to_string())?;
+    let ct_bytes = B64
+        .decode(parts[2])
+        .map_err(|_| "Invalid sealed ciphertext.".to_string())?;
+    let nonce_arr: [u8; 12] = nonce_bytes
+        .try_into()
+        .map_err(|_| "Invalid sealed nonce length.".to_string())?;
+    let mut combined = Vec::with_capacity(ct_bytes.len() + tag_bytes.len());
+    combined.extend_from_slice(&ct_bytes);
+    combined.extend_from_slice(&tag_bytes);
+
+    let key = wrapping_key_bytes();
+    let cipher = Aes256Gcm::new_from_slice(&key)
+        .map_err(|e| format!("Invalid decryption key length: {e}"))?;
+    let plaintext = cipher
+        .decrypt(aes_gcm::Nonce::from_slice(&nonce_arr), combined.as_slice())
+        .map_err(|_| "Secret integrity check failed.".to_string())?;
+    String::from_utf8(plaintext).map_err(|_| "Decrypted secret is not valid UTF-8.".to_string())
+}
+
 pub fn mint_did_peer_keypair() -> Result<(String, String, String), String> {
     let signing_key = SigningKey::generate(&mut OsRng);
     let raw_pub = signing_key.verifying_key().to_bytes();
@@ -583,22 +641,7 @@ pub fn mint_did_peer_keypair() -> Result<(String, String, String), String> {
         .to_pkcs8_pem(LineEnding::LF)
         .map_err(|e| format!("Failed to encode PKCS8 key: {e}"))?;
 
-    let key = wrapping_key_bytes();
-    let cipher = Aes256Gcm::new_from_slice(&key)
-        .map_err(|e| format!("Invalid key length: {e}"))?;
-    let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-    let sealed = cipher
-        .encrypt(&nonce, pem.as_bytes())
-        .map_err(|e| format!("Failed to seal private key: {e}"))?;
-
-    let tag_split = sealed.len().saturating_sub(16);
-    let (ciphertext, tag) = sealed.split_at(tag_split);
-    let encrypted = format!(
-        "{}.{}.{}",
-        B64.encode(nonce.as_slice()),
-        B64.encode(tag),
-        B64.encode(ciphertext)
-    );
+    let encrypted = seal_secret(&pem)?;
 
     Ok((did_peer, multibase, encrypted))
 }

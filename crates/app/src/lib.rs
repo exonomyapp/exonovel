@@ -1,6 +1,7 @@
 #![recursion_limit = "512"]
 
 mod cms;
+mod connected_apps_ui;
 mod i18n;
 mod live;
 mod models;
@@ -22,12 +23,13 @@ use crate::{
     i18n::{fetch_locale_catalog, fetch_locale_pack, use_i18n, I18nState},
     live::{spawn_live_sse_connector, use_live_sync, LiveSyncState},
     models::{
-        active_persona_for_user, copy_text_to_clipboard, detect_browser_timezone,
-        display_name_for_user, format_account_role, is_safe_avatar_url, load_authenticated_user,
-        read_session_storage, remove_session_storage, resolve_fresh_jwt, save_profile_patch,
-        sleep_ms, write_session_storage, ActiveTab, AppearanceMode, AuthConfigResponse, BellIcon,
-        CopyIcon, GitHubLogoIcon, GoogleLogoIcon, InvitePreview, MonitorIcon, MoonIcon,
-        NotificationItem, NotificationsListResponse, ProfilePatchResponse, SunIcon, VerifiedUser,
+        account_role_key, active_persona_for_user, copy_text_to_clipboard, detect_browser_timezone,
+        display_name_for_user, is_safe_avatar_url, load_authenticated_user, read_session_storage,
+        remove_session_storage, resolve_fresh_jwt, save_profile_patch, sleep_ms,
+        write_session_storage, ActiveTab, AppearanceMode, AuthConfigResponse, BellIcon, CloseIcon,
+        CopyIcon, GitHubLogoIcon, GoogleLogoIcon, InvitePreview, LocaleFlag, MenuIcon, MonitorIcon,
+        MoonIcon, NotificationItem, NotificationsListResponse, ProfilePatchResponse,
+        SettingsSection, SunIcon, VerifiedUser,
     },
     profile::ProfileView,
     settings::SettingsView,
@@ -93,6 +95,30 @@ async fn claim_pending_invite_if_any(jwt: &str) {
 #[component]
 pub fn App() -> impl IntoView {
     provide_meta_context();
+    let i18n = I18nState::new();
+    provide_context(i18n);
+
+    Effect::new(move |_| {
+        leptos::task::spawn_local(async move {
+            fetch_locale_catalog(i18n).await;
+        });
+    });
+
+    // Apply Output UI Locale (<html lang dir="ltr|rtl">) and download .ftl pack
+    Effect::new(move |_| {
+        let code = i18n.ui_locale.get();
+        let dir = i18n.ui_dir();
+        if let Some(root) = web_sys::window()
+            .and_then(|w| w.document())
+            .and_then(|d| d.document_element())
+        {
+            let _ = root.set_attribute("lang", &code);
+            let _ = root.set_attribute("dir", dir);
+        }
+        leptos::task::spawn_local(async move {
+            fetch_locale_pack(i18n, &code).await;
+        });
+    });
 
     view! {
         <Title text="ExoNovel — Collaborative Creative Writing & Sovereign Publishing" />
@@ -110,9 +136,8 @@ pub fn App() -> impl IntoView {
 #[component]
 fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView {
     let live = LiveSyncState::new();
-    let i18n = I18nState::new();
     provide_context(live);
-    provide_context(i18n);
+    let i18n = use_i18n();
 
     let (auth_config, set_auth_config) = signal::<Option<AuthConfigResponse>>(None);
     let (loading_session, set_loading_session) = signal(true);
@@ -125,12 +150,16 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
     let (return_tab, set_return_tab) = signal(ActiveTab::Workspace);
     let (chip_open, set_chip_open) = signal(false);
     let (bell_open, set_bell_open) = signal(false);
+    let (lang_open, set_lang_open) = signal(false);
+    let (mobile_nav_open, set_mobile_nav_open) = signal(false);
     let (notifications, set_notifications) = signal::<Vec<NotificationItem>>(Vec::new());
     let (unread_count, set_unread_count) = signal(0_usize);
     let (toast_msg, set_toast_msg) = signal::<Option<String>>(None);
     let (toast_seq, set_toast_seq) = signal(0_u64);
     let (pending_invite, set_pending_invite) = signal::<Option<String>>(None);
     let (sse_started, set_sse_started) = signal(false);
+    let settings_initial_section = RwSignal::new(None::<SettingsSection>);
+    let (oauth_banner, set_oauth_banner) = signal::<Option<(bool, String)>>(None);
 
     let is_authenticated = Memo::new(move |_| current_user.get().is_some());
 
@@ -148,7 +177,7 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
 
     let show_did_copied_toast = move |did: String| {
         copy_text_to_clipboard(&did);
-        show_toast("did:peer ID copied".to_string());
+        show_toast(i18n.tr_untracked("toast_did_copied", "did:peer ID copied"));
     };
 
     let reload_notifications = move || {
@@ -196,17 +225,71 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
         }
     };
 
-    // Fetch 29-language catalog + URL params (invite/doc) once on mount
+    // Parse URL params (invite/doc/tab/connected) once on mount
     Effect::new(move |_| {
-        leptos::task::spawn_local(async move {
-            fetch_locale_catalog(i18n).await;
-        });
         if let Some(win) = web_sys::window() {
             if let Ok(search) = win.location().search() {
                 if let Ok(params) = web_sys::UrlSearchParams::new_with_str(&search) {
+                    let mut should_clean = false;
                     if let Some(doc_param) = params.get("doc").filter(|d| !d.trim().is_empty()) {
                         set_active_doc_path.set(doc_param);
                         set_active_tab.set(ActiveTab::Docs);
+                    }
+                    if let Some(tab_param) = params.get("tab") {
+                        match tab_param.as_str() {
+                            "settings" => {
+                                set_active_tab.set(ActiveTab::Settings);
+                                should_clean = true;
+                            }
+                            "docs" => {
+                                set_active_tab.set(ActiveTab::Docs);
+                                should_clean = true;
+                            }
+                            _ => {}
+                        }
+                        params.delete("tab");
+                    }
+                    if let Some(sec_param) = params.get("section") {
+                        if sec_param == "connected-apps" {
+                            settings_initial_section.set(Some(SettingsSection::ConnectedApps));
+                            set_active_tab.set(ActiveTab::Settings);
+                        }
+                        params.delete("section");
+                        should_clean = true;
+                    }
+                    if let Some(conn) = params.get("connected") {
+                        if conn == "google" {
+                            set_oauth_banner.set(Some((
+                                false,
+                                i18n.tr_untracked(
+                                    "oauth_connected_google",
+                                    "Google Drive & Docs connected successfully.",
+                                ),
+                            )));
+                        }
+                        params.delete("connected");
+                        should_clean = true;
+                    }
+                    if let Some(err_param) = params.get("oauth_error") {
+                        set_oauth_banner.set(Some((true, err_param)));
+                        params.delete("oauth_error");
+                        should_clean = true;
+                    }
+                    if should_clean {
+                        let clean_query = params.to_string().as_string().unwrap_or_default();
+                        let pathname = win.location().pathname().unwrap_or_else(|_| "/".to_string());
+                        let next_url = if clean_query.is_empty() {
+                            pathname
+                        } else {
+                            format!("{pathname}?{clean_query}")
+                        };
+                        if let Ok(history) = win.history() {
+                            let _ = history.replace_state_with_url(
+                                &wasm_bindgen::JsValue::NULL,
+                                "",
+                                Some(&next_url),
+                            );
+                        }
                     }
                     if let Some(inv_param) = params.get("invite").filter(|i| !i.trim().is_empty()) {
                         write_session_storage("exo_pending_invite", &inv_param);
@@ -235,22 +318,6 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
         {
             let _ = root.set_attribute("data-appearance", mode.as_str());
         }
-    });
-
-    // Apply Output UI Locale (<html lang dir="ltr|rtl">) and download .ftl pack
-    Effect::new(move |_| {
-        let code = i18n.ui_locale.get();
-        let dir = i18n.ui_dir();
-        if let Some(root) = web_sys::window()
-            .and_then(|w| w.document())
-            .and_then(|d| d.document_element())
-        {
-            let _ = root.set_attribute("lang", &code);
-            let _ = root.set_attribute("dir", dir);
-        }
-        leptos::task::spawn_local(async move {
-            fetch_locale_pack(i18n, &code).await;
-        });
     });
 
     let persist_profile_patch = move |patch: serde_json::Value| {
@@ -323,6 +390,8 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
         }
         set_chip_open.set(false);
         set_bell_open.set(false);
+        set_lang_open.set(false);
+        set_mobile_nav_open.set(false);
         set_active_tab.set(dest);
     };
 
@@ -447,6 +516,8 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
         let auth_url = auth_config.get_untracked().and_then(|c| c.auth_url);
         set_chip_open.set(false);
         set_bell_open.set(false);
+        set_lang_open.set(false);
+        set_mobile_nav_open.set(false);
         leptos::task::spawn_local(async move {
             if let Some(url) = auth_url {
                 let endpoint = format!("{}/sign-out", url.trim_end_matches('/'));
@@ -472,13 +543,35 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                     href="/"
                     title="ExoNovel"
                     class="navbar-brand-link"
-                    on:click=move |_| set_show_signin.set(false)
+                    on:click=move |_| {
+                        set_show_signin.set(false);
+                        set_mobile_nav_open.set(false);
+                    }
                 >
                     <img src="/exonovel-logo.png" alt="ExoNovel" class="navbar-logo navbar-logo-light" />
                     <img src="/exonovel-logo-dark.png" alt="ExoNovel" class="navbar-logo navbar-logo-dark" />
                 </a>
 
-                <div class="navbar-menu">
+                <button
+                    type="button"
+                    class="navbar-mobile-toggle"
+                    aria-label=move || i18n.tr("nav_toggle_menu", "Toggle navigation menu")
+                    aria-expanded=move || if mobile_nav_open.get() { "true" } else { "false" }
+                    on:click=move |_| {
+                        set_chip_open.set(false);
+                        set_bell_open.set(false);
+                        set_lang_open.set(false);
+                        set_mobile_nav_open.update(|v| *v = !*v);
+                    }
+                >
+                    {move || if mobile_nav_open.get() {
+                        view! { <CloseIcon /> }.into_any()
+                    } else {
+                        view! { <MenuIcon /> }.into_any()
+                    }}
+                </button>
+
+                <div class=move || if mobile_nav_open.get() { "navbar-menu navbar-menu-open" } else { "navbar-menu" }>
                     {move || match current_user.get() {
                         Some(user) => {
                             let can_read_docs = user.authorized;
@@ -492,15 +585,16 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                             let chip_initial = chip_name.chars().next().unwrap_or('W').to_uppercase().to_string();
                             let active_did_cmp = active_p.persona_did.clone();
                             let personas_list = user.personas.clone();
-                            let pinned_ui = user
-                                .profile
-                                .as_ref()
-                                .map(|p| p.preferred_ui_locales.clone())
-                                .unwrap_or_default();
+                            let pinned_ui_sv = StoredValue::new(
+                                user.profile
+                                    .as_ref()
+                                    .map(|p| p.preferred_ui_locales.clone())
+                                    .unwrap_or_default(),
+                            );
 
                             view! {
                                 <>
-                                    <a href="https://exosystems.net/" class="nav-link">
+                                    <a href="https://exosystems.net/" class="nav-link" on:click=move |_| set_mobile_nav_open.set(false)>
                                         {move || i18n.tr("nav_home", "Home")}
                                     </a>
 
@@ -510,6 +604,8 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                         on:click=move |_| {
                                             set_chip_open.set(false);
                                             set_bell_open.set(false);
+                                            set_lang_open.set(false);
+                                            set_mobile_nav_open.set(false);
                                             set_active_tab.set(ActiveTab::Workspace);
                                             persist_profile_patch(serde_json::json!({ "lastActiveTab": "workspace" }));
                                         }
@@ -525,6 +621,8 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                                 on:click=move |_| {
                                                     set_chip_open.set(false);
                                                     set_bell_open.set(false);
+                                                    set_lang_open.set(false);
+                                                    set_mobile_nav_open.set(false);
                                                     set_active_tab.set(ActiveTab::Docs);
                                                     persist_profile_patch(serde_json::json!({ "lastActiveTab": "docs" }));
                                                 }
@@ -536,46 +634,95 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                         view! { <span /> }.into_any()
                                     }}
 
-                                    <div class="exo-live-indicator" title="Global Neon SSE Real-Time Connection">
+                                    <div class="exo-live-indicator" title=move || i18n.tr("live_connection_title", "Global Neon SSE Real-Time Connection")>
                                         <span class=move || if live.connected.get() { "exo-live-dot exo-live-dot-on" } else { "exo-live-dot" } />
                                         <span>{move || i18n.tr("live_sync_label", "Live")}</span>
                                     </div>
 
-                                    <select
-                                        class="exo-nav-select"
-                                        aria-label="App Output Language"
-                                        prop:value=move || i18n.ui_locale.get()
-                                        on:change=move |ev| {
-                                            let next = event_target_value(&ev);
-                                            i18n.ui_locale.set(next.clone());
-                                            persist_profile_patch(serde_json::json!({ "uiLocale": next }));
-                                        }
-                                    >
-                                        {move || {
-                                            let catalog = i18n.catalog.get();
-                                            let list = if pinned_ui.is_empty() {
-                                                catalog
-                                            } else {
-                                                let filtered: Vec<_> = catalog
-                                                    .iter()
-                                                    .filter(|l| pinned_ui.contains(&l.code) || l.code == i18n.ui_locale.get_untracked())
-                                                    .cloned()
-                                                    .collect();
-                                                if filtered.is_empty() { catalog } else { filtered }
-                                            };
-                                            list.into_iter().map(|l| {
-                                                view! { <option value=l.code>{l.native_name}</option> }
-                                            }).collect_view()
-                                        }}
-                                    </select>
+                                    <div class="exo-lang-wrap">
+                                        <button
+                                            type="button"
+                                            class="exo-lang-trigger"
+                                            aria-label=move || i18n.tr("ui_lang_aria", "App Output Language")
+                                            aria-expanded=move || if lang_open.get() { "true" } else { "false" }
+                                            on:click=move |_| {
+                                                set_chip_open.set(false);
+                                                set_bell_open.set(false);
+                                                set_lang_open.update(|v| *v = !*v);
+                                            }
+                                        >
+                                            {move || {
+                                                let cur = i18n.ui_locale.get();
+                                                let name = i18n.catalog
+                                                    .get()
+                                                    .into_iter()
+                                                    .find(|l| l.code == cur)
+                                                    .map(|l| l.native_name)
+                                                    .unwrap_or_else(|| cur.clone());
+                                                view! {
+                                                    <>
+                                                        <LocaleFlag code=cur />
+                                                        <span>{name}</span>
+                                                    </>
+                                                }
+                                            }}
+                                            <span style="font-size: 12px; opacity: 0.75;">"▾"</span>
+                                        </button>
+                                        <Show when=move || lang_open.get()>
+                                            <div class="exo-chip-menu exo-lang-menu" role="menu">
+                                                <div class="exo-chip-menu-label">{move || i18n.tr("ui_lang_label", "App Language")}</div>
+                                                {move || {
+                                                    let catalog = i18n.catalog.get();
+                                                    let cur = i18n.ui_locale.get();
+                                                    let list = pinned_ui_sv.with_value(|pinned| {
+                                                        if pinned.is_empty() {
+                                                            catalog.clone()
+                                                        } else {
+                                                            let filtered: Vec<_> = catalog
+                                                                .iter()
+                                                                .filter(|l| pinned.contains(&l.code) || l.code == cur)
+                                                                .cloned()
+                                                                .collect();
+                                                            if filtered.is_empty() { catalog.clone() } else { filtered }
+                                                        }
+                                                    });
+                                                    list.into_iter().map(|loc| {
+                                                        let code_click = loc.code.clone();
+                                                        let code_flag = loc.code.clone();
+                                                        let is_active = loc.code == cur;
+                                                        view! {
+                                                            <button
+                                                                type="button"
+                                                                class=if is_active { "exo-chip-menu-item exo-chip-menu-item-active" } else { "exo-chip-menu-item" }
+                                                                on:click=move |_| {
+                                                                    let next = code_click.clone();
+                                                                    i18n.ui_locale.set(next.clone());
+                                                                    set_lang_open.set(false);
+                                                                    set_mobile_nav_open.set(false);
+                                                                    persist_profile_patch(serde_json::json!({ "uiLocale": next }));
+                                                                }
+                                                            >
+                                                                <span class="exo-lang-item-label">
+                                                                    <LocaleFlag code=code_flag />
+                                                                    <span>{loc.native_name}</span>
+                                                                </span>
+                                                                <span class="exo-eyebrow" style="margin: 0; font-size: 12px;">{loc.code}</span>
+                                                            </button>
+                                                        }
+                                                    }).collect_view()
+                                                }}
+                                            </div>
+                                        </Show>
+                                    </div>
 
                                     <div class="exo-bell-wrap">
                                         <button
                                             type="button"
                                             class="ctl"
-                                            aria-label="Notifications"
+                                            aria-label=move || i18n.tr("notifications_aria", "Notifications")
                                             on:click=move |_| {
                                                 set_chip_open.set(false);
+                                                set_lang_open.set(false);
                                                 set_bell_open.update(|v| *v = !*v);
                                             }
                                         >
@@ -594,13 +741,13 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                                         style="min-height: 30px; padding: 0 8px; font-size: 13px;"
                                                         on:click=move |_| mark_notification_read("all".to_string())
                                                     >
-                                                        "Mark all read"
+                                                        {move || i18n.tr("mark_all_read", "Mark all read")}
                                                     </button>
                                                 </div>
                                                 {move || {
                                                     let list = notifications.get();
                                                     if list.is_empty() {
-                                                        view! { <p class="exo-sub">"No notifications yet."</p> }.into_any()
+                                                        view! { <p class="exo-sub">{move || i18n.tr("no_notifications", "No notifications yet.")}</p> }.into_any()
                                                     } else {
                                                         list.into_iter().take(12).map(|n| {
                                                             let nid = n.id.clone();
@@ -617,7 +764,7 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                                                             style="min-height: 28px; padding: 0 8px; font-size: 13px; margin-top: 6px;"
                                                                             on:click=move |_| mark_notification_read(nid.clone())
                                                                         >
-                                                                            "Mark read"
+                                                                            {move || i18n.tr("mark_read", "Mark read")}
                                                                         </button>
                                                                     })}
                                                                 </div>
@@ -635,6 +782,7 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                             class="exo-user-chip"
                                             on:click=move |_| {
                                                 set_bell_open.set(false);
+                                                set_lang_open.set(false);
                                                 set_chip_open.update(|v| *v = !*v);
                                             }
                                         >
@@ -658,11 +806,17 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                                 </button>
 
                                                 <div class="exo-chip-menu-divider" />
-                                                <div class="exo-chip-menu-label">"Switch Persona"</div>
+                                                <div class="exo-chip-menu-label">{move || i18n.tr("switch_persona", "Switch Persona")}</div>
                                                 {personas_list.clone().into_iter().map(|p| {
                                                     let p_did = p.persona_did.clone();
                                                     let is_curr = p_did == active_did_cmp;
-                                                    let p_name = if p.display_name.is_empty() { "Default Persona".to_string() } else { p.display_name.clone() };
+                                                    let p_empty = p.display_name.is_empty();
+                                                    let p_raw = p.display_name.clone();
+                                                    let p_name = if p_empty {
+                                                        i18n.tr_untracked("default_persona_label", "Default Persona")
+                                                    } else {
+                                                        p.display_name.clone()
+                                                    };
                                                     let p_avatar = if !p.avatar_thumb_url.is_empty() { p.avatar_thumb_url.clone() } else { p.avatar_url.clone() };
                                                     let p_init = p_name.chars().next().unwrap_or('W').to_uppercase().to_string();
                                                     let p_name_toast = p_name.clone();
@@ -672,8 +826,10 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                                             class=if is_curr { "exo-chip-menu-item exo-chip-menu-item-active" } else { "exo-chip-menu-item" }
                                                             on:click=move |_| {
                                                                 set_chip_open.set(false);
+                                                                set_mobile_nav_open.set(false);
                                                                 persist_profile_patch(serde_json::json!({ "activePersonaDid": p_did.clone() }));
-                                                                show_toast(format!("Switched to {p_name_toast}"));
+                                                                let prefix = i18n.tr_untracked("toast_switched_persona", "Switched persona");
+                                                                show_toast(format!("{prefix}: {p_name_toast}"));
                                                             }
                                                         >
                                                             <span style="display: inline-flex; align-items: center; gap: 8px; min-width: 0;">
@@ -682,10 +838,16 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                                                 } else {
                                                                     view! { <div class="exo-avatar-sm">{p_init}</div> }.into_any()
                                                                 }}
-                                                                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{p_name}</span>
+                                                                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                                    {move || if p_empty {
+                                                                        i18n.tr("default_persona_label", "Default Persona")
+                                                                    } else {
+                                                                        p_raw.clone()
+                                                                    }}
+                                                                </span>
                                                             </span>
                                                             {if is_curr {
-                                                                view! { <span class="exo-tag exo-tag-accent">"Active"</span> }.into_any()
+                                                                view! { <span class="exo-tag exo-tag-accent">{move || i18n.tr("active_badge", "Active")}</span> }.into_any()
                                                             } else {
                                                                 view! { <span /> }.into_any()
                                                             }}
@@ -716,23 +878,35 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                         }
                         None => view! {
                             <>
-                                <a href="/#overview" class="nav-link" on:click=move |_| set_show_signin.set(false)>
-                                    "Overview"
+                                <a
+                                    href="/#overview"
+                                    class="nav-link"
+                                    on:click=move |_| {
+                                        set_show_signin.set(false);
+                                        set_mobile_nav_open.set(false);
+                                    }
+                                >
+                                    {move || i18n.tr("nav_overview", "Overview")}
                                 </a>
-                                <a href="/#formats" class="nav-link" on:click=move |_| set_show_signin.set(false)>
-                                    "Formats"
+                                <a
+                                    href="/#formats"
+                                    class="nav-link"
+                                    on:click=move |_| {
+                                        set_show_signin.set(false);
+                                        set_mobile_nav_open.set(false);
+                                    }
+                                >
+                                    {move || i18n.tr("nav_formats", "Formats")}
                                 </a>
-                                <a href="/#compliance" class="nav-link" on:click=move |_| set_show_signin.set(false)>
-                                    "API Use"
-                                </a>
-                                <a href="/privacy" class="nav-link">"Privacy"</a>
-                                <a href="/terms" class="nav-link">"Terms"</a>
                                 <button
                                     type="button"
                                     class="exo-btn exo-btn-primary"
-                                    on:click=move |_| set_show_signin.set(true)
+                                    on:click=move |_| {
+                                        set_show_signin.set(true);
+                                        set_mobile_nav_open.set(false);
+                                    }
                                 >
-                                    "Sign in"
+                                    {move || i18n.tr("nav_sign_in", "Sign in")}
                                 </button>
                             </>
                         }.into_any(),
@@ -742,8 +916,14 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                         <button
                             type="button"
                             class="ctl"
-                            title=move || appearance.get().label()
-                            aria-label=move || appearance.get().label()
+                            title=move || {
+                                let m = appearance.get();
+                                i18n.tr(m.label_key(), m.label())
+                            }
+                            aria-label=move || {
+                                let m = appearance.get();
+                                i18n.tr(m.label_key(), m.label())
+                            }
                             on:click=move |_| {
                                 let next = appearance.get_untracked().next();
                                 set_appearance.set(next);
@@ -759,6 +939,20 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                     </span>
                 </div>
             </nav>
+
+            {move || oauth_banner.get().map(|(is_err, msg)| {
+                let cls = if is_err { "exo-alert-error" } else { "exo-invite-banner" };
+                view! {
+                    <div class="page-main" style="padding-bottom: 0; margin-bottom: 0;">
+                        <div class=cls style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <span>{msg}</span>
+                            <button type="button" class="exo-btn" style="min-height: 30px; font-size: 13px;" on:click=move |_| set_oauth_banner.set(None)>
+                                {move || i18n.tr("dismiss_label", "Dismiss")}
+                            </button>
+                        </div>
+                    </div>
+                }
+            })}
 
             {
                 let session_view_key = Memo::new(move |_| {
@@ -841,6 +1035,7 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                                     }
                                                 });
                                             }
+                                            initial_section=settings_initial_section
                                             on_back=move || {
                                                 let dest = return_tab.get_untracked();
                                                 let is_auth = current_user.get_untracked().is_some_and(|u| u.authorized);
@@ -865,6 +1060,10 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                     }
                                     on_open_profile=move || navigate_to_subpage(ActiveTab::Profile)
                                     on_open_settings=move || navigate_to_subpage(ActiveTab::Settings)
+                                    on_open_connected_apps=move || {
+                                        settings_initial_section.set(Some(SettingsSection::ConnectedApps));
+                                        navigate_to_subpage(ActiveTab::Settings);
+                                    }
                                     on_copy_did=show_did_copied_toast
                                 />
                             }.into_any(),
@@ -890,6 +1089,7 @@ fn WorkspaceHomeView(
     on_open_docs: impl Fn() + Copy + Send + Sync + 'static,
     on_open_profile: impl Fn() + Copy + Send + Sync + 'static,
     on_open_settings: impl Fn() + Copy + Send + Sync + 'static,
+    on_open_connected_apps: impl Fn() + Copy + Send + Sync + 'static,
     on_copy_did: impl Fn(String) + Copy + Send + Sync + 'static,
 ) -> impl IntoView {
     let i18n = use_i18n();
@@ -905,7 +1105,9 @@ fn WorkspaceHomeView(
                 let display_name = display_name_for_user(&user);
                 let email_label = user.email.clone().unwrap_or_default();
                 let persona_did = if persona.persona_did.is_empty() {
-                    user.did_peer.clone().unwrap_or_else(|| "Pending did:peer".to_string())
+                    user.did_peer
+                        .clone()
+                        .unwrap_or_else(|| i18n.tr("pending_did_label", "Pending did:peer"))
                 } else {
                     persona.persona_did.clone()
                 };
@@ -915,7 +1117,7 @@ fn WorkspaceHomeView(
                 let handle = persona.handle.clone();
                 let initial = display_name.chars().next().unwrap_or('W').to_uppercase().to_string();
                 let can_read_docs = user.authorized;
-                let role_label = format_account_role(&user.account_role);
+                let role_label = i18n.tr(account_role_key(&user.account_role), "User");
                 let sync_tier = user.profile.as_ref().map(|p| p.sync_plan_tier.clone()).unwrap_or_else(|| "free".to_string());
 
                 view! {
@@ -933,11 +1135,11 @@ fn WorkspaceHomeView(
                                             {i18n.tr("welcome_prefix", "Welcome,")} " " {display_name} "."
                                         </h1>
                                         <span class="exo-tag exo-tag-accent">{role_label}</span>
-                                        <span class="exo-tag tabular-nums">{"Plan: "}{sync_tier}</span>
+                                        <span class="exo-tag tabular-nums">{i18n.tr("plan_label", "Plan:")} " " {sync_tier}</span>
                                     </div>
                                     <p class="exo-sub">
                                         {if !handle.is_empty() {
-                                            format!("Pen name: {handle} · {email_label}")
+                                            format!("{} {handle} · {email_label}", i18n.tr("pen_name_label", "Pen name:"))
                                         } else {
                                             email_label
                                         }}
@@ -946,12 +1148,15 @@ fn WorkspaceHomeView(
                             </div>
 
                             <p class="exo-sub" style="margin-top: 16px;">
-                                "Your collaborative creative writing space anchored to your sovereign did:peer identity across Web Mode 1, Free Device Mode 2, and Managed Blind Sync Mode 3."
+                                {i18n.tr("workspace_desc", "Your collaborative creative writing space anchored to your sovereign did:peer identity across Web Mode 1, Free Device Mode 2, and Managed Blind Sync Mode 3.")}
                             </p>
 
                             <div style="margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
                                 <button type="button" class="exo-btn exo-btn-primary" on:click=move |_| on_open_profile()>
-                                    "Profile, Personas & Billing"
+                                    {i18n.tr("btn_profile_billing", "Profile, Personas & Billing")}
+                                </button>
+                                <button type="button" class="exo-btn" on:click=move |_| on_open_connected_apps()>
+                                    {i18n.tr("btn_connected_apps", "Connected Apps & Google Docs")}
                                 </button>
                                 <button type="button" class="exo-btn" on:click=move |_| on_open_settings()>
                                     {i18n.tr("nav_settings", "Settings")}
@@ -959,7 +1164,7 @@ fn WorkspaceHomeView(
                                 {if can_read_docs {
                                     view! {
                                         <button type="button" class="exo-btn" on:click=move |_| on_open_docs()>
-                                            "Open MADR Docs CMS"
+                                            {i18n.tr("btn_open_cms", "Open MADR Docs CMS")}
                                         </button>
                                     }.into_any()
                                 } else {
@@ -969,7 +1174,7 @@ fn WorkspaceHomeView(
                         </div>
 
                         <div class="exo-card">
-                            <div class="exo-label">"Active Persona Workspace Key (did:peer)"</div>
+                            <div class="exo-label">{i18n.tr("workspace_key_label", "Active Persona Workspace Key (did:peer)")}</div>
                             <div class="exo-id-cell">
                                 <button type="button" class="exo-copy-btn" on:click=move |_| on_copy_did(did_copy.clone())>
                                     <CopyIcon />
@@ -988,22 +1193,57 @@ fn WorkspaceHomeView(
 fn PublicLandingView(
     on_open_signin: impl Fn() + Copy + Send + Sync + 'static,
 ) -> impl IntoView {
+    let i18n = use_i18n();
+    let (slide_idx, set_slide_idx) = signal(0_usize);
+    let slides = [
+        (
+            "01",
+            "slide_1_title",
+            "Individual Ownership in Shared Story Worlds",
+            "slide_1_body",
+            "Every creative unit—character profiles, lore notes, plot beats, scenes, and chapters—is anchored to the author's cryptographic did:peer identity. Contributors can collaborate inside shared projects and permissioned forks without surrendering authorship or attribution.",
+        ),
+        (
+            "02",
+            "slide_2_title",
+            "Multi-Persona Pen Names",
+            "slide_2_body",
+            "Writers manage distinct pen names and avatars under one verified account, switching active personas seamlessly across collaborative manuscripts and publishing channels.",
+        ),
+        (
+            "03",
+            "slide_3_title",
+            "Web & Local-First Sync",
+            "slide_3_body",
+            "Work online in the browser backed by Neon PostgreSQL or synchronize end-to-end encrypted local workspaces across Linux, macOS, Windows, Android, and iOS.",
+        ),
+        (
+            "04",
+            "slide_4_title",
+            "User-Controlled Connected Apps & Revocation",
+            "slide_4_body",
+            "External integrations such as Google Drive remain strictly optional and separated from primary sign-in. Users can inspect active permissions or disconnect and revoke provider tokens anytime from Settings without losing access to ExoNovel.",
+        ),
+    ];
+
     view! {
         <main class="page-main">
             <div class="exo-landing-stack">
                 <section id="overview" class="exo-landing-hero">
                     <div class="exo-eyebrow">
-                        "ExoNovel · Operated by Exosystems (exosystems.net) · Web, Desktop & Mobile"
+                        {move || i18n.tr("landing_eyebrow", "ExoNovel · Web, Desktop & Mobile")}
                     </div>
                     <h1 class="exo-landing-title">
-                        "ExoNovel — Collaborative Creative Writing Where Authors Own Their Work"
+                        {move || i18n.tr(
+                            "landing_title",
+                            "ExoNovel — Collaborative Creative Writing Where Authors Own Their Work"
+                        )}
                     </h1>
                     <p class="exo-landing-lead">
-                        "ExoNovel (https://exonovel.exosystems.net) is a text-based collaborative creative writing and local-first publishing platform built for authors, co-writers, and literary teams. Draft novels, essays, short stories, screenplays, and poetry together while keeping cryptographic ownership of your manuscripts."
-                    </p>
-                    <p class="exo-hero-compliance">
-                        <strong>"Google APIs & Safety Compliance: "</strong>
-                        "Google Sign-In (openid, email, profile) is used strictly for authentication, and optional Google Drive access is used solely when you choose to back up your own Markdown documents. ExoNovel provides text authoring tools only—it does not generate images, video, or audio, does not train AI models on Google user data, and strictly prohibits using ExoNovel or connected Google APIs for AI-generated Non-Consensual Intimate Imagery (AI NCII)."
+                        {move || i18n.tr(
+                            "landing_lead",
+                            "ExoNovel (https://exonovel.exosystems.net) is a text-based collaborative creative writing and local-first publishing platform built for authors, co-writers, and literary teams. Draft novels, essays, short stories, screenplays, and poetry together while keeping cryptographic ownership of your manuscripts."
+                        )}
                     </p>
                     <div class="exo-landing-actions">
                         <button
@@ -1011,89 +1251,98 @@ fn PublicLandingView(
                             class="exo-btn exo-btn-primary"
                             on:click=move |_| on_open_signin()
                         >
-                            "Sign in to ExoNovel"
+                            {move || i18n.tr("landing_cta", "Sign in to ExoNovel")}
                         </button>
-                        <a href="/privacy" class="exo-landing-text-link">"Privacy Policy"</a>
-                        <a href="/terms" class="exo-landing-text-link">"Terms of Service"</a>
                     </div>
                 </section>
 
-                <section id="compliance" class="exo-compliance-panel">
-                    <h2 class="exo-h2">"Application Purpose, Google API Usage & Safety Compliance"</h2>
-                    <div class="exo-compliance-grid">
-                        <div class="exo-compliance-item">
-                            <h3>"01. Purpose of ExoNovel"</h3>
-                            <p>
-                                "ExoNovel is a text-based writing, story-planning, and publishing workspace. Authors organize character biographies, worldbuilding bibles, outlines, and chapters, collaborate with invited co-authors, and publish finished works."
-                            </p>
+                <section class="exo-carousel" aria-label=move || i18n.tr("landing_cap_aria", "Platform capabilities")>
+                    <div class="exo-carousel-head">
+                        <div class="exo-carousel-tabs" role="tablist">
+                            {slides.into_iter().enumerate().map(|(idx, (num, t_key, t_fb, _, _))| {
+                                view! {
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        aria-selected=move || if slide_idx.get() == idx { "true" } else { "false" }
+                                        class=move || if slide_idx.get() == idx {
+                                            "exo-carousel-tab exo-carousel-tab-active"
+                                        } else {
+                                            "exo-carousel-tab"
+                                        }
+                                        on:click=move |_| set_slide_idx.set(idx)
+                                    >
+                                        <span class="exo-mono">{num}</span>
+                                        <span class="exo-carousel-tab-title">{move || i18n.tr(t_key, t_fb)}</span>
+                                    </button>
+                                }
+                            }).collect_view()}
                         </div>
-                        <div class="exo-compliance-item">
-                            <h3>"02. Google Sign-In & Optional Drive Use"</h3>
-                            <p>
-                                "Google Sign-In (openid, email, and profile scopes) is used strictly to authenticate your ExoNovel account and resolve your portable did:peer identity. Optional Google Drive integration is requested only when you explicitly choose to back up or export your own Markdown documents to your Drive."
-                            </p>
-                        </div>
-                        <div class="exo-compliance-item">
-                            <h3>"03. Google APIs Terms & Zero AI NCII"</h3>
-                            <p>
-                                "ExoNovel complies with the Google APIs Terms of Service and the Google API Services User Data Policy (Limited Use). ExoNovel does not generate images, video, or audio, does not train AI models on Google user data, and strictly prohibits using ExoNovel or connected Google APIs for AI-generated Non-Consensual Intimate Imagery (AI NCII)."
-                            </p>
+                        <div class="exo-carousel-nav">
+                            <button
+                                type="button"
+                                class="exo-btn"
+                                style="min-height: 36px; padding: 0 12px; font-size: 15px;"
+                                aria-label=move || i18n.tr("landing_prev_slide", "Previous slide")
+                                on:click=move |_| set_slide_idx.update(|i| *i = (*i + 3) % 4)
+                            >
+                                "←"
+                            </button>
+                            <span class="exo-eyebrow tabular-nums" style="margin: 0; min-width: 44px; text-align: center;">
+                                {move || format!("{} / 4", slide_idx.get() + 1)}
+                            </span>
+                            <button
+                                type="button"
+                                class="exo-btn"
+                                style="min-height: 36px; padding: 0 12px; font-size: 15px;"
+                                aria-label=move || i18n.tr("landing_next_slide", "Next slide")
+                                on:click=move |_| set_slide_idx.update(|i| *i = (*i + 1) % 4)
+                            >
+                                "→"
+                            </button>
                         </div>
                     </div>
-                </section>
 
-                <section class="exo-bento-grid">
-                    <article class="exo-bento-card exo-bento-wide">
-                        <h3>"01. Individual Ownership in Shared Story Worlds"</h3>
-                        <p>
-                            "Every creative unit—character profiles, lore notes, plot beats, scenes, and chapters—is anchored to the author's cryptographic did:peer identity. Contributors can collaborate inside shared projects and permissioned forks without surrendering authorship or attribution."
-                        </p>
-                    </article>
-                    <article class="exo-bento-card">
-                        <h3>"02. Multi-Persona Pen Names"</h3>
-                        <p>
-                            "Writers manage distinct pen names and avatars under one verified account, switching active personas seamlessly across collaborative manuscripts and publishing channels."
-                        </p>
-                    </article>
-                    <article class="exo-bento-card">
-                        <h3>"03. Web & Local-First Sync"</h3>
-                        <p>
-                            "Work online in the browser backed by Neon PostgreSQL or synchronize end-to-end encrypted local workspaces across Linux, macOS, Windows, Android, and iOS."
-                        </p>
-                    </article>
-                    <article class="exo-bento-card exo-bento-wide">
-                        <h3>"04. User-Controlled Connected Apps & Revocation"</h3>
-                        <p>
-                            "External integrations such as Google Drive remain strictly optional and separated from primary sign-in. Users can inspect active permissions or disconnect and revoke provider tokens anytime from Settings without losing access to ExoNovel."
-                        </p>
-                    </article>
+                    {move || {
+                        let (num, t_key, t_fb, b_key, b_fb) = slides[slide_idx.get()];
+                        view! {
+                            <article class="exo-carousel-body">
+                                <div class="exo-eyebrow exo-mono">{num}</div>
+                                <h3>{move || i18n.tr(t_key, t_fb)}</h3>
+                                <p>{move || i18n.tr(b_key, b_fb)}</p>
+                            </article>
+                        }
+                    }}
                 </section>
 
                 <section id="formats" class="exo-card">
-                    <h2 class="exo-h2">"Supported Authoring & Publication Formats"</h2>
+                    <h2 class="exo-h2">{move || i18n.tr("landing_formats_title", "Supported Authoring & Publication Formats")}</h2>
                     <p class="exo-sub">
-                        "Structured planning dimensions and publication layouts tailored to five core writing disciplines."
+                        {move || i18n.tr(
+                            "landing_formats_sub",
+                            "Structured planning dimensions and publication layouts tailored to five core writing disciplines."
+                        )}
                     </p>
                     <div class="exo-format-grid">
                         <div class="exo-format-tile">
-                            <h3>"Novels"</h3>
-                            <p>"Story bibles, character arcs, worldbuilding rules, parts, chapters, and scenes."</p>
+                            <h3>{move || i18n.tr("format_novel_title", "Novels")}</h3>
+                            <p>{move || i18n.tr("format_novel_desc", "Story bibles, character arcs, worldbuilding rules, parts, chapters, and scenes.")}</p>
                         </div>
                         <div class="exo-format-tile">
-                            <h3>"Articles & Nonfiction"</h3>
-                            <p>"Thesis angles, structured section outlines, citations, and editorial drafts."</p>
+                            <h3>{move || i18n.tr("format_article_title", "Articles & Nonfiction")}</h3>
+                            <p>{move || i18n.tr("format_article_desc", "Thesis angles, structured section outlines, citations, and editorial drafts.")}</p>
                         </div>
                         <div class="exo-format-tile">
-                            <h3>"Short Stories"</h3>
-                            <p>"Compact single-conflict fiction, flash prose, and themed anthology sequencing."</p>
+                            <h3>{move || i18n.tr("format_short_title", "Short Stories")}</h3>
+                            <p>{move || i18n.tr("format_short_desc", "Compact single-conflict fiction, flash prose, and themed anthology sequencing.")}</p>
                         </div>
                         <div class="exo-format-tile">
-                            <h3>"Screenplays & Scripts"</h3>
-                            <p>"Loglines, treatments, beat cards, sluglines, action lines, and dialogue blocks."</p>
+                            <h3>{move || i18n.tr("format_screenplay_title", "Screenplays & Scripts")}</h3>
+                            <p>{move || i18n.tr("format_screenplay_desc", "Loglines, treatments, beat cards, sluglines, action lines, and dialogue blocks.")}</p>
                         </div>
                         <div class="exo-format-tile">
-                            <h3>"Poetry"</h3>
-                            <p>"Lineation-preserving verse, stanza craft, chapbooks, and full collections."</p>
+                            <h3>{move || i18n.tr("format_poetry_title", "Poetry")}</h3>
+                            <p>{move || i18n.tr("format_poetry_desc", "Lineation-preserving verse, stanza craft, chapbooks, and full collections.")}</p>
                         </div>
                     </div>
                 </section>
@@ -1110,6 +1359,7 @@ fn SignInView(
     on_back_home: impl Fn() + Copy + Send + Sync + 'static,
     on_signed_in: impl Fn() + Copy + Send + Sync + 'static,
 ) -> impl IntoView {
+    let i18n = use_i18n();
     let (is_signup, set_is_signup) = signal(false);
     let (name, set_name) = signal(String::new());
     let (email, set_email) = signal(String::new());
@@ -1190,6 +1440,7 @@ fn SignInView(
         let user_email = email.get_untracked().trim().to_string();
         let user_pass = password.get_untracked();
         let user_name = name.get_untracked().trim().to_string();
+        let auth_failed = i18n.tr_untracked("signin_auth_failed", "Authentication failed.");
 
         leptos::task::spawn_local(async move {
             let base = auth_url.trim_end_matches('/');
@@ -1215,7 +1466,7 @@ fn SignInView(
                         on_signed_in();
                         return;
                     }
-                    set_error_msg.set(Some(resp.text().await.unwrap_or_else(|_| "Authentication failed.".to_string())));
+                    set_error_msg.set(Some(resp.text().await.unwrap_or(auth_failed)));
                 }
             }
             set_submitting.set(false);
@@ -1231,41 +1482,58 @@ fn SignInView(
                         class="exo-btn"
                         on:click=move |_| on_back_home()
                     >
-                        "← Back to ExoNovel overview"
+                        {move || i18n.tr("signin_back_home", "← Back to ExoNovel overview")}
                     </button>
                 </div>
-                <h1>"Sign in to ExoNovel"</h1>
-                <p>"Authenticate to resolve your authoritative did:peer identity and open your workspace."</p>
+                <h1>{move || i18n.tr("signin_title", "Sign in to ExoNovel")}</h1>
+                <p>{move || i18n.tr("signin_subtitle", "Authenticate to resolve your authoritative did:peer identity and open your workspace.")}</p>
                 <Show when=move || loading_session.get()>
-                    <p class="exo-sub">"Checking existing session..."</p>
+                    <p class="exo-sub">{move || i18n.tr("signin_checking_session", "Checking existing session...")}</p>
                 </Show>
             </header>
 
             <div class="exo-auth-wrap">
                 {move || invite_preview.get().map(|inv| {
                     let av = inv.inviter_avatar_thumb_url.clone();
-                    let init = inv.inviter_display_name.chars().next().unwrap_or('W').to_uppercase().to_string();
-                    let detail = match inv.group_name {
-                        Some(g) => format!("{} invited you to join \"{g}\" on ExoNovel.", inv.inviter_display_name),
-                        None => format!("{} invited you to join ExoNovel.", inv.inviter_display_name),
-                    };
+                    let inviter_name = inv.inviter_display_name.clone();
+                    let group_name = inv.group_name.clone();
+                    let init = inviter_name.chars().next().unwrap_or('W').to_uppercase().to_string();
                     view! {
                         <div class="exo-invite-banner">
                             {if is_safe_avatar_url(&av) {
-                                view! { <img src=av alt="Inviter" class="exo-avatar-sm" /> }.into_any()
+                                view! { <img src=av alt=inviter_name.clone() class="exo-avatar-sm" /> }.into_any()
                             } else {
                                 view! { <div class="exo-avatar-sm">{init}</div> }.into_any()
                             }}
                             <div>
-                                <div style="font-weight: 700;">"Personal Invitation"</div>
-                                <div class="exo-sub" style="margin: 2px 0 0; color: var(--text);">{detail}</div>
+                                <div style="font-weight: 700;">{move || i18n.tr("signin_invite_badge", "Personal Invitation")}</div>
+                                <div class="exo-sub" style="margin: 2px 0 0; color: var(--text);">
+                                    {move || match &group_name {
+                                        Some(g) => format!(
+                                            "{} {} \"{g}\"",
+                                            inviter_name,
+                                            i18n.tr("signin_invited_group", "invited you to join this group on ExoNovel:")
+                                        ),
+                                        None => format!(
+                                            "{} {}",
+                                            inviter_name,
+                                            i18n.tr("signin_invited_platform", "invited you to join ExoNovel.")
+                                        ),
+                                    }}
+                                </div>
                             </div>
                         </div>
                     }
                 })}
 
                 <div class="exo-card">
-                    <h2 class="exo-h2">{move || if is_signup.get() { "Create account" } else { "Continue to ExoNovel" }}</h2>
+                    <h2 class="exo-h2">
+                        {move || if is_signup.get() {
+                            i18n.tr("signin_create_heading", "Create account")
+                        } else {
+                            i18n.tr("signin_continue_heading", "Continue to ExoNovel")
+                        }}
+                    </h2>
                     <div class="exo-social-grid">
                         <button type="button" class="exo-btn exo-btn-google" disabled=move || submitting.get() on:click=move |_| start_social("google")>
                             <GoogleLogoIcon />
@@ -1277,26 +1545,32 @@ fn SignInView(
                         </button>
                     </div>
 
-                    <div class="exo-divider">"or email"</div>
+                    <div class="exo-divider">{move || i18n.tr("signin_or_email", "or email")}</div>
                     {move || error_msg.get().map(|msg| view! { <div class="exo-alert-error">{msg}</div> })}
 
                     <form on:submit=submit_email>
                         <Show when=move || is_signup.get()>
                             <div class="exo-field">
-                                <label class="exo-label">"Name"</label>
+                                <label class="exo-label">{move || i18n.tr("signin_name_label", "Name")}</label>
                                 <input type="text" class="exo-input" prop:value=move || name.get() on:input=move |ev| set_name.set(event_target_value(&ev)) />
                             </div>
                         </Show>
                         <div class="exo-field">
-                            <label class="exo-label">"Email"</label>
+                            <label class="exo-label">{move || i18n.tr("signin_email_label", "Email")}</label>
                             <input type="email" class="exo-input" required=true prop:value=move || email.get() on:input=move |ev| set_email.set(event_target_value(&ev)) />
                         </div>
                         <div class="exo-field">
-                            <label class="exo-label">"Password"</label>
+                            <label class="exo-label">{move || i18n.tr("signin_password_label", "Password")}</label>
                             <input type="password" class="exo-input" required=true minlength="8" prop:value=move || password.get() on:input=move |ev| set_password.set(event_target_value(&ev)) />
                         </div>
                         <button type="submit" class="exo-btn exo-btn-primary" style="width: 100%;" disabled=move || submitting.get()>
-                            {move || if submitting.get() { "Authenticating..." } else if is_signup.get() { "Create account" } else { "Sign in" }}
+                            {move || if submitting.get() {
+                                i18n.tr("signin_authenticating", "Authenticating...")
+                            } else if is_signup.get() {
+                                i18n.tr("signin_create_btn", "Create account")
+                            } else {
+                                i18n.tr("signin_submit_btn", "Sign in")
+                            }}
                         </button>
                     </form>
 
@@ -1310,7 +1584,11 @@ fn SignInView(
                                 set_is_signup.update(|v| *v = !*v);
                             }
                         >
-                            {move || if is_signup.get() { "Already have an account? Sign in" } else { "Need an account? Create one" }}
+                            {move || if is_signup.get() {
+                                i18n.tr("signin_have_account", "Already have an account? Sign in")
+                            } else {
+                                i18n.tr("signin_need_account", "Need an account? Create one")
+                            }}
                         </button>
                     </div>
                 </div>
@@ -1321,13 +1599,14 @@ fn SignInView(
 
 #[component]
 fn PublicFooter() -> impl IntoView {
+    let i18n = use_i18n();
     view! {
         <footer class="exo-footer">
-            <span>"ExoNovel · Operated by Exosystems (exosystems.net)"</span>
+            <span>{move || i18n.tr("footer_operator", "ExoNovel · Operated by Exosystems (exosystems.net)")}</span>
             <div class="exo-footer-links">
-                <a href="/">"Home"</a>
-                <a href="/privacy">"Privacy Policy"</a>
-                <a href="/terms">"Terms of Service"</a>
+                <a href="/">{move || i18n.tr("nav_home", "Home")}</a>
+                <a href="/privacy">{move || i18n.tr("nav_privacy", "Privacy Policy")}</a>
+                <a href="/terms">{move || i18n.tr("nav_terms", "Terms of Service")}</a>
                 <a href="mailto:support@exosystems.net">"support@exosystems.net"</a>
             </div>
         </footer>
@@ -1336,120 +1615,199 @@ fn PublicFooter() -> impl IntoView {
 
 #[component]
 fn PrivacyPolicyView() -> impl IntoView {
+    let i18n = use_i18n();
+    let (mobile_nav_open, set_mobile_nav_open) = signal(false);
+
     view! {
         <div class="exo-shell">
-            <Title text="Privacy Policy — ExoNovel" />
+            <Title text=move || i18n.tr("privacy_page_title", "Privacy Policy — ExoNovel") />
             <nav class="navbar-solid">
                 <a href="/" title="ExoNovel" class="navbar-brand-link">
                     <img src="/exonovel-logo.png" alt="ExoNovel" class="navbar-logo navbar-logo-light" />
                     <img src="/exonovel-logo-dark.png" alt="ExoNovel" class="navbar-logo navbar-logo-dark" />
                 </a>
-                <div class="navbar-menu">
-                    <a href="/" class="nav-link">"Home"</a>
-                    <a href="/privacy" class="nav-link nav-link-active">"Privacy Policy"</a>
-                    <a href="/terms" class="nav-link">"Terms of Service"</a>
-                    <a href="/signin" class="exo-btn exo-btn-primary">"Sign in"</a>
+                <button
+                    type="button"
+                    class="navbar-mobile-toggle"
+                    aria-label=move || i18n.tr("nav_toggle_menu", "Toggle navigation menu")
+                    aria-expanded=move || if mobile_nav_open.get() { "true" } else { "false" }
+                    on:click=move |_| set_mobile_nav_open.update(|v| *v = !*v)
+                >
+                    {move || if mobile_nav_open.get() {
+                        view! { <CloseIcon /> }.into_any()
+                    } else {
+                        view! { <MenuIcon /> }.into_any()
+                    }}
+                </button>
+                <div class=move || if mobile_nav_open.get() { "navbar-menu navbar-menu-open" } else { "navbar-menu" }>
+                    <a href="/" class="nav-link">{move || i18n.tr("nav_home", "Home")}</a>
+                    <a href="/signin" class="exo-btn exo-btn-primary">{move || i18n.tr("nav_sign_in", "Sign in")}</a>
                 </div>
             </nav>
 
             <main class="page-main" style="max-width: 900px; margin: 0 auto;">
                 <div class="exo-card">
-                    <div class="exo-eyebrow">"Effective Date & Last Updated: November 24, 2026"</div>
-                    <h1 class="exo-h1" style="margin-top: 6px;">"ExoNovel Privacy Policy"</h1>
+                    <div class="exo-eyebrow">{move || i18n.tr("privacy_effective", "Effective Date & Last Updated: November 24, 2026")}</div>
+                    <h1 class="exo-h1" style="margin-top: 6px;">{move || i18n.tr("privacy_heading", "ExoNovel Privacy Policy")}</h1>
                     <p class="exo-legal-body">
-                        "ExoNovel (https://exonovel.exosystems.net) is a collaborative creative writing and local-first publishing platform operated by Exosystems (https://exosystems.net). This Privacy Policy describes how Exosystems collects, uses, stores, protects, and deletes personal data and Google user data when you use ExoNovel across the web application and companion client builds."
+                        {move || i18n.tr(
+                            "privacy_intro",
+                            "ExoNovel (https://exonovel.exosystems.net) is a collaborative creative writing and local-first publishing platform operated by Exosystems (https://exosystems.net). This Privacy Policy describes how Exosystems collects, uses, stores, protects, and deletes personal data and Google user data when you use ExoNovel across the web application and companion client builds."
+                        )}
                     </p>
 
-                    <h2 class="exo-h2" style="margin-top: 24px;">"1. Information We Collect"</h2>
+                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("privacy_s1_title", "1. Information We Collect")}</h2>
                     <p class="exo-legal-body">
-                        "We collect only the information needed to authenticate your account, operate your collaborative writing workspace, and deliver features you explicitly enable:"
-                    </p>
-                    <ul class="exo-legal-list">
-                        <li>
-                            <strong>"Google Sign-In Account Data (openid, email, profile): "</strong>
-                            "When you sign in with Google, we receive your verified email address, email verification status, display name, given and family name, profile picture URL, locale, and Google provider account identifier."
-                        </li>
-                        <li>
-                            <strong>"Optional Connected Google Drive Data: "</strong>
-                            "Primary sign-in never requests Google Drive permissions. Only if you explicitly connect Google Drive inside ExoNovel's Workspace or Settings does ExoNovel request Google Drive authorization to list folders, create or rename backup folders, upload your exported Markdown documentation/manuscript archives or session transcripts, and restore or trash files you select inside the Drive Workspace."
-                        </li>
-                        <li>
-                            <strong>"Other Sign-In & Author Profile Information: "</strong>
-                            "If you sign in with GitHub or email/password, or customize your workspace, we store your display name, pen name/handle, biography, website, location, preferred publication format, output and input language preferences, timezone, notification preferences, uploaded avatar images (processed server-side into 64px, 256px, and 1024px WebP/JPEG variants), and your cryptographic public key / did:peer identity."
-                        </li>
-                        <li>
-                            <strong>"Manuscripts & Collaboration Records: "</strong>
-                            "Creative works, story bibles, personas, collaboration group memberships, referrals, and invitations that you choose to create or share inside ExoNovel."
-                        </li>
-                        <li>
-                            <strong>"Security & Technical Diagnostics: "</strong>
-                            "Sign-in timestamps, IP address, browser User-Agent string, and application health/error logs used strictly to protect accounts against unauthorized access and keep the service reliable."
-                        </li>
-                    </ul>
-
-                    <h2 class="exo-h2" style="margin-top: 24px;">"2. Cookies & Browser Storage"</h2>
-                    <p class="exo-legal-body">
-                        "ExoNovel uses strictly necessary authentication cookies (HttpOnly session cookies managed through Neon Auth) to maintain your signed-in session, and temporary browser sessionStorage strictly to preserve pending collaboration invite codes across OAuth redirects. ExoNovel does not use third-party advertising cookies, behavioral tracking pixels, or cross-site ad networks."
-                    </p>
-
-                    <h2 class="exo-h2" style="margin-top: 24px;">"3. How We Use Your Information"</h2>
-                    <ul class="exo-legal-list">
-                        <li>"Authenticate your session and resolve your authoritative did:peer identity across Web, Desktop, and Mobile modes."</li>
-                        <li>"Display your chosen author persona, pen name, avatar, and language settings (including right-to-left layout preferences)."</li>
-                        <li>"Operate collaborative story groups, contributor attribution, and group/referral invitations you initiate."</li>
-                        <li>"Execute user-initiated backups or exports to your connected Google Drive workspace when you explicitly trigger them."</li>
-                        <li>"Deliver transactional, security, and notification emails you enable via Brevo (sent from notes@exosystems.net, noreply@exosystems.net, or support@exosystems.net)."</li>
-                        <li>"Prevent fraud, abuse, unauthorized access, and violations of our Terms of Service."</li>
-                    </ul>
-
-                    <h2 class="exo-h2" style="margin-top: 24px;">"4. Google API Services User Data Policy (Limited Use) & AI / Content Restrictions"</h2>
-                    <p class="exo-legal-body">
-                        "ExoNovel's use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements."
+                        {move || i18n.tr(
+                            "privacy_s1_intro",
+                            "We collect only the information needed to authenticate your account, operate your collaborative writing workspace, and deliver features you explicitly enable:"
+                        )}
                     </p>
                     <ul class="exo-legal-list">
                         <li>
-                            <strong>"No Advertising or Data Brokerage: "</strong>
-                            "We never sell, rent, or transfer Google user data or your writing content to data brokers, advertisers, or third-party marketing platforms."
+                            <strong>{move || i18n.tr("privacy_s1_google_label", "Google Sign-In Account Data (openid, email, profile): ")}</strong>
+                            " "
+                            {move || i18n.tr(
+                                "privacy_s1_google_body",
+                                "When you sign in with Google, we receive your verified email address, email verification status, display name, given and family name, profile picture URL, locale, and Google provider account identifier."
+                            )}
                         </li>
                         <li>
-                            <strong>"No Generalized AI Model Training: "</strong>
-                            "ExoNovel does not use Google user data, Google Drive files, or your private manuscripts to train generalized artificial intelligence or machine learning models."
+                            <strong>{move || i18n.tr("privacy_s1_drive_label", "Optional Connected Google Drive Data: ")}</strong>
+                            " "
+                            {move || i18n.tr(
+                                "privacy_s1_drive_body",
+                                "Primary sign-in never requests Google Drive permissions. Only if you explicitly connect Google Drive inside ExoNovel's Workspace or Settings does ExoNovel request Google Drive authorization to list folders, create or rename backup folders, upload your exported Markdown documentation/manuscript archives or session transcripts, and restore or trash files you select inside the Drive Workspace."
+                            )}
                         </li>
                         <li>
-                            <strong>"No Image Generation & Zero Tolerance for AI NCII: "</strong>
-                            "ExoNovel is a text-based writing and publishing platform. It does not generate images, video, or audio, and strictly prohibits using ExoNovel or any connected Google APIs for AI-generated Non-Consensual Intimate Imagery (AI NCII)."
+                            <strong>{move || i18n.tr("privacy_s1_profile_label", "Other Sign-In & Author Profile Information: ")}</strong>
+                            " "
+                            {move || i18n.tr(
+                                "privacy_s1_profile_body",
+                                "If you sign in with GitHub or email/password, or customize your workspace, we store your display name, pen name/handle, biography, website, location, preferred publication format, output and input language preferences, timezone, notification preferences, uploaded avatar images (processed server-side into 64px, 256px, and 1024px WebP/JPEG variants), and your cryptographic public key / did:peer identity."
+                            )}
                         </li>
                         <li>
-                            <strong>"Human Access Restrictions: "</strong>
-                            "Exosystems personnel do not read your private Google Drive files or private manuscripts unless (a) you explicitly grant consent for support debugging, (b) it is necessary for security or abuse investigation, or (c) it is required to comply with applicable law."
+                            <strong>{move || i18n.tr("privacy_s1_works_label", "Manuscripts & Collaboration Records: ")}</strong>
+                            " "
+                            {move || i18n.tr(
+                                "privacy_s1_works_body",
+                                "Creative works, story bibles, personas, collaboration group memberships, referrals, and invitations that you choose to create or share inside ExoNovel."
+                            )}
+                        </li>
+                        <li>
+                            <strong>{move || i18n.tr("privacy_s1_sec_label", "Security & Technical Diagnostics: ")}</strong>
+                            " "
+                            {move || i18n.tr(
+                                "privacy_s1_sec_body",
+                                "Sign-in timestamps, IP address, browser User-Agent string, and application health/error logs used strictly to protect accounts against unauthorized access and keep the service reliable."
+                            )}
                         </li>
                     </ul>
 
-                    <h2 class="exo-h2" style="margin-top: 24px;">"5. Data Storage, Subprocessors & Cryptographic Protection"</h2>
+                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("privacy_s2_title", "2. Cookies & Browser Storage")}</h2>
                     <p class="exo-legal-body">
-                        "All traffic to ExoNovel is encrypted in transit using HTTPS/TLS. Hosted web records and account state are stored in Neon PostgreSQL and Neon Managed Auth, hosted on Tencent Cloud application infrastructure, with email delivery handled by Brevo. When optional Connected External App offline tokens are stored server-side, they are envelope-encrypted via HashiCorp Vault Transit KMS and isolated from primary login credentials. On device-native installations using peer-to-peer Willow and iroh relay synchronization, payloads are end-to-end encrypted on your device so relay servers remain cryptographically blind to relayed content."
+                        {move || i18n.tr(
+                            "privacy_s2_body",
+                            "ExoNovel uses strictly necessary authentication cookies (HttpOnly session cookies managed through Neon Auth) to maintain your signed-in session, and temporary browser sessionStorage strictly to preserve pending collaboration invite codes across OAuth redirects. ExoNovel does not use third-party advertising cookies, behavioral tracking pixels, or cross-site ad networks."
+                        )}
                     </p>
 
-                    <h2 class="exo-h2" style="margin-top: 24px;">"6. How to Revoke Access, Export & Delete Your Data"</h2>
+                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("privacy_s3_title", "3. How We Use Your Information")}</h2>
+                    <ul class="exo-legal-list">
+                        <li>{move || i18n.tr("privacy_s3_li1", "Authenticate your session and resolve your authoritative did:peer identity across Web, Desktop, and Mobile modes.")}</li>
+                        <li>{move || i18n.tr("privacy_s3_li2", "Display your chosen author persona, pen name, avatar, and language settings (including right-to-left layout preferences).")}</li>
+                        <li>{move || i18n.tr("privacy_s3_li3", "Operate collaborative story groups, contributor attribution, and group/referral invitations you initiate.")}</li>
+                        <li>{move || i18n.tr("privacy_s3_li4", "Execute user-initiated backups or exports to your connected Google Drive workspace when you explicitly trigger them.")}</li>
+                        <li>{move || i18n.tr("privacy_s3_li5", "Deliver transactional, security, and notification emails you enable via Brevo (sent from notes@exosystems.net, noreply@exosystems.net, or support@exosystems.net).")}</li>
+                        <li>{move || i18n.tr("privacy_s3_li6", "Prevent fraud, abuse, unauthorized access, and violations of our Terms of Service.")}</li>
+                    </ul>
+
+                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("privacy_s4_title", "4. Google API Services User Data Policy (Limited Use) & AI / Content Restrictions")}</h2>
+                    <p class="exo-legal-body">
+                        {move || i18n.tr(
+                            "privacy_s4_intro",
+                            "ExoNovel's use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements."
+                        )}
+                    </p>
                     <ul class="exo-legal-list">
                         <li>
-                            <strong>"Disconnect & Revoke Google Access Anytime: "</strong>
-                            "You can disconnect Google Drive or other optional Connected Apps inside ExoNovel Settings -> Connected Apps (which revokes active tokens directly through https://oauth2.googleapis.com/revoke without closing your primary ExoNovel account), or revoke access anytime in your Google Account Permissions at https://myaccount.google.com/permissions."
+                            <strong>{move || i18n.tr("privacy_s4_li1_label", "No Advertising or Data Brokerage: ")}</strong>
+                            " "
+                            {move || i18n.tr(
+                                "privacy_s4_li1_body",
+                                "We never sell, rent, or transfer Google user data or your writing content to data brokers, advertisers, or third-party marketing platforms."
+                            )}
                         </li>
                         <li>
-                            <strong>"Export & Account Deletion Requests: "</strong>
-                            "You may request a complete export or permanent deletion of your ExoNovel account, Google OAuth profile metadata, personas, avatar assets, and hosted workspace records by emailing support@exosystems.net or exonomyapp@gmail.com. Verified deletion requests are completed within 30 days and remove active personal data from our hosted database and OAuth token store."
+                            <strong>{move || i18n.tr("privacy_s4_li2_label", "No Generalized AI Model Training: ")}</strong>
+                            " "
+                            {move || i18n.tr(
+                                "privacy_s4_li2_body",
+                                "ExoNovel does not use Google user data, Google Drive files, or your private manuscripts to train generalized artificial intelligence or machine learning models."
+                            )}
+                        </li>
+                        <li>
+                            <strong>{move || i18n.tr("privacy_s4_li3_label", "No Image Generation & Zero Tolerance for AI NCII: ")}</strong>
+                            " "
+                            {move || i18n.tr(
+                                "privacy_s4_li3_body",
+                                "ExoNovel is a text-based writing and publishing platform. It does not generate images, video, or audio, and strictly prohibits using ExoNovel or any connected Google APIs for AI-generated Non-Consensual Intimate Imagery (AI NCII)."
+                            )}
+                        </li>
+                        <li>
+                            <strong>{move || i18n.tr("privacy_s4_li4_label", "Human Access Restrictions: ")}</strong>
+                            " "
+                            {move || i18n.tr(
+                                "privacy_s4_li4_body",
+                                "Exosystems personnel do not read your private Google Drive files or private manuscripts unless (a) you explicitly grant consent for support debugging, (b) it is necessary for security or abuse investigation, or (c) it is required to comply with applicable law."
+                            )}
                         </li>
                     </ul>
 
-                    <h2 class="exo-h2" style="margin-top: 24px;">"7. Data Retention, Children's Privacy & Policy Updates"</h2>
+                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("privacy_s5_title", "5. Data Storage, Subprocessors & Cryptographic Protection")}</h2>
                     <p class="exo-legal-body">
-                        "We retain personal account data only as long as your account remains active or as necessary to fulfill security, billing, or legal obligations. ExoNovel is not directed to children under 13 (or under 16 where required by applicable regional data protection law), and we do not knowingly collect personal data from minors below the applicable age threshold. If we make material changes to this Privacy Policy, we will update the Effective Date above and notify active account holders where appropriate."
+                        {move || i18n.tr(
+                            "privacy_s5_body",
+                            "All traffic to ExoNovel is encrypted in transit using HTTPS/TLS. Hosted web records and account state are stored in Neon PostgreSQL and Neon Managed Auth, hosted on enterprise cloud application infrastructure, with email delivery handled by Brevo. When optional Connected External App offline tokens are stored server-side, they are envelope-encrypted via HashiCorp Vault Transit KMS and isolated from primary login credentials. On device-native installations using peer-to-peer Willow and iroh relay synchronization, payloads are end-to-end encrypted on your device so relay servers remain cryptographically blind to relayed content."
+                        )}
                     </p>
 
-                    <h2 class="exo-h2" style="margin-top: 24px;">"8. Contact Information"</h2>
+                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("privacy_s6_title", "6. How to Revoke Access, Export & Delete Your Data")}</h2>
+                    <ul class="exo-legal-list">
+                        <li>
+                            <strong>{move || i18n.tr("privacy_s6_li1_label", "Disconnect & Revoke Google Access Anytime: ")}</strong>
+                            " "
+                            {move || i18n.tr(
+                                "privacy_s6_li1_body",
+                                "You can disconnect Google Drive or other optional Connected Apps inside ExoNovel Settings -> Connected Apps (which revokes active tokens directly through https://oauth2.googleapis.com/revoke without closing your primary ExoNovel account), or revoke access anytime in your Google Account Permissions at https://myaccount.google.com/permissions."
+                            )}
+                        </li>
+                        <li>
+                            <strong>{move || i18n.tr("privacy_s6_li2_label", "Export & Account Deletion Requests: ")}</strong>
+                            " "
+                            {move || i18n.tr(
+                                "privacy_s6_li2_body",
+                                "You may request a complete export or permanent deletion of your ExoNovel account, Google OAuth profile metadata, personas, avatar assets, and hosted workspace records by emailing support@exosystems.net or exonomyapp@gmail.com. Verified deletion requests are completed within 30 days and remove active personal data from our hosted database and OAuth token store."
+                            )}
+                        </li>
+                    </ul>
+
+                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("privacy_s7_title", "7. Data Retention, Children's Privacy & Policy Updates")}</h2>
                     <p class="exo-legal-body">
-                        "For privacy questions, Google user data inquiries, or deletion requests, contact Exosystems Support at support@exosystems.net or exonomyapp@gmail.com."
+                        {move || i18n.tr(
+                            "privacy_s7_body",
+                            "We retain personal account data only as long as your account remains active or as necessary to fulfill security, billing, or legal obligations. ExoNovel is not directed to children under 13 (or under 16 where required by applicable regional data protection law), and we do not knowingly collect personal data from minors below the applicable age threshold. If we make material changes to this Privacy Policy, we will update the Effective Date above and notify active account holders where appropriate."
+                        )}
+                    </p>
+
+                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("privacy_s8_title", "8. Contact Information")}</h2>
+                    <p class="exo-legal-body">
+                        {move || i18n.tr(
+                            "privacy_s8_body",
+                            "For privacy questions, Google user data inquiries, or deletion requests, contact Exosystems Support at support@exosystems.net or exonomyapp@gmail.com."
+                        )}
                     </p>
                 </div>
             </main>
@@ -1461,63 +1819,103 @@ fn PrivacyPolicyView() -> impl IntoView {
 
 #[component]
 fn TermsOfServiceView() -> impl IntoView {
+    let i18n = use_i18n();
+    let (mobile_nav_open, set_mobile_nav_open) = signal(false);
+
     view! {
         <div class="exo-shell">
-            <Title text="Terms of Service — ExoNovel" />
+            <Title text=move || i18n.tr("terms_page_title", "Terms of Service — ExoNovel") />
             <nav class="navbar-solid">
                 <a href="/" title="ExoNovel" class="navbar-brand-link">
                     <img src="/exonovel-logo.png" alt="ExoNovel" class="navbar-logo navbar-logo-light" />
                     <img src="/exonovel-logo-dark.png" alt="ExoNovel" class="navbar-logo navbar-logo-dark" />
                 </a>
-                <div class="navbar-menu">
-                    <a href="/" class="nav-link">"Home"</a>
-                    <a href="/privacy" class="nav-link">"Privacy Policy"</a>
-                    <a href="/terms" class="nav-link nav-link-active">"Terms of Service"</a>
-                    <a href="/signin" class="exo-btn exo-btn-primary">"Sign in"</a>
+                <button
+                    type="button"
+                    class="navbar-mobile-toggle"
+                    aria-label=move || i18n.tr("nav_toggle_menu", "Toggle navigation menu")
+                    aria-expanded=move || if mobile_nav_open.get() { "true" } else { "false" }
+                    on:click=move |_| set_mobile_nav_open.update(|v| *v = !*v)
+                >
+                    {move || if mobile_nav_open.get() {
+                        view! { <CloseIcon /> }.into_any()
+                    } else {
+                        view! { <MenuIcon /> }.into_any()
+                    }}
+                </button>
+                <div class=move || if mobile_nav_open.get() { "navbar-menu navbar-menu-open" } else { "navbar-menu" }>
+                    <a href="/" class="nav-link">{move || i18n.tr("nav_home", "Home")}</a>
+                    <a href="/signin" class="exo-btn exo-btn-primary">{move || i18n.tr("nav_sign_in", "Sign in")}</a>
                 </div>
             </nav>
 
             <main class="page-main" style="max-width: 900px; margin: 0 auto;">
                 <div class="exo-card">
-                    <div class="exo-eyebrow">"Effective Date & Last Updated: November 24, 2026"</div>
-                    <h1 class="exo-h1" style="margin-top: 6px;">"ExoNovel Terms of Service"</h1>
+                    <div class="exo-eyebrow">{move || i18n.tr("terms_effective", "Effective Date & Last Updated: November 24, 2026")}</div>
+                    <h1 class="exo-h1" style="margin-top: 6px;">{move || i18n.tr("terms_heading", "ExoNovel Terms of Service")}</h1>
                     <p class="exo-legal-body">
-                        "By accessing or using ExoNovel (https://exonovel.exosystems.net), operated by Exosystems (https://exosystems.net), you agree to be bound by these Terms of Service and our Privacy Policy (/privacy)."
+                        {move || i18n.tr(
+                            "terms_intro",
+                            "By accessing or using ExoNovel (https://exonovel.exosystems.net), operated by Exosystems (https://exosystems.net), you agree to be bound by these Terms of Service and our Privacy Policy (/privacy)."
+                        )}
                     </p>
 
-                    <h2 class="exo-h2" style="margin-top: 24px;">"1. Ownership of Your Creative Works"</h2>
+                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("terms_s1_title", "1. Ownership of Your Creative Works")}</h2>
                     <p class="exo-legal-body">
-                        "You retain full ownership and copyright of all manuscripts, stories, characters, worldbuilding notes, scripts, poetry, annotations, and creative assets you write or publish on ExoNovel. You grant ExoNovel only the limited technical license necessary to store, render, synchronize, back up (when directed by you), and transmit your content according to your workspace and collaboration settings."
+                        {move || i18n.tr(
+                            "terms_s1_body",
+                            "You retain full ownership and copyright of all manuscripts, stories, characters, worldbuilding notes, scripts, poetry, annotations, and creative assets you write or publish on ExoNovel. You grant ExoNovel only the limited technical license necessary to store, render, synchronize, back up (when directed by you), and transmit your content according to your workspace and collaboration settings."
+                        )}
                     </p>
 
-                    <h2 class="exo-h2" style="margin-top: 24px;">"2. Accounts, Keys & Acceptable Use"</h2>
+                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("terms_s2_title", "2. Accounts, Keys & Acceptable Use")}</h2>
                     <p class="exo-legal-body">
-                        "You are responsible for safeguarding your login credentials and sovereign did:peer device keys. You must be at least 13 years old (or the minimum legal age in your jurisdiction) to create an account. You agree not to interfere with platform security, attempt unauthorized access to other users' workspaces, distribute malware, or send automated spam."
+                        {move || i18n.tr(
+                            "terms_s2_body",
+                            "You are responsible for safeguarding your login credentials and sovereign did:peer device keys. You must be at least 13 years old (or the minimum legal age in your jurisdiction) to create an account. You agree not to interfere with platform security, attempt unauthorized access to other users' workspaces, distribute malware, or send automated spam."
+                        )}
                     </p>
 
-                    <h2 class="exo-h2" style="margin-top: 24px;">"3. Prohibited Content & Google APIs Terms of Service Compliance"</h2>
+                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("terms_s3_title", "3. Prohibited Content & Google APIs Terms of Service Compliance")}</h2>
                     <p class="exo-legal-body">
-                        "ExoNovel is a text-focused collaborative creative writing platform and does not provide image, video, or audio generation tools. ExoNovel strictly complies with the Google APIs Terms of Service and enforces zero tolerance for harmful or unlawful content:"
+                        {move || i18n.tr(
+                            "terms_s3_intro",
+                            "ExoNovel is a text-focused collaborative creative writing platform and does not provide image, video, or audio generation tools. ExoNovel strictly complies with the Google APIs Terms of Service and enforces zero tolerance for harmful or unlawful content:"
+                        )}
                     </p>
                     <ul class="exo-legal-list">
                         <li>
-                            <strong>"Strict Prohibition on AI NCII: "</strong>
-                            "You may not use ExoNovel or any connected Google APIs (including Google Sign-In or Google Drive integrations) to create, host, upload, synchronize, distribute, or facilitate AI-generated Non-Consensual Intimate Imagery (AI NCII), non-consensual sexualized depictions, or deepfakes."
+                            <strong>{move || i18n.tr("terms_s3_li1_label", "Strict Prohibition on AI NCII: ")}</strong>
+                            " "
+                            {move || i18n.tr(
+                                "terms_s3_li1_body",
+                                "You may not use ExoNovel or any connected Google APIs (including Google Sign-In or Google Drive integrations) to create, host, upload, synchronize, distribute, or facilitate AI-generated Non-Consensual Intimate Imagery (AI NCII), non-consensual sexualized depictions, or deepfakes."
+                            )}
                         </li>
                         <li>
-                            <strong>"Unlawful & Abusive Material: "</strong>
-                            "Child sexual abuse material (CSAM), non-consensual intimate imagery, harassment, hate incitement, and copyright infringement are strictly prohibited and result in immediate account suspension and termination."
+                            <strong>{move || i18n.tr("terms_s3_li2_label", "Unlawful & Abusive Material: ")}</strong>
+                            " "
+                            {move || i18n.tr(
+                                "terms_s3_li2_body",
+                                "Child sexual abuse material (CSAM), non-consensual intimate imagery, harassment, hate incitement, and copyright infringement are strictly prohibited and result in immediate account suspension and termination."
+                            )}
                         </li>
                     </ul>
 
-                    <h2 class="exo-h2" style="margin-top: 24px;">"4. Connected External Apps (Google Drive & Third-Party Services)"</h2>
+                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("terms_s4_title", "4. Connected External Apps (Google Drive & Third-Party Services)")}</h2>
                     <p class="exo-legal-body">
-                        "Optional integrations such as Google Drive backup are activated only upon your explicit authorization and may be disconnected or revoked at any time in ExoNovel Settings -> Connected Apps or via your third-party provider's account security page. Your use of third-party services remains subject to their respective terms."
+                        {move || i18n.tr(
+                            "terms_s4_body",
+                            "Optional integrations such as Google Drive backup are activated only upon your explicit authorization and may be disconnected or revoked at any time in ExoNovel Settings -> Connected Apps or via your third-party provider's account security page. Your use of third-party services remains subject to their respective terms."
+                        )}
                     </p>
 
-                    <h2 class="exo-h2" style="margin-top: 24px;">"5. Service Modes, Availability & Contact"</h2>
+                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("terms_s5_title", "5. Service Modes, Availability & Contact")}</h2>
                     <p class="exo-legal-body">
-                        "ExoNovel provides hosted web collaboration, local-first device storage, and optional cloud-relay sync plans. Features are provided on an 'as available' basis as the platform evolves. For legal, safety, billing, or support inquiries, contact support@exosystems.net or exonomyapp@gmail.com."
+                        {move || i18n.tr(
+                            "terms_s5_body",
+                            "ExoNovel provides hosted web collaboration, local-first device storage, and optional cloud-relay sync plans. Features are provided on an 'as available' basis as the platform evolves. For legal, safety, billing, or support inquiries, contact support@exosystems.net or exonomyapp@gmail.com."
+                        )}
                     </p>
                 </div>
             </main>
