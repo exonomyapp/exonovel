@@ -1258,32 +1258,44 @@ fn PublicLandingView(
     let (slide_idx, set_slide_idx) = signal(0_usize);
     let slides = [
         (
-            "01",
+            "slide_1_tab",
+            "Your Writing, Your Rights",
             "slide_1_title",
-            "Individual Ownership in Shared Story Worlds",
-            "slide_1_body",
-            "Every creative unit—character profiles, lore notes, plot beats, scenes, and chapters—is anchored to the author's cryptographic did:peer identity. Contributors can collaborate inside shared projects and permissioned forks without surrendering authorship or attribution.",
+            "Create Together, But Remain the Owner of Each of Your Ideas",
+            "slide_1_p1",
+            "ExoNovel is a creative writing space where you can build stories on your own or team up with friends, co-writers, and writing groups in real time. Instead of losing track of who wrote what inside messy shared documents, every character profile, plot outline, timeline, theme, and scene remains clearly and securely credited to its creator, including the comments you make on the creations of others.",
+            "slide_1_p2",
+            "That means collaborating never costs you your work. You decide what remains private, what your group can edit together, and what other writers can borrow and remix into their own stories—with your entirely independent decentralized identity permanently attached to what you made.",
         ),
         (
-            "02",
+            "slide_2_tab",
+            "One Producer, Many Personas",
             "slide_2_title",
-            "Multi-Persona Pen Names",
-            "slide_2_body",
-            "Writers manage distinct pen names and avatars under one verified account, switching active personas seamlessly across collaborative manuscripts and publishing channels.",
+            "One Identity, as Many Personas as You Want",
+            "slide_2_p1",
+            "Writing a sci-fi story with friends, sharing poetry under a pen name, and drafting nonfiction under your real name shouldn't force you to juggle three separate accounts. ExoNovel supports creating many Personas—each with its own display name/handle, bio, and avatar, operating also as a content proxy (meaning that you can publish as your Persona), and with its own access to your community of readers and collaborators, so that you can even chat as your Persona about your own work and the work of others. ExoNovel creators need not disclose their true identity to the world, but may do so if they wish—all under one entirely independent login.",
+            "slide_2_p2",
+            "Switch personas instantly to switch to another Persona workspace, with its own projects, group chats, or genres. Collaborators and readers see the exact Persona display name you chose for each space, while everything you write across all of your Persona spaces remains safely organized and permanently legitimately yours, thanks to your Identity's securely decentralized P2P ID.",
         ),
         (
-            "03",
+            "slide_3_tab",
+            "Write, Wherever You Are",
             "slide_3_title",
-            "Write Online or Offline, Across Every Device",
-            "slide_3_body",
-            "Draft in your browser when you're online, or keep writing offline on our Linux, macOS, Windows, Android, and iOS apps. Using a device app never cuts you off from the web—switch seamlessly anytime or sync your encrypted drafts automatically.",
+            "Online and Offline, Sync All Your Devices",
+            "slide_3_p1",
+            "Create right in your browser whenever you're online, or continue writing without the web using our free Linux, macOS, Windows, Android, and iOS apps. Using our free apps can keep you in sync with your work from the web, and for a small monthly fee (or even a smaller annual fee), your online and local creations are always within reach, together in your one virtual writing home.",
+            "slide_3_p2",
+            "Start a scene on your phone on the go, polish a chapter on your laptop later, and manually sync your work, on demand, between offline devices and the web whenever you want—or activate our automatic sync so that every draft stays up to date across all your screens.",
         ),
         (
-            "04",
+            "slide_4_tab",
+            "Connect Your Way",
             "slide_4_title",
-            "Optional Connections, Zero Lock-In",
-            "slide_4_body",
-            "Keep your writing portable and on your terms. Link external storage or tools only when you want extra backups or quick exports, and disconnect anytime without losing access to your stories.",
+            "Connect Your Tools, Keep Total Freedom",
+            "slide_4_p1",
+            "Your writing shouldn't be trapped inside a single platform. Sign in the way you prefer, write in the formats that fit your project, and link external cloud storage, tools, and workflows for backups, quick exports, publishing, cross-platform projects, or whatever else your creative process needs.",
+            "slide_4_p2",
+            "Everything in ExoNovel works together without locking you in. Add connections whenever they help, combine tools as your projects grow, and disconnect any service anytime while enjoying full access to your account, personas, and creations.",
         ),
     ];
 
@@ -1295,15 +1307,22 @@ fn PublicLandingView(
                         {move || i18n.tr("landing_eyebrow", "ExoNovel · Web, Desktop & Mobile")}
                     </div>
                     <h1 class="exo-landing-title">
-                        {move || i18n.tr(
-                            "landing_title",
-                            "ExoNovel — Collaborative Creative Writing Where Authors Own Their Work"
-                        )}
+                        <span class="exo-landing-title-sub">
+                            {move || i18n.tr("landing_title_row1", "Collaborative Creative Writing")}
+                        </span>
+                        <span class="exo-landing-title-anchor">
+                            <span class="exo-landing-title-sub">
+                                {move || i18n.tr("landing_title_row2", "Where Authors Own Their Work")}
+                            </span>
+                            <span class="exo-landing-title-punch">
+                                {move || i18n.tr("landing_title_row3", "... by Design!")}
+                            </span>
+                        </span>
                     </h1>
                     <p class="exo-landing-lead">
                         {move || i18n.tr(
                             "landing_lead",
-                            "ExoNovel (https://exonovel.exosystems.net) is a text-based collaborative creative writing and local-first publishing platform built for authors, co-writers, and literary teams. Draft novels, essays, short stories, screenplays, and poetry together while keeping cryptographic ownership of your manuscripts."
+                            "ExoNovel is a collaborative creative writing and local-first publishing platform built for authors, co-writers, and literary teams. Draft novels, essays, short stories, screenplays, and poetry together while keeping cryptographic ownership of your manuscripts."
                         )}
                     </p>
                     <div class="exo-landing-actions">
@@ -1320,7 +1339,7 @@ fn PublicLandingView(
                 <section class="exo-carousel" aria-label=move || i18n.tr("landing_cap_aria", "Platform capabilities")>
                     <div class="exo-carousel-head">
                         <div class="exo-carousel-tabs" role="tablist">
-                            {slides.into_iter().enumerate().map(|(idx, (num, t_key, t_fb, _, _))| {
+                            {slides.into_iter().enumerate().map(|(idx, (tab_key, tab_fb, _, _, _, _, _, _))| {
                                 view! {
                                     <button
                                         type="button"
@@ -1333,11 +1352,35 @@ fn PublicLandingView(
                                         }
                                         on:click=move |_| set_slide_idx.set(idx)
                                     >
-                                        <span class="exo-mono">{num}</span>
-                                        <span class="exo-carousel-tab-title">{move || i18n.tr(t_key, t_fb)}</span>
+                                        <span class="exo-carousel-tab-title">{move || i18n.tr(tab_key, tab_fb)}</span>
                                     </button>
                                 }
                             }).collect_view()}
+                        </div>
+                        <div class="exo-carousel-select-wrap">
+                            <select
+                                class="exo-carousel-select"
+                                aria-label=move || i18n.tr("landing_cap_aria", "Platform capabilities")
+                                prop:value=move || slide_idx.get().to_string()
+                                on:change=move |ev| {
+                                    if let Ok(next) = event_target_value(&ev).parse::<usize>() {
+                                        if next < slides.len() {
+                                            set_slide_idx.set(next);
+                                        }
+                                    }
+                                }
+                            >
+                                {slides.into_iter().enumerate().map(|(idx, (tab_key, tab_fb, _, _, _, _, _, _))| {
+                                    view! {
+                                        <option
+                                            value=idx.to_string()
+                                            selected=move || slide_idx.get() == idx
+                                        >
+                                            {move || i18n.tr(tab_key, tab_fb)}
+                                        </option>
+                                    }
+                                }).collect_view()}
+                            </select>
                         </div>
                         <div class="exo-carousel-nav">
                             <button
@@ -1349,9 +1392,6 @@ fn PublicLandingView(
                             >
                                 "←"
                             </button>
-                            <span class="exo-eyebrow tabular-nums" style="margin: 0; min-width: 44px; text-align: center;">
-                                {move || format!("{} / 4", slide_idx.get() + 1)}
-                            </span>
                             <button
                                 type="button"
                                 class="exo-btn"
@@ -1365,12 +1405,12 @@ fn PublicLandingView(
                     </div>
 
                     {move || {
-                        let (num, t_key, t_fb, b_key, b_fb) = slides[slide_idx.get()];
+                        let (_, _, t_key, t_fb, p1_key, p1_fb, p2_key, p2_fb) = slides[slide_idx.get()];
                         view! {
                             <article class="exo-carousel-body">
-                                <div class="exo-eyebrow exo-mono">{num}</div>
                                 <h3>{move || i18n.tr(t_key, t_fb)}</h3>
-                                <p>{move || i18n.tr(b_key, b_fb)}</p>
+                                <p>{move || i18n.tr(p1_key, p1_fb)}</p>
+                                <p>{move || i18n.tr(p2_key, p2_fb)}</p>
                             </article>
                         }
                     }}
@@ -1404,6 +1444,33 @@ fn PublicLandingView(
                         <div class="exo-format-tile">
                             <h3>{move || i18n.tr("format_poetry_title", "Poetry")}</h3>
                             <p>{move || i18n.tr("format_poetry_desc", "Shape rhythm, stanzas, and line breaks that stay right where you put them—from a single poem to a full book.")}</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="modes" class="exo-card">
+                    <h2 class="exo-h2">{move || i18n.tr("landing_modes_title", "Choose How You Write and Sync")}</h2>
+                    <p class="exo-sub">
+                        {move || i18n.tr(
+                            "landing_modes_sub",
+                            "Start completely free in your browser and on your own devices—or turn on automatic encrypted sync monthly or annually to keep every screen united in one virtual writing home."
+                        )}
+                    </p>
+                    <div class="exo-grid-3">
+                        <div class="exo-format-tile">
+                            <div class="exo-eyebrow">{move || i18n.tr("mode_free_badge", "Free Forever")}</div>
+                            <h3>{move || i18n.tr("mode_free_title", "Web & Offline Device Apps")}</h3>
+                            <p>{move || i18n.tr("mode_free_desc", "Create, collaborate live, and publish right in your browser for free—plus download our free Linux, macOS, Windows, Android, and iOS apps to write offline and manually sync your drafts with the web on demand.")}</p>
+                        </div>
+                        <div class="exo-format-tile">
+                            <div class="exo-eyebrow">{move || i18n.tr("mode_monthly_badge", "Monthly Sync")}</div>
+                            <h3>{move || i18n.tr("mode_monthly_title", "Automatic Sync — $9 / month")}</h3>
+                            <p>{move || i18n.tr("mode_monthly_desc", "Keep your browser workspace and all offline devices continuously connected for a small monthly fee (local currency equivalent), uniting online and local creations automatically with end-to-end encryption.")}</p>
+                        </div>
+                        <div class="exo-format-tile">
+                            <div class="exo-eyebrow">{move || i18n.tr("mode_annual_badge", "Annual Sync")}</div>
+                            <h3>{move || i18n.tr("mode_annual_title", "Automatic Sync — $90 / year")}</h3>
+                            <p>{move || i18n.tr("mode_annual_desc", "Enjoy full automatic Web + Device sync at an even smaller monthly cost on the annual plan ($7.50/month effective rate in local currency equivalent—two months free compared to monthly).")}</p>
                         </div>
                     </div>
                 </section>
