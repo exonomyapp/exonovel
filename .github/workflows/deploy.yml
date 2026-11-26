@@ -77,6 +77,13 @@ jobs:
             cp "$BIN_PATH" deploy/exonovel-server
             chmod +x deploy/exonovel-server
             cp -r target/site deploy/site
+            for h in target/site/hash.txt target/hash.txt hash.txt; do
+              if [ -f "$h" ]; then
+                cp "$h" deploy/hash.txt
+                cp "$h" deploy/site/hash.txt
+                break
+              fi
+            done
             cp -r docs deploy/docs
             cp AGENTS.md deploy/AGENTS.md
           } 2>&1 | tee -a /tmp/ci-build.log
@@ -171,6 +178,9 @@ jobs:
             sudo cp /tmp/exonovel-incoming/exonovel-server /opt/exonovel/exonovel-server
             sudo chmod +x /opt/exonovel/exonovel-server
             sudo cp -r /tmp/exonovel-incoming/site /opt/exonovel/site
+            if [ -f /tmp/exonovel-incoming/hash.txt ]; then
+              sudo cp /tmp/exonovel-incoming/hash.txt /opt/exonovel/hash.txt
+            fi
             sudo cp -r /tmp/exonovel-incoming/docs /opt/exonovel/docs
             sudo cp /tmp/exonovel-incoming/AGENTS.md /opt/exonovel/AGENTS.md
             sudo rm -rf /tmp/exonovel-incoming
@@ -216,6 +226,8 @@ jobs:
             Environment=LEPTOS_SITE_ROOT=/opt/exonovel/site
             Environment=LEPTOS_SITE_PKG_DIR=pkg
             Environment=LEPTOS_OUTPUT_NAME=exonovel
+            Environment=LEPTOS_HASH_FILES=true
+            Environment=LEPTOS_HASH_FILE_NAME=hash.txt
             EnvironmentFile=-/opt/exonovel/env
             ExecStart=/opt/exonovel/exonovel-server
             Restart=always

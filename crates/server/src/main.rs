@@ -15,6 +15,7 @@ use std::{fs, path::PathBuf};
 use axum::{
     extract::{DefaultBodyLimit, FromRef, Path, Query, State},
     http::{header, HeaderValue, StatusCode},
+    middleware,
     response::IntoResponse,
     routing::{get, post, put},
     Json, Router,
@@ -22,7 +23,7 @@ use axum::{
 use exonovel_app::App;
 use leptos::prelude::*;
 use leptos_axum::{generate_route_list, LeptosRoutes};
-use leptos_meta::MetaTags;
+use leptos_meta::{HashedStylesheet, MetaTags};
 use serde::Deserialize;
 use sqlx::PgPool;
 
@@ -211,6 +212,7 @@ async fn main() {
             move || shell(options.clone())
         })
         .fallback(leptos_axum::file_and_error_handler::<AppState, _>(shell))
+        .layer(middleware::from_fn(cache_control_headers))
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(&addr)
@@ -220,6 +222,30 @@ async fn main() {
     axum::serve(listener, app.into_make_service())
         .await
         .expect("Server error");
+}
+
+async fn cache_control_headers(
+    req: axum::extract::Request,
+    next: middleware::Next,
+) -> axum::response::Response {
+    let path = req.uri().path().to_string();
+    let mut res = next.run(req).await;
+    if !res.headers().contains_key(header::CACHE_CONTROL) {
+        if path.starts_with("/pkg/") {
+            res.headers_mut().insert(
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("public, max-age=31536000, immutable"),
+            );
+        } else if let Some(ct) = res.headers().get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()) {
+            if ct.contains("text/html") {
+                res.headers_mut().insert(
+                    header::CACHE_CONTROL,
+                    HeaderValue::from_static("no-cache, no-store, must-revalidate"),
+                );
+            }
+        }
+    }
+    res
 }
 
 fn shell(options: LeptosOptions) -> impl IntoView {
@@ -242,7 +268,7 @@ fn shell(options: LeptosOptions) -> impl IntoView {
                 <AutoReload options=options.clone() />
                 <HydrationScripts options=options.clone() />
                 <link rel="icon" type="image/png" href="/exonovel-symbol.png" />
-                <link rel="stylesheet" id="leptos" href="/pkg/exonovel.css" />
+                <HashedStylesheet id="leptos" options=options.clone() />
                 <MetaTags />
             </head>
             <body>

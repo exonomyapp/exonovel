@@ -1256,6 +1256,7 @@ fn PublicLandingView(
 ) -> impl IntoView {
     let i18n = use_i18n();
     let (slide_idx, set_slide_idx) = signal(0_usize);
+    let (card_menu_open, set_card_menu_open) = signal(false);
     let slides = [
         (
             "slide_1_tab",
@@ -1350,37 +1351,62 @@ fn PublicLandingView(
                                         } else {
                                             "exo-carousel-tab"
                                         }
-                                        on:click=move |_| set_slide_idx.set(idx)
+                                        on:click=move |_| {
+                                            set_card_menu_open.set(false);
+                                            set_slide_idx.set(idx);
+                                        }
                                     >
                                         <span class="exo-carousel-tab-title">{move || i18n.tr(tab_key, tab_fb)}</span>
                                     </button>
                                 }
                             }).collect_view()}
                         </div>
-                        <div class="exo-carousel-select-wrap">
-                            <select
-                                class="exo-carousel-select"
+                        <div class="exo-carousel-dropdown-wrap">
+                            <Show when=move || card_menu_open.get()>
+                                <div
+                                    class="exo-nav-backdrop"
+                                    on:click=move |_| set_card_menu_open.set(false)
+                                />
+                            </Show>
+                            <button
+                                type="button"
+                                class="exo-carousel-dropdown-trigger"
+                                aria-haspopup="menu"
+                                aria-expanded=move || if card_menu_open.get() { "true" } else { "false" }
                                 aria-label=move || i18n.tr("landing_cap_aria", "Platform capabilities")
-                                prop:value=move || slide_idx.get().to_string()
-                                on:change=move |ev| {
-                                    if let Ok(next) = event_target_value(&ev).parse::<usize>() {
-                                        if next < slides.len() {
-                                            set_slide_idx.set(next);
-                                        }
-                                    }
-                                }
+                                on:click=move |_| set_card_menu_open.update(|v| *v = !*v)
                             >
-                                {slides.into_iter().enumerate().map(|(idx, (tab_key, tab_fb, _, _, _, _, _, _))| {
-                                    view! {
-                                        <option
-                                            value=idx.to_string()
-                                            selected=move || slide_idx.get() == idx
-                                        >
-                                            {move || i18n.tr(tab_key, tab_fb)}
-                                        </option>
-                                    }
-                                }).collect_view()}
-                            </select>
+                                <span class="exo-carousel-dropdown-label">
+                                    {move || {
+                                        let (tab_key, tab_fb, _, _, _, _, _, _) = slides[slide_idx.get()];
+                                        i18n.tr(tab_key, tab_fb)
+                                    }}
+                                </span>
+                                <span class="exo-carousel-dropdown-caret" aria-hidden="true">"▾"</span>
+                            </button>
+                            <Show when=move || card_menu_open.get()>
+                                <div class="exo-carousel-dropdown-menu" role="menu">
+                                    {slides.into_iter().enumerate().map(|(idx, (tab_key, tab_fb, _, _, _, _, _, _))| {
+                                        view! {
+                                            <button
+                                                type="button"
+                                                role="menuitem"
+                                                class=move || if slide_idx.get() == idx {
+                                                    "exo-chip-menu-item exo-chip-menu-item-active"
+                                                } else {
+                                                    "exo-chip-menu-item"
+                                                }
+                                                on:click=move |_| {
+                                                    set_slide_idx.set(idx);
+                                                    set_card_menu_open.set(false);
+                                                }
+                                            >
+                                                <span>{move || i18n.tr(tab_key, tab_fb)}</span>
+                                            </button>
+                                        }
+                                    }).collect_view()}
+                                </div>
+                            </Show>
                         </div>
                         <div class="exo-carousel-nav">
                             <button
@@ -1388,7 +1414,10 @@ fn PublicLandingView(
                                 class="exo-btn"
                                 style="min-height: 36px; padding: 0 12px; font-size: 15px;"
                                 aria-label=move || i18n.tr("landing_prev_slide", "Previous slide")
-                                on:click=move |_| set_slide_idx.update(|i| *i = (*i + 3) % 4)
+                                on:click=move |_| {
+                                    set_card_menu_open.set(false);
+                                    set_slide_idx.update(|i| *i = (*i + 3) % 4);
+                                }
                             >
                                 "←"
                             </button>
@@ -1397,7 +1426,10 @@ fn PublicLandingView(
                                 class="exo-btn"
                                 style="min-height: 36px; padding: 0 12px; font-size: 15px;"
                                 aria-label=move || i18n.tr("landing_next_slide", "Next slide")
-                                on:click=move |_| set_slide_idx.update(|i| *i = (*i + 1) % 4)
+                                on:click=move |_| {
+                                    set_card_menu_open.set(false);
+                                    set_slide_idx.update(|i| *i = (*i + 1) % 4);
+                                }
                             >
                                 "→"
                             </button>

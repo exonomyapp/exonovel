@@ -16,6 +16,7 @@
 
 ## 2. Recent Verified Commits Pushed to `exonomyapp/exonovel@main`
 
+- **`b69ce5cf` (2026-11-26)** — `feat(home): refine hero layout, 4 educational cards, 3 sync modes & mobile logo`: Updated homepage copy, 4 educational panels, 3 sync modes (`Free` / `Monthly` / `Annual`), 3-row hero structure, and `45px` mobile logo height in CSS.
 - **`a39b9949` (2026-11-26)** — `fix(style): restore mobile navbar logo size to 30px`: Scoped mobile navbar logo sizing inside `@media (max-width: 768px)` back to `30px` while keeping desktop `.navbar-logo` at 2x (`clamp(64px, 7.2vw, 80px)`).
 - **`bf21f6f0` (2026-11-26)** — `feat(home): refine homepage copy, remove nav links, and double navbar logo`: Removed `Overview` and `Formats` links from the unauthenticated navbar, doubled the navbar logo size, and synced initial EN/DE/PL homepage copy in `crates/app/src/lib.rs` and `crates/server/src/i18n.rs`.
 - **`91ebb436` (2026-11-26)** — `fix(app): clone chip_name before view! move in user chip`: Resolved Leptos closure move ownership compile error in the authenticated user chip.
@@ -26,24 +27,14 @@
 
 ## 3. Staged Work in Progress (Ready to Push to `exonomyapp/exonovel@main`)
 
-Changes staged across `crates/app/src/lib.rs`, `crates/server/src/i18n.rs`, `style/main.css`, and `docs/session.md`:
+Changes staged across `Cargo.toml`, `.github/workflows/deploy.yml`, `crates/server/src/main.rs`, `crates/app/src/lib.rs`, `style/main.css`, and `docs/session.md`:
 
-1. **Top Hero Copy & 3-Row Display Alignment (`crates/app/src/lib.rs`, `style/main.css`, `crates/server/src/i18n.rs`)**:
-   - Removed `"ExoNovel —"`, `"(https://exonovel.exosystems.net)"`, and `"text-based"` from the hero section.
-   - Structured `<h1 class="exo-landing-title">` on three explicit rows (`Collaborative Creative Writing` / `Where Authors Own Their Work` at `2/3` scale, followed by `... by Design!` at full headline scale right-aligned flush with `"Work"` directly above it).
-2. **4-Card Educational Panel Overhaul (`crates/app/src/lib.rs`, `style/main.css`, `crates/server/src/i18n.rs`)**:
-   - Removed `"01"`–`"04"` numbering from tabs and card headers, removed `"2 / 4"` counter between arrows, placed looping `←` / `→` controls cleanly at the end of the tab strip on desktop, and replaced wrapping mobile tabs (`@media (max-width: 768px)`) with a single-row `<select>` card selector synced bidirectionally with the `←` / `→` controls.
-   - Updated all 4 panels into approachable, explanatory two-paragraph educational copy covering:
-     1. *Your Writing, Your Rights* (shared creative worlds, credited comments, private/group control, decentralized identity ownership).
-     2. *One Producer, Many Personas* (content-proxy Personas, anonymous or open publishing/chatting, isolated Persona workspaces under one independent P2P identity).
-     3. *Write, Wherever You Are* (free browser + free native desktop/mobile apps, on-demand manual sync vs. automatic sync for a small monthly or smaller annual fee).
-     4. *Connect Your Way* (AOTA open connections without lock-in).
-3. **New 3-Mode Section Below Formats (`crates/app/src/lib.rs`, `crates/server/src/i18n.rs`)**:
-   - Added `#modes` (`Choose How You Write and Sync`) below `#formats` (`Pick Your Format. Start Creating.`) presenting the **Free** (`Web & Offline Device Apps`), **Monthly** (`$9 / month` automatic encrypted sync), and **Annual** (`$90 / year` — `$7.50/month` effective rate) options in local currency equivalent, aligned with ADRs `002-data.md` / `004-pay.md` and Slide 3.
-4. **Mobile Navbar Logo Sizing (+50% on Mobile Only, `style/main.css`)**:
-   - Increased `@media (max-width: 768px) .navbar-logo` height by 50% (`30px -> 45px`, mobile dropdown sheet `top: 68px`), leaving desktop `.navbar-logo` (`clamp(64px, 7.2vw, 80px)`) untouched.
-5. **Multilingual Sync (`crates/server/src/i18n.rs`)**:
-   - Synchronized English (`_`), Polish (`pl`), and German (`de`) Fluent catalogs for all added and modified landing keys.
+1. **Content-Hashed CSS/JS/WASM Delivery (`Cargo.toml`, `.github/workflows/deploy.yml`, `crates/server/src/main.rs`)**:
+   - Enabled `hash-files = true` (`hash-file-name = "hash.txt"`), switched the server shell to `<HashedStylesheet id="leptos" options=options.clone() />`, packaged `hash.txt` with `LEPTOS_HASH_FILES=true` in `systemd`, and set `no-cache` on dynamic SSR HTML + immutable caching on `/pkg/*` so browsers never execute stale cached WASM or CSS against updated HTML (which previously broke hydration and button click handlers).
+2. **Custom ExoNovel-Themed Mobile Card Dropdown (`crates/app/src/lib.rs`, `style/main.css`)**:
+   - Replaced the native OS `<select>` picker with an in-page themed dropdown menu (`.exo-carousel-dropdown-trigger` + `.exo-carousel-dropdown-menu`) styled cleanly in ExoNovel's light/dark theme tokens, keeping `←` / `→` arrows bidirectionally synced while leaving desktop tabs untouched.
+3. **Hero Title Font Proportions Across Viewports (`style/main.css`)**:
+   - Adjusted mobile hero title clamping (`clamp(27px, 7.2vw, 38px)`) and hero padding (`22px 18px`) inside `@media (max-width: 768px)` alongside desktop (`clamp(38px, 4vw, 54px)`), ensuring rows 1 & 2 stay 1/3 smaller than `... by Design!` without dropping below body copy size.
 
 ---
 
