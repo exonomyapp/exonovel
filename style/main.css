@@ -1590,9 +1590,7 @@ html[data-appearance="dark"] .exo-btn-google {
     gap: 8px;
   }
   .navbar-logo {
-    height: clamp(48px, 14vw, 60px);
-    width: auto;
-    max-width: 58vw;
+    height: 30px;
   }
   .navbar-menu {
     display: flex;
@@ -1641,12 +1639,12 @@ html[data-appearance="dark"] .exo-btn-google {
   .navbar-menu .exo-lang-menu,
   .navbar-menu .exo-bell-menu {
     position: fixed;
-    top: 78px;
+    top: 62px;
     inset-inline: 12px;
     width: auto;
     min-width: 0;
     max-width: none;
-    max-height: calc(100dvh - 92px);
+    max-height: calc(100dvh - 76px);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     margin-top: 0;
