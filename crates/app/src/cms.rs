@@ -726,8 +726,8 @@ pub fn DocsCmsView(
         let auto_expand = !search_query.get().trim().is_empty() || status_filter.get() != "all";
         let mut root = FolderDir::default();
         for adr in list {
-            let parts: Vec<&str> = adr
-                .rel_path
+            let rel_path_owned = adr.rel_path.clone();
+            let parts: Vec<&str> = rel_path_owned
                 .split('/')
                 .filter(|s| !s.is_empty())
                 .collect();

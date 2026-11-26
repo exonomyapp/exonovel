@@ -19,6 +19,7 @@ jobs:
     permissions:
       contents: read
       checks: write
+      actions: read
     defaults:
       run:
         shell: bash -eo pipefail {0}
@@ -86,7 +87,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ ! -f /tmp/ci-build.log ]; then
+          if [ ! -s /tmp/ci-build.log ]; then
+            JOB_ID=$(gh api "/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" --jq '.jobs[] | select(.name == "Build & Package ExoNovel (Leptos 0.8)") | .id' | head -n 1 || true)
+            if [ -n "${JOB_ID:-}" ]; then
+              gh api "/repos/${{ github.repository }}/actions/jobs/${JOB_ID}/logs" > /tmp/ci-build.log 2>&1 || true
+            fi
+          fi
+          if [ ! -s /tmp/ci-build.log ]; then
             echo "No build log captured." > /tmp/ci-build.log
           fi
           {
@@ -127,6 +134,10 @@ jobs:
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      actions: read
 
     steps:
       - name: Download finished package artifact
@@ -229,3 +240,41 @@ jobs:
             echo "ExoNovel failed to answer cleanly on 127.0.0.1:3001."
             sudo journalctl -u exonovel -n 40 --no-pager || true
             exit 1
+
+      - name: Publish deploy failure diagnostic log to public Check Run and Summary
+        if: failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          JOB_ID=$(gh api "/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" --jq '.jobs[] | select(.name == "Deploy Finished ExoNovel Package to Production") | .id' | head -n 1 || true)
+          if [ -n "${JOB_ID:-}" ]; then
+            gh api "/repos/${{ github.repository }}/actions/jobs/${JOB_ID}/logs" > /tmp/ci-deploy.log 2>&1 || true
+          fi
+          if [ ! -s /tmp/ci-deploy.log ]; then
+            echo "Deploy failed before job log retrieval." > /tmp/ci-deploy.log
+          fi
+          {
+            echo "### ExoNovel Deploy Failure Diagnostic Log"
+            echo '```text'
+            tail -n 150 /tmp/ci-deploy.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          python3 - <<'PY' | gh api --method POST "/repos/${{ github.repository }}/check-runs" --input -
+          import json, pathlib
+          raw = pathlib.Path("/tmp/ci-deploy.log").read_text(errors="replace")
+          tail = raw[-58000:] if len(raw) > 58000 else raw
+          payload = {
+              "name": "ExoNovel Deploy Failure Diagnostic",
+              "head_sha": "${{ github.sha }}",
+              "status": "completed",
+              "conclusion": "failure",
+              "output": {
+                  "title": "Production Deploy / Service Startup Failure Log",
+                  "summary": "Captured SSH/systemd deployment failure output for automated diagnostic review.",
+                  "text": "```text\n" + tail + "\n```"
+              }
+          }
+          print(json.dumps(payload))
+          PY
