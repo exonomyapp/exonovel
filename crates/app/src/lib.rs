@@ -969,22 +969,6 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                         }
                         None => view! {
                             <>
-                                <div class="exo-desktop-nav-links">
-                                    <a
-                                        href="/#overview"
-                                        class="nav-link"
-                                        on:click=move |_| set_show_signin.set(false)
-                                    >
-                                        {move || i18n.tr("nav_overview", "Overview")}
-                                    </a>
-                                    <a
-                                        href="/#formats"
-                                        class="nav-link"
-                                        on:click=move |_| set_show_signin.set(false)
-                                    >
-                                        {move || i18n.tr("nav_formats", "Formats")}
-                                    </a>
-                                </div>
                                 <button
                                     type="button"
                                     class="exo-btn exo-btn-primary"
@@ -1290,16 +1274,16 @@ fn PublicLandingView(
         (
             "03",
             "slide_3_title",
-            "Web & Local-First Sync",
+            "Write Online or Offline, Across Every Device",
             "slide_3_body",
-            "Work online in the browser backed by managed PostgreSQL or synchronize end-to-end encrypted local workspaces across Linux, macOS, Windows, Android, and iOS.",
+            "Draft in your browser when you're online, or keep writing offline on our Linux, macOS, Windows, Android, and iOS apps. Using a device app never cuts you off from the web—switch seamlessly anytime or sync your encrypted drafts automatically.",
         ),
         (
             "04",
             "slide_4_title",
-            "User-Controlled Connected Apps & Revocation",
+            "Optional Connections, Zero Lock-In",
             "slide_4_body",
-            "External integrations such as Google Drive remain strictly optional and separated from primary sign-in. Users can inspect active permissions or disconnect and revoke provider tokens anytime from Preferences without losing access to ExoNovel.",
+            "Keep your writing portable and on your terms. Link external storage or tools only when you want extra backups or quick exports, and disconnect anytime without losing access to your stories.",
         ),
     ];
 
@@ -1393,33 +1377,33 @@ fn PublicLandingView(
                 </section>
 
                 <section id="formats" class="exo-card">
-                    <h2 class="exo-h2">{move || i18n.tr("landing_formats_title", "Supported Authoring & Publication Formats")}</h2>
+                    <h2 class="exo-h2">{move || i18n.tr("landing_formats_title", "Pick Your Format. Start Creating.")}</h2>
                     <p class="exo-sub">
                         {move || i18n.tr(
                             "landing_formats_sub",
-                            "Structured planning dimensions and publication layouts tailored to five core writing disciplines."
+                            "Whether you're writing a novel for fun, drafting a class essay, or scripting a short film, start with a clean layout built for the way you create."
                         )}
                     </p>
                     <div class="exo-format-grid">
                         <div class="exo-format-tile">
                             <h3>{move || i18n.tr("format_novel_title", "Novels")}</h3>
-                            <p>{move || i18n.tr("format_novel_desc", "Story bibles, character arcs, worldbuilding rules, parts, chapters, and scenes.")}</p>
+                            <p>{move || i18n.tr("format_novel_desc", "Build entire worlds from scratch. Organize characters, plot twists, and chapters in one place so big stories never get messy.")}</p>
                         </div>
                         <div class="exo-format-tile">
                             <h3>{move || i18n.tr("format_article_title", "Articles & Nonfiction")}</h3>
-                            <p>{move || i18n.tr("format_article_desc", "Thesis angles, structured section outlines, citations, and editorial drafts.")}</p>
+                            <p>{move || i18n.tr("format_article_desc", "Turn ideas and research into sharp essays, blog posts, or school papers with clear outlines and neat sources.")}</p>
                         </div>
                         <div class="exo-format-tile">
                             <h3>{move || i18n.tr("format_short_title", "Short Stories")}</h3>
-                            <p>{move || i18n.tr("format_short_desc", "Compact single-conflict fiction, flash prose, and themed anthology sequencing.")}</p>
+                            <p>{move || i18n.tr("format_short_desc", "Nail the hook, the twist, and the ending—great for flash fiction, standalone stories, or your own story collection.")}</p>
                         </div>
                         <div class="exo-format-tile">
                             <h3>{move || i18n.tr("format_screenplay_title", "Screenplays & Scripts")}</h3>
-                            <p>{move || i18n.tr("format_screenplay_desc", "Loglines, treatments, beat cards, sluglines, action lines, and dialogue blocks.")}</p>
+                            <p>{move || i18n.tr("format_screenplay_desc", "Write scenes and dialogue that look like real movie or video scripts, formatted cleanly as you type.")}</p>
                         </div>
                         <div class="exo-format-tile">
                             <h3>{move || i18n.tr("format_poetry_title", "Poetry")}</h3>
-                            <p>{move || i18n.tr("format_poetry_desc", "Lineation-preserving verse, stanza craft, chapbooks, and full collections.")}</p>
+                            <p>{move || i18n.tr("format_poetry_desc", "Shape rhythm, stanzas, and line breaks that stay right where you put them—from a single poem to a full book.")}</p>
                         </div>
                     </div>
                 </section>
