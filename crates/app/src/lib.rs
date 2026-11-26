@@ -569,6 +569,8 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                             let can_read_docs = user.authorized;
                             let active_p = active_persona_for_user(&user);
                             let chip_name = display_name_for_user(&user);
+                            let chip_aria = chip_name.clone();
+                            let chip_alt = chip_name.clone();
                             let chip_avatar = if !active_p.avatar_thumb_url.is_empty() {
                                 active_p.avatar_thumb_url.clone()
                             } else {
@@ -802,7 +804,7 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                         <button
                                             type="button"
                                             class="exo-user-chip"
-                                            aria-label=chip_name.clone()
+                                            aria-label=chip_aria
                                             aria-expanded=move || if chip_open.get() { "true" } else { "false" }
                                             on:click=move |_| {
                                                 set_bell_open.set(false);
@@ -811,7 +813,7 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                             }
                                         >
                                             {if is_safe_avatar_url(&chip_avatar) {
-                                                view! { <img src=chip_avatar alt=chip_name.clone() class="exo-avatar-sm" /> }.into_any()
+                                                view! { <img src=chip_avatar alt=chip_alt class="exo-avatar-sm" /> }.into_any()
                                             } else {
                                                 view! { <div class="exo-avatar-sm">{chip_initial}</div> }.into_any()
                                             }}
