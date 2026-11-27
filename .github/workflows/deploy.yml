@@ -77,13 +77,21 @@ jobs:
             cp "$BIN_PATH" deploy/exonovel-server
             chmod +x deploy/exonovel-server
             cp -r target/site deploy/site
-            for h in target/site/hash.txt target/hash.txt hash.txt; do
+            BIN_DIR="$(dirname "$BIN_PATH")"
+            HASH_PATH=""
+            for h in "$BIN_DIR/hash.txt" target/server/release/hash.txt target/release/hash.txt target/site/hash.txt target/hash.txt hash.txt; do
               if [ -f "$h" ]; then
-                cp "$h" deploy/hash.txt
-                cp "$h" deploy/site/hash.txt
+                HASH_PATH="$h"
                 break
               fi
             done
+            if [ -z "$HASH_PATH" ]; then
+              HASH_PATH=$(find target -maxdepth 4 -type f -name hash.txt -print -quit)
+            fi
+            test -s "$HASH_PATH"
+            echo "Packaging Leptos hash file: $HASH_PATH"
+            cp "$HASH_PATH" deploy/hash.txt
+            cp "$HASH_PATH" deploy/site/hash.txt
             cp -r docs deploy/docs
             cp AGENTS.md deploy/AGENTS.md
           } 2>&1 | tee -a /tmp/ci-build.log
@@ -178,9 +186,8 @@ jobs:
             sudo cp /tmp/exonovel-incoming/exonovel-server /opt/exonovel/exonovel-server
             sudo chmod +x /opt/exonovel/exonovel-server
             sudo cp -r /tmp/exonovel-incoming/site /opt/exonovel/site
-            if [ -f /tmp/exonovel-incoming/hash.txt ]; then
-              sudo cp /tmp/exonovel-incoming/hash.txt /opt/exonovel/hash.txt
-            fi
+            test -s /tmp/exonovel-incoming/hash.txt
+            sudo cp /tmp/exonovel-incoming/hash.txt /opt/exonovel/hash.txt
             sudo cp -r /tmp/exonovel-incoming/docs /opt/exonovel/docs
             sudo cp /tmp/exonovel-incoming/AGENTS.md /opt/exonovel/AGENTS.md
             sudo rm -rf /tmp/exonovel-incoming
@@ -242,8 +249,9 @@ jobs:
             sudo systemctl restart exonovel
 
             for i in $(seq 1 15); do
-              if curl -fsS "http://127.0.0.1:3001/api/health" | grep -q '"runtime":"rust-leptos"'; then
-                echo "ExoNovel service healthy on 127.0.0.1:3001."
+              if curl -fsS "http://127.0.0.1:3001/api/health" | grep -q '"runtime":"rust-leptos"' \
+                && curl -fsS "http://127.0.0.1:3001/" | grep -q 'ExoNovel'; then
+                echo "ExoNovel service and SSR shell healthy on 127.0.0.1:3001."
                 exit 0
               fi
               sleep 2
