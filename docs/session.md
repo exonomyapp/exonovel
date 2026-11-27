@@ -1,12 +1,12 @@
 # ExoNovel — Active Development & Open Work (`session.md`)
 
-> **Scope & Purpose Notice (Coding Target: `exonomyapp/exonovel`)**:
-> All implementation, styling, i18n, and architecture changes recorded in this file belong exclusively to the **`exonomyapp/exonovel`** Rust/Leptos codebase (`crates/`, `style/`, `assets/`, `.github/`, `docs/`). Staging container harness tooling (`server.ts`, `server/`, `src/`, `AGENTS.md`, `workspace.md`) is strictly excluded from `exonomyapp/exonovel` diffs and pushes.
-> Keep `docs/session.md` focused on current active work, verified recent commits on `main`, and open unfinished roadmap items (distill finalized architecture into `docs/adr/`).
+> **Shared Multi-Author Coordination Notice (`exonomyapp/exonovel`)**:
+> - Multiple AI Studio accounts and author sessions sync with `exonomyapp/exonovel@main` (`crates/`, `style/`, `assets/`, `.github/`, `docs/`, and the shared `Sync Console`).
+> - **Author Session Attribution**: Because `docs/session.md` is shared across collaborators, every session must track its active changes and notes inside a clearly attributed section identified by the account's email address (e.g., `thalperi@gmail.com`). Collaborators from other accounts should add or update their own `<email>` subsection rather than overwriting another session's work in progress.
 
 ---
 
-## 1. Active `exonomyapp/exonovel` Architectural & Build Boundaries
+## 1. Shared Architectural & Build Boundaries (`exonomyapp/exonovel`)
 
 - **Target Application (`crates/server` + `crates/app` WASM)**: Production (`https://exonovel.exosystems.net`) runs solely as the compiled Rust + Leptos WebAssembly application (`006-stack.md`). Preview verification runs against the deployed live system rather than any prototype server.
 - **Author Sovereignty & Willow Parity**: Author `did:peer` identities, multiple Personas, comments, and paywalled entitlements stay owned by their creator, with PostgreSQL `willow_*` coordinates aligned to `willow25` + `iroh` portability (`002-data/002-iroh.md`).
@@ -14,40 +14,52 @@
 
 ---
 
-## 2. Recent Verified Commits Pushed to `exonomyapp/exonovel@main`
+## 2. Recent Verified Commits on `exonomyapp/exonovel@main`
 
-- **`b69ce5cf` (2026-11-26)** — `feat(home): refine hero layout, 4 educational cards, 3 sync modes & mobile logo`: Updated homepage copy, 4 educational panels, 3 sync modes (`Free` / `Monthly` / `Annual`), 3-row hero structure, and `45px` mobile logo height in CSS.
+- **`60f3f167` (2026-11-27)** — `fix(deploy): package Leptos hash.txt and verify SSR root route`: Fixed `.github/workflows/deploy.yml` to locate `hash.txt` beside the compiled server binary, require non-empty `deploy/hash.txt`, and verify HTTP `200` on `/` SSR output after deploy.
+- **`28ec5cf1` (2026-11-26)** — `fix(ui,build): enable asset file hashing, themed mobile card dropdown & hero scaling`: Enabled `hash-files = true`, `<HashedStylesheet>`, HTML `no-cache` headers, custom themed mobile card dropdown in `crates/app/src/lib.rs`, and hero font scaling in `style/main.css`.
+- **`b69ce5cf` (2026-11-26)** — `feat(home): refine hero layout, 4 educational cards, 3 sync modes & mobile logo`: Updated homepage copy, 4 educational panels, 3 sync modes (`Free` / `Monthly` / `Annual`), 3-row hero structure, and `45px` mobile logo height.
 - **`a39b9949` (2026-11-26)** — `fix(style): restore mobile navbar logo size to 30px`: Scoped mobile navbar logo sizing inside `@media (max-width: 768px)` back to `30px` while keeping desktop `.navbar-logo` at 2x (`clamp(64px, 7.2vw, 80px)`).
-- **`bf21f6f0` (2026-11-26)** — `feat(home): refine homepage copy, remove nav links, and double navbar logo`: Removed `Overview` and `Formats` links from the unauthenticated navbar, doubled the navbar logo size, and synced initial EN/DE/PL homepage copy in `crates/app/src/lib.rs` and `crates/server/src/i18n.rs`.
+- **`bf21f6f0` (2026-11-26)** — `feat(home): refine homepage copy, remove nav links, and double navbar logo`: Removed `Overview` and `Formats` links from the unauthenticated navbar, doubled desktop navbar logo size, and synced EN/DE/PL copy.
 - **`91ebb436` (2026-11-26)** — `fix(app): clone chip_name before view! move in user chip`: Resolved Leptos closure move ownership compile error in the authenticated user chip.
-- **`b760907b` (2026-11-26)** — `docs: rename Settings to Preferences in ADRs`: Aligned all ADR terminology with the app-wide `Preferences` naming convention.
-- **`e057269c` (2026-11-26)** — `ci: improve CI diagnostic logging and fix path handling` & **`1b35a5aa` (2026-11-26)** — Google Drive auth/session alignment in `.github/workflows/deploy.yml` and `docs/`.
+- **`b760907b` (2026-11-26)** — `docs: rename Settings to Preferences in ADRs`: Aligned ADR terminology with `Preferences`.
+- **`e057269c` & `1b35a5aa` (2026-11-26)** — CI diagnostic logging and Google Drive auth/session alignment.
 
 ---
 
-## 3. Staged Work in Progress (Ready to Push to `exonomyapp/exonovel@main`)
+## 3. Active Work & Staged Changes by Author Session
 
-Changes staged across `Cargo.toml`, `.github/workflows/deploy.yml`, `crates/server/src/main.rs`, `crates/app/src/lib.rs`, `style/main.css`, and `docs/session.md`:
+### Author Session: `thalperi@gmail.com` (AI Studio Workspace)
+*Scope: Both `exonomyapp/exonovel` product changes and shared `Sync Console` tooling authored from this account.*
 
-1. **Content-Hashed CSS/JS/WASM Delivery (`Cargo.toml`, `.github/workflows/deploy.yml`, `crates/server/src/main.rs`)**:
-   - Enabled `hash-files = true` (`hash-file-name = "hash.txt"`), switched the server shell to `<HashedStylesheet id="leptos" options=options.clone() />`, packaged `hash.txt` with `LEPTOS_HASH_FILES=true` in `systemd`, and set `no-cache` on dynamic SSR HTML + immutable caching on `/pkg/*` so browsers never execute stale cached WASM or CSS against updated HTML (which previously broke hydration and button click handlers).
-2. **Custom ExoNovel-Themed Mobile Card Dropdown (`crates/app/src/lib.rs`, `style/main.css`)**:
-   - Replaced the native OS `<select>` picker with an in-page themed dropdown menu (`.exo-carousel-dropdown-trigger` + `.exo-carousel-dropdown-menu`) styled cleanly in ExoNovel's light/dark theme tokens, keeping `←` / `→` arrows bidirectionally synced while leaving desktop tabs untouched.
-3. **Hero Title Font Proportions Across Viewports (`style/main.css`)**:
-   - Adjusted mobile hero title clamping (`clamp(27px, 7.2vw, 38px)`) and hero padding (`22px 18px`) inside `@media (max-width: 768px)` alongside desktop (`clamp(38px, 4vw, 54px)`), ensuring rows 1 & 2 stay 1/3 smaller than `... by Design!` without dropping below body copy size.
+1. **`exonomyapp/exonovel` App, CI, `AGENTS.md` & `docs/session.md` Reconciliation (`crates/`, `style/`, `assets/`, `.github/`, `docs/`, `AGENTS.md`)**:
+   - Pulled `.github/workflows/deploy.yml` (`60f3f167`) into this workspace so local Rust/Leptos crates, styles, assets, and deployment workflow match `exonomyapp/exonovel@main` (`0` app diffs).
+   - Live diff audit against `main` (`60f3f167`): `9` modified files (`.env.example`, `AGENTS.md`, `bun.lock`, `docs/session.md`, `index.html`, `metadata.json`, `package.json`, `server.ts`, `src/App.tsx`), `8` new locally, and `91` on `main` only (superseded prototype/Neon skill/asset files). Reconciled `AGENTS.md` (preserving Rules 2–19 from `main` alongside Rule 1 container/Sync Console scope, updated Rule 4 author-email attribution, and Rules 20–22) and `docs/session.md` (preserving all active `main` context and `28ec5cf1`/`60f3f167` history alongside the `thalperi@gmail.com` session block), and seeded baseline snapshots in `.aistudio/sync-base/` against `main` (`60f3f167`) so push/pull tracking starts synchronized.
+   - Updated `AGENTS.md` Rule 4 and `docs/session.md` so multi-author session work is segregated by **author account email** (`thalperi@gmail.com`) across both ExoNovel product work and Sync Console updates, and so every completed turn ends by updating this `docs/session.md` section.
+2. **Bidirectional 3-Way Merge (`node-diff3`), Selective Sync & Selection `Filter` (`server/syncMerge.ts`, `server/githubSync.ts`, `server.ts`, `src/components/GitHubSyncPanel.tsx`)**:
+   - Added `.aistudio/sync-base/` SHA-256-keyed per-file baseline snapshot tracking (`seed`, `pull`, `push`, `merge`) and `node-diff3` `mergeDigIn` three-way text merging (`runThreeWayMergeText`) protecting **both Pull and Push**:
+     - **Pull (`POST /api/admin/github/pull`)**: Preserves local-only edits when `baseSha === remoteSha`, auto-merges non-overlapping local + remote edits while keeping the remote blob as the next merge baseline, and returns HTTP `409` conflict records (`overlap`, `no_base`, `binary`) instead of overwriting local changes.
+     - **Push (`POST /api/admin/github/sync`)**: Checks every staged upload for `baseSha !== remoteSha` (or unseen `knownRemoteShas` mismatches), returns HTTP `409` conflicts with pre-computed suggested merges before touching GitHub blobs/trees, and updates baselines on direct pushes (keeping PR pushes tied to `main` until merged).
+     - **Merge Resolver (`POST /api/admin/github/resolve-merge`)**: Added inline **Merge Review Required** workflow in the Sync Console (`Use Auto-Merged`, `Use Local`, `Use Remote`, editable buffer, `Apply Merge Locally`, and binary resolution).
+   - Renamed panel heading to **Sync Console**, added categorized diffs (`All Differences`, `ExoNovel App & CI`, `Sync Console`, `Superseded on main`, `Ignored (.gitignore)`), inline side-by-side diffs, selective deletions (`sha: null`), and the `Filter` checkbox right of `Clear` (enabled when `Select All` is unchecked).
+3. **`.gitignore`-Driven Visibility & Live File Filter (`server/githubSync.ts`, `server.ts`, `src/components/GitHubSyncPanel.tsx`)**:
+   - Evaluates active workspace diffs against `.gitignore` (`ignore` parser) while locking core secret/cache protections (`.env*`, `.git/`, `node_modules/`, `target/`).
+   - Added per-file `Ignore` controls, an `Ignored (.gitignore)` management tab (add/remove rules, `Unignore`, optional `tracked on main` untracking), and a debounced live file filter (`180ms` after typing stops, theme-matched surface colors, right-aligned at 25% list width inline with quick-select actions on desktop and full-width on mobile).
+4. **Header Toolbar, Render-Loop Fix & Persistent Unlock Session (`src/App.tsx`, `server/workspaceAuth.ts`, `workspace.md`)**:
+   - Moved `Refresh Diff` to the sticky header next to the theme switcher (`Refresh Diff` desktop, `Refresh` + icon-only `Lock` mobile) and stabilized callback refs / in-flight guards to prevent render loops.
+   - Replaced ephemeral per-boot HMAC signing keys in `server/workspaceAuth.ts` with a persistent signing key derived from `ADMIN_PASSCODE` (or `.aistudio/.ws-signing.key`) so server restarts during app updates preserve the 7-day `exonovel_ws_session` browser cookie.
 
 ---
 
-## 4. Open Unfinished Work & Roadmap Interviews (Next Up)
+## 4. Open Unfinished Work & Roadmap Interviews (Shared Next Up)
 
 1. **Google OAuth Brand, Client & Redirect URI Verification**:
    - Confirm production Google OAuth credentials, Authorized redirect URI `https://exonovel.exosystems.net/api/oauth/google/callback`, and branding submission under the `ExoNovel` OAuth client.
 2. **Live Production Review (`https://exonovel.exosystems.net`)**:
-   - Verify the updated hero typography alignment, 4-card educational panel, 3-mode section, mobile `45px` logo scaling, and EN/DE/PL switching once GitHub Actions deploys these changes.
+   - Verify the updated hero typography alignment, 4-card educational panel, 3-mode section, mobile logo scaling, and EN/DE/PL switching.
 3. **Content Models & Top 5 Formats (`003-content` / `003-001` / `003-002`)**:
    - Finalize author component ownership, reusable story elements (characters, plots, timelines, themes), and permissioned forking rules ahead of `loro 1.18.0` CRDT co-editing (`002-005`).
 4. **Author Paywalls & AOTA Multi-Currency Payments (`004-pay` / `004-002` / `004-003`)**:
    - Specify paywall gating rules and Tier 1 checkout rollout (`dLocal`, `Stripe Connect`, `Reown AppKit`) inside the Profile commercial hub.
 5. **Offline `willow25` + `iroh` Native Packaging (`002-data/002-iroh.md` / `006-stack.md`)**:
    - Sequence desktop (`Linux`, `macOS`, `Windows`) and Android **F-Droid (`foss` UnifiedPush-only)** builds ahead of Google Play and Apple Store submissions.
-

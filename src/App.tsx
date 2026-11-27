@@ -3,99 +3,31 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  HardDrive,
-  LogOut,
-  Menu,
-  Moon,
-  PanelLeftClose,
-  PanelLeftOpen,
-  RefreshCw,
-  Settings,
-  Sun,
-} from 'lucide-react';
-import { AdminSettings, type LinkedProviderSummary } from './components/AdminSettings';
-import { AuthGate } from './components/AuthGate';
-import { DocsSidebar } from './components/DocsSidebar';
-import { DriveWorkspace } from './components/DriveWorkspace';
-import { MarkdownReader } from './components/MarkdownReader';
-import { TableOfContents } from './components/TableOfContents';
-import { getAuthInstance } from './lib/authClient';
-import {
-  getDriveAccessToken,
-  googleDriveSignIn,
-  initDriveAuth,
-} from './lib/driveAuth';
-import type { DocNode, DocPayload } from './types/docs';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { Lock, Moon, RefreshCw, Sun } from 'lucide-react';
+import { GitHubSyncPanel } from './components/GitHubSyncPanel';
 
-interface AuthConfigResponse {
-  authConfigured: boolean;
-  authUrl: string | null;
-  adminEmail: string;
-}
-
-interface VerifiedUser {
-  authUserId: string;
-  email: string | null;
-  name: string | null;
-  didPeer: string | null;
-  authorized: boolean;
-  isAdmin: boolean;
-}
-
-function flattenFiles(nodes: DocNode[]): DocNode[] {
-  const result: DocNode[] = [];
-  for (const node of nodes) {
-    if (node.type === 'file') {
-      result.push(node);
-    }
-    if (node.children) {
-      result.push(...flattenFiles(node.children));
-    }
-  }
-  return result;
-}
-
-function getInitialDocFromUrl(): string {
-  const params = new URLSearchParams(window.location.search);
-  return params.get('doc') || '';
+interface WorkspaceAuthStatus {
+  claimed: boolean;
+  source: 'env' | 'claimed' | 'unclaimed';
+  unlocked: boolean;
 }
 
 export default function App() {
-  const [authConfig, setAuthConfig] = useState<AuthConfigResponse | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<VerifiedUser | null>(null);
-  const [linkedProviders, setLinkedProviders] = useState<LinkedProviderSummary[]>([]);
-  const [driveConnected, setDriveConnected] = useState<boolean>(() => Boolean(getDriveAccessToken()));
-  const [driveAutoError, setDriveAutoError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'docs' | 'settings' | 'drive'>('docs');
-
-  const [tree, setTree] = useState<DocNode[]>([]);
-  const [activePath, setActivePath] = useState<string>(getInitialDocFromUrl);
-  const [doc, setDoc] = useState<DocPayload | null>(null);
-  const [loadingTree, setLoadingTree] = useState(false);
-  const [loadingDoc, setLoadingDoc] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [authStatus, setAuthStatus] = useState<WorkspaceAuthStatus | null>(null);
+  const [passcode, setPasscode] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-    try {
-      return window.localStorage.getItem('exonovel-docs-sidebar-collapsed') === 'true';
-    } catch {
-      return false;
-    }
-  });
-  const [activeHeadingId, setActiveHeadingId] = useState('');
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [diffRefreshing, setDiffRefreshing] = useState(false);
+  const memoryTokenRef = useRef<string | null>(null);
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     try {
-      return window.localStorage.getItem('exonovel-docs-theme') === 'dark';
+      return window.localStorage.getItem('exonovel-sync-theme') === 'dark';
     } catch {
       return false;
     }
   });
-
-  const activeDocUpdatedAtRef = useRef<string>('');
 
   useEffect(() => {
     const root = document.documentElement;
@@ -105,579 +37,217 @@ export default function App() {
       root.classList.remove('dark');
     }
     try {
-      window.localStorage.setItem('exonovel-docs-theme', darkMode ? 'dark' : 'light');
+      window.localStorage.setItem('exonovel-sync-theme', darkMode ? 'dark' : 'light');
     } catch {
       // Ignore storage failures
     }
   }, [darkMode]);
 
-  useEffect(() => {
+  const loadAuthStatus = useCallback(async () => {
     try {
-      window.localStorage.setItem(
-        'exonovel-docs-sidebar-collapsed',
-        sidebarCollapsed ? 'true' : 'false'
-      );
-    } catch {
-      // Ignore storage failures
-    }
-  }, [sidebarCollapsed]);
-
-  const resolveJwt = useCallback(async (authUrl: string): Promise<string | null> => {
-    const instance = getAuthInstance(authUrl);
-    const cached = await instance.getJWTToken();
-    if (cached) return cached;
-    try {
-      const res = await fetch(`${authUrl.replace(/\/$/, '')}/token`, {
+      const res = await fetch('/api/workspace-auth/status', {
         credentials: 'include',
         cache: 'no-store',
+        headers: memoryTokenRef.current
+          ? { Authorization: `Bearer ${memoryTokenRef.current}` }
+          : undefined,
       });
-      if (!res.ok) return null;
-      const data = (await res.json()) as { token?: string };
-      return data.token ?? null;
-    } catch {
-      return null;
+      if (!res.ok) {
+        throw new Error('Unable to verify workspace session.');
+      }
+      const data = (await res.json()) as WorkspaceAuthStatus;
+      setAuthStatus(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to reach workspace server.');
+      setAuthStatus({ claimed: true, source: 'env', unlocked: false });
     }
   }, []);
 
-  const getToken = useCallback(async (): Promise<string | null> => {
-    if (!authConfig?.authConfigured || !authConfig.authUrl) return null;
+  useEffect(() => {
+    loadAuthStatus();
+  }, [loadAuthStatus]);
+
+  const getToken = useCallback(async () => memoryTokenRef.current, []);
+
+  const handleUnauthorized = useCallback(() => {
+    memoryTokenRef.current = null;
+    setAuthStatus((prev) => (prev ? { ...prev, unlocked: false } : null));
+  }, []);
+
+  const handlePasscodeSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!passcode.trim() || !authStatus) return;
+
+    setSubmitting(true);
+    setError(null);
+    const endpoint = authStatus.claimed
+      ? '/api/workspace-auth/unlock'
+      : '/api/workspace-auth/claim';
+
     try {
-      return await resolveJwt(authConfig.authUrl);
-    } catch {
-      return null;
-    }
-  }, [authConfig, resolveJwt]);
-
-  const loadSession = useCallback(async (config: AuthConfigResponse) => {
-    if (!config.authConfigured || !config.authUrl) {
-      setCurrentUser(null);
-      setAuthLoading(false);
-      return;
-    }
-
-    setAuthLoading(true);
-    try {
-      const instance = getAuthInstance(config.authUrl);
-      const sessionRes = await instance.adapter.getSession();
-      const sessionData = sessionRes?.data;
-      if (!sessionData || !('user' in sessionData) || !sessionData.user) {
-        setCurrentUser(null);
-        setAuthLoading(false);
-        return;
-      }
-
-      const jwt = await resolveJwt(config.authUrl);
-      if (!jwt) {
-        setCurrentUser(null);
-        setAuthLoading(false);
-        return;
-      }
-
-      const meRes = await fetch('/api/me', {
-        cache: 'no-store',
-        headers: { Authorization: `Bearer ${jwt}` },
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({ passcode }),
       });
-
-      if (!meRes.ok) {
-        setCurrentUser(null);
-        setLinkedProviders([]);
-      } else {
-        const meData = (await meRes.json()) as { user: VerifiedUser };
-        setCurrentUser(meData.user);
-        try {
-          const accountsRes = await instance.adapter.listAccounts();
-          const list = Array.isArray(accountsRes?.data) ? accountsRes.data : [];
-          setLinkedProviders(
-            list.map((acc) => ({
-              providerId: String(acc.providerId || 'unknown'),
-              scopes: Array.isArray(acc.scopes) ? acc.scopes.map(String) : [],
-            }))
-          );
-        } catch {
-          setLinkedProviders([]);
-        }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Unable to unlock workspace.');
       }
-    } catch {
-      setCurrentUser(null);
-      setLinkedProviders([]);
+      if (typeof data.token === 'string' && data.token) {
+        memoryTokenRef.current = data.token;
+      }
+      setPasscode('');
+      await loadAuthStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unlock failed.');
     } finally {
-      setAuthLoading(false);
+      setSubmitting(false);
     }
-  }, [resolveJwt]);
+  };
 
-  useEffect(() => {
-    const unsubscribe = initDriveAuth(
-      () => setDriveConnected(true),
-      () => setDriveConnected(false)
-    );
-    return unsubscribe;
-  }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('neon_popup') && window.opener && window.opener !== window) {
-      try {
-        window.opener.postMessage(
-          {
-            type: 'neon-auth:oauth-complete',
-            verifier: params.get('neon_auth_session_verifier'),
-            originalCallback: params.get('neon_popup_callback'),
-          },
-          window.location.origin
-        );
-        window.close();
-      } catch {
-        // Fallback to adapter initBroadcastChannel
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    fetch('/api/auth-config', { cache: 'no-store' })
-      .then((res) => res.json() as Promise<AuthConfigResponse>)
-      .then((cfg) => {
-        if (!active) return;
-        setAuthConfig(cfg);
-        loadSession(cfg);
-      })
-      .catch(() => {
-        if (!active) return;
-        setAuthConfig({
-          authConfigured: false,
-          authUrl: null,
-          adminEmail: 'exonomyapp@gmail.com',
-        });
-        setAuthLoading(false);
+  const handleLock = async () => {
+    try {
+      await fetch('/api/workspace-auth/lock', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(memoryTokenRef.current
+            ? { Authorization: `Bearer ${memoryTokenRef.current}` }
+            : {}),
+        },
       });
-    return () => {
-      active = false;
-    };
-  }, [loadSession]);
-
-  const handleSignOut = async () => {
-    if (authConfig?.authUrl) {
-      try {
-        await getAuthInstance(authConfig.authUrl).adapter.signOut();
-      } catch {
-        // Proceed clearing local state
-      }
-    }
-    setCurrentUser(null);
-    setLinkedProviders([]);
-    setTree([]);
-    setDoc(null);
-    setViewMode('docs');
-  };
-
-  const flatFiles = useMemo(() => flattenFiles(tree), [tree]);
-
-  const fetchTree = useCallback(
-    async (silent = false) => {
-      if (!currentUser?.authorized) return null;
-      if (!silent) setLoadingTree(true);
-      try {
-        const token = await getToken();
-        const response = await fetch('/api/docs', {
-          cache: 'no-store',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (!response.ok) {
-          throw new Error('Failed to load documentation index.');
-        }
-        const data = (await response.json()) as { tree: DocNode[] };
-        setTree(data.tree);
-        setError(null);
-        return data.tree;
-      } catch (err) {
-        if (!silent) {
-          setError(err instanceof Error ? err.message : 'Unable to load documentation.');
-        }
-        return null;
-      } finally {
-        if (!silent) setLoadingTree(false);
-      }
-    },
-    [currentUser?.authorized, getToken]
-  );
-
-  const fetchDoc = useCallback(
-    async (docPath: string, silent = false) => {
-      if (!docPath || !currentUser?.authorized) return;
-      if (!silent) setLoadingDoc(true);
-      try {
-        const token = await getToken();
-        const response = await fetch(`/api/doc?path=${encodeURIComponent(docPath)}`, {
-          cache: 'no-store',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (!response.ok) {
-          throw new Error(`Could not open ${docPath}`);
-        }
-        const payload = (await response.json()) as DocPayload;
-        if (payload.updatedAt !== activeDocUpdatedAtRef.current || !silent) {
-          activeDocUpdatedAtRef.current = payload.updatedAt;
-          setDoc(payload);
-        }
-        setError(null);
-      } catch (err) {
-        if (!silent) {
-          setError(err instanceof Error ? err.message : 'Failed to load document.');
-        }
-      } finally {
-        if (!silent) setLoadingDoc(false);
-      }
-    },
-    [currentUser?.authorized, getToken]
-  );
-
-  useEffect(() => {
-    if (currentUser?.authorized) {
-      fetchTree(false);
-    }
-  }, [currentUser?.authorized, fetchTree]);
-
-  useEffect(() => {
-    if (flatFiles.length === 0) return;
-    const exists = flatFiles.some((file) => file.path === activePath);
-    if (!activePath || !exists) {
-      const preferred =
-        flatFiles.find((file) => file.path !== 'AGENTS.md') ?? flatFiles[0];
-      setActivePath(preferred.path);
-    }
-  }, [flatFiles, activePath]);
-
-  useEffect(() => {
-    if (!activePath || !currentUser?.authorized) return;
-    activeDocUpdatedAtRef.current = '';
-    fetchDoc(activePath, false);
-
-    const url = new URL(window.location.href);
-    url.searchParams.set('doc', activePath);
-    window.history.replaceState(null, '', url.toString());
-  }, [activePath, currentUser?.authorized, fetchDoc]);
-
-  useEffect(() => {
-    if (!currentUser?.authorized) return;
-    const interval = window.setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
-      fetchTree(true);
-      if (activePath) {
-        fetchDoc(activePath, true);
-      }
-    }, 3500);
-    return () => window.clearInterval(interval);
-  }, [activePath, currentUser?.authorized, fetchDoc, fetchTree]);
-
-  useEffect(() => {
-    if (!doc || doc.headings.length === 0 || viewMode !== 'docs') {
-      setActiveHeadingId('');
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible.length > 0 && visible[0].target.id) {
-          setActiveHeadingId(visible[0].target.id);
-        }
-      },
-      { rootMargin: '-80px 0px -65% 0px', threshold: 0.1 }
-    );
-
-    for (const heading of doc.headings) {
-      const el = document.getElementById(heading.id);
-      if (el) observer.observe(el);
-    }
-
-    return () => observer.disconnect();
-  }, [doc, viewMode]);
-
-  const handleSelectDoc = (path: string) => {
-    setViewMode('docs');
-    setActivePath(path);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleManualRefresh = async () => {
-    setRefreshing(true);
-    await fetchTree(true);
-    if (activePath) {
-      await fetchDoc(activePath, false);
-    }
-    setRefreshing(false);
-  };
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAF8F4] dark:bg-[#111317] text-sm text-[#57534E] dark:text-[#9CA3AF]">
-        Checking session...
-      </div>
-    );
-  }
-
-  if (!currentUser || !currentUser.authorized) {
-    return (
-      <AuthGate
-        authConfigured={Boolean(authConfig?.authConfigured)}
-        authUrl={authConfig?.authUrl ?? null}
-        signedInEmail={currentUser?.email ?? null}
-        didPeer={currentUser?.didPeer ?? null}
-        accessDenied={Boolean(currentUser && !currentUser.authorized)}
-        onAuthSuccess={() => {
-          if (authConfig) loadSession(authConfig);
-        }}
-        onSignOut={handleSignOut}
-      />
-    );
-  }
-
-  const currentIndex = flatFiles.findIndex((f) => f.path === activePath);
-  const prevDoc = currentIndex > 0 ? flatFiles[currentIndex - 1] : null;
-  const nextDoc =
-    currentIndex >= 0 && currentIndex < flatFiles.length - 1
-      ? flatFiles[currentIndex + 1]
-      : null;
-
-  const googleSsoLinked = linkedProviders.some((p) => p.providerId === 'google');
-
-  const handleOpenDriveClick = async () => {
-    if (viewMode === 'drive') {
-      setViewMode('docs');
-      return;
-    }
-
-    setDriveAutoError(null);
-    setViewMode('drive');
-
-    if (!getDriveAccessToken() && googleSsoLinked) {
-      try {
-        await googleDriveSignIn({
-          loginHint: currentUser.email ?? undefined,
-        });
-        setDriveConnected(true);
-      } catch (err) {
-        setDriveAutoError(
-          err instanceof Error
-            ? err.message
-            : 'Google Drive authorization was cancelled or blocked.'
-        );
-      }
+    } finally {
+      memoryTokenRef.current = null;
+      await loadAuthStatus();
     }
   };
-
-  const breadcrumbs =
-    viewMode === 'settings'
-      ? [currentUser.isAdmin ? 'Admin & Connected Apps Settings' : 'Settings']
-      : viewMode === 'drive'
-        ? ['Google Drive']
-        : activePath
-          ? activePath.split('/')
-          : [];
 
   return (
-    <div className="min-h-screen flex bg-[#FAF8F4] dark:bg-[#111317] text-[#1C1917] dark:text-[#ECEEF2]">
-      <DocsSidebar
-        tree={tree}
-        activePath={activePath}
-        onSelectDoc={handleSelectDoc}
-        collapsed={sidebarCollapsed}
-        mobileOpen={mobileNavOpen}
-        onCloseMobile={() => setMobileNavOpen(false)}
-      />
+    <div className="min-h-screen flex flex-col bg-[#FAF8F4] dark:bg-[#111317] text-[#1C1917] dark:text-[#ECEEF2]">
+      <header className="sticky top-0 z-30 h-14 px-4 sm:px-8 border-b border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4]/95 dark:bg-[#111317]/95 backdrop-blur-sm flex items-center justify-between gap-3 sm:gap-6">
+        <span className="font-display text-base sm:text-lg font-semibold tracking-tight text-[#1C1917] dark:text-[#ECEEF2] whitespace-nowrap truncate">
+          Update <span className="font-mono text-xs sm:text-sm font-medium">exonomyapp/exonovel</span>
+        </span>
 
-      <div className="flex-1 min-w-0 flex flex-col">
-        <header className="sticky top-0 z-30 h-14 px-4 sm:px-8 border-b border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4]/95 dark:bg-[#111317]/95 backdrop-blur-sm flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2 shrink-0">
+          {authStatus?.unlocked && (
             <button
               type="button"
-              onClick={() => setMobileNavOpen(true)}
-              className="lg:hidden p-2 -ml-2 rounded-md text-[#44403C] dark:text-[#D1D5DB] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D] min-h-[40px] min-w-[40px] flex items-center justify-center shrink-0"
-              aria-label="Open documentation explorer"
+              onClick={() => setRefreshTrigger((prev) => prev + 1)}
+              disabled={diffRefreshing}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] text-[#1C1917] dark:text-[#ECEEF2] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D] transition-colors whitespace-nowrap shrink-0 min-h-[40px] disabled:opacity-50"
+              aria-label="Refresh GitHub diff"
             >
-              <Menu className="w-5 h-5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSidebarCollapsed((prev) => !prev)}
-              className="hidden lg:inline-flex items-center justify-center p-2 -ml-2 rounded-md text-[#44403C] dark:text-[#D1D5DB] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D] min-h-[40px] min-w-[40px] shrink-0 transition-colors"
-              aria-label={sidebarCollapsed ? 'Expand navigation sidebar' : 'Collapse navigation sidebar'}
-              aria-expanded={!sidebarCollapsed}
-              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              {sidebarCollapsed ? (
-                <PanelLeftOpen className="w-4 h-4" />
-              ) : (
-                <PanelLeftClose className="w-4 h-4" />
-              )}
-            </button>
-
-            <nav
-              aria-label="Breadcrumb"
-              className="flex items-center gap-1.5 text-xs sm:text-sm text-[#57534E] dark:text-[#9CA3AF] min-w-0"
-            >
-              <span className="font-medium text-[#1C1917] dark:text-[#ECEEF2] whitespace-nowrap shrink-0">
-                Docs
+              <RefreshCw className={`w-3.5 h-3.5 ${diffRefreshing ? 'animate-spin' : ''}`} />
+              <span>
+                {diffRefreshing ? (
+                  'Checking...'
+                ) : (
+                  <>
+                    Refresh<span className="hidden sm:inline"> Diff</span>
+                  </>
+                )}
               </span>
-              {breadcrumbs.map((segment, index) => {
-                const isLast = index === breadcrumbs.length - 1;
-                return (
-                  <span key={`${segment}-${index}`} className="flex items-center gap-1.5 min-w-0">
-                    <span aria-hidden="true" className="opacity-50 shrink-0">
-                      /
-                    </span>
-                    <span
-                      className={`truncate ${
-                        isLast
-                          ? 'text-[#1C1917] dark:text-[#ECEEF2] font-medium'
-                          : 'hidden sm:inline'
-                      }`}
-                    >
-                      {segment}
-                    </span>
-                  </span>
-                );
-              })}
-            </nav>
-          </div>
+            </button>
+          )}
 
-          <div className="flex items-center gap-2 shrink-0">
-            {viewMode === 'docs' && (
-              <button
-                type="button"
-                onClick={handleManualRefresh}
-                disabled={refreshing}
-                className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] text-[#1C1917] dark:text-[#ECEEF2] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D] transition-colors whitespace-nowrap shrink-0 min-h-[40px]"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">Refresh</span>
-              </button>
+          <button
+            type="button"
+            onClick={() => setDarkMode((prev) => !prev)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] text-[#1C1917] dark:text-[#ECEEF2] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D] transition-colors whitespace-nowrap shrink-0 min-h-[40px]"
+            aria-label={darkMode ? 'Switch to light theme' : 'Switch to dark theme'}
+          >
+            {darkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            <span>{darkMode ? 'Light' : 'Dark'}</span>
+          </button>
+
+          {authStatus?.unlocked && (
+            <button
+              type="button"
+              onClick={handleLock}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] text-[#1C1917] dark:text-[#ECEEF2] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D] transition-colors whitespace-nowrap shrink-0 min-h-[40px]"
+              aria-label="Lock workspace"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Lock</span>
+            </button>
+          )}
+        </div>
+      </header>
+
+      <main className="flex-1 w-full max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
+        {!authStatus ? (
+          <div className="py-16 text-sm text-[#57534E] dark:text-[#9CA3AF]">
+            Loading workspace session...
+          </div>
+        ) : authStatus.unlocked ? (
+          <GitHubSyncPanel
+            getToken={getToken}
+            refreshTrigger={refreshTrigger}
+            onLoadingChange={setDiffRefreshing}
+            onUnauthorized={handleUnauthorized}
+          />
+        ) : (
+          <div className="max-w-md mx-auto mt-10 rounded-lg border border-[#E5E0D5] dark:border-[#262B36] bg-[#FFFFFF] dark:bg-[#171A21] p-6 sm:p-8">
+            <h1 className="font-display text-2xl font-semibold tracking-tight">
+              {authStatus.claimed ? 'Unlock Sync Console' : 'Set Sync Passcode'}
+            </h1>
+            <p className="mt-2 text-sm text-[#57534E] dark:text-[#9CA3AF]">
+              {authStatus.claimed
+                ? 'Enter your workspace passcode to review diffs, pull main updates, and push changes to exonomyapp/exonovel.'
+                : 'Choose a workspace passcode to protect GitHub sync actions. Your browser stays unlocked for 7 days.'}
+            </p>
+
+            {error && (
+              <div className="mt-4 p-3 rounded-md border border-red-300 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 text-xs text-red-700 dark:text-red-300">
+                {error}
+              </div>
             )}
 
-            <button
-              type="button"
-              onClick={handleOpenDriveClick}
-              className={`inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md border transition-colors whitespace-nowrap shrink-0 min-h-[40px] ${
-                viewMode === 'drive'
-                  ? 'border-[#1D4ED8] text-[#1D4ED8] dark:border-[#60A5FA] dark:text-[#60A5FA] bg-[#EFF6FF] dark:bg-[#172554]/40'
-                  : 'border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] text-[#1C1917] dark:text-[#ECEEF2] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D]'
-              }`}
-              aria-label="Open Google Drive Workspace"
-            >
-              <HardDrive className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Google Drive</span>
-            </button>
+            <form onSubmit={handlePasscodeSubmit} className="mt-5 space-y-4">
+              <div>
+                <label
+                  htmlFor="workspace-passcode"
+                  className="block text-xs font-medium text-[#57534E] dark:text-[#9CA3AF] mb-1.5"
+                >
+                  Workspace Passcode
+                </label>
+                <input
+                  id="workspace-passcode"
+                  type="password"
+                  autoComplete="current-password"
+                  autoFocus
+                  required
+                  value={passcode}
+                  onChange={(e) => setPasscode(e.target.value)}
+                  placeholder="Enter passcode"
+                  className="w-full px-3.5 py-2.5 text-sm rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] text-[#1C1917] dark:text-[#ECEEF2] focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]"
+                />
+              </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                setViewMode((prev) => (prev === 'settings' ? 'docs' : 'settings'))
-              }
-              className={`inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md border transition-colors whitespace-nowrap shrink-0 min-h-[40px] ${
-                viewMode === 'settings'
-                  ? 'border-[#1D4ED8] text-[#1D4ED8] dark:border-[#60A5FA] dark:text-[#60A5FA] bg-[#EFF6FF] dark:bg-[#172554]/40'
-                  : 'border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] text-[#1C1917] dark:text-[#ECEEF2] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D]'
-              }`}
-            >
-              <Settings className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Settings</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setDarkMode((prev) => !prev)}
-              className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] text-[#1C1917] dark:text-[#ECEEF2] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D] transition-colors whitespace-nowrap shrink-0 min-h-[40px]"
-              aria-label={darkMode ? 'Switch to light theme' : 'Switch to dark theme'}
-            >
-              {darkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">{darkMode ? 'Light' : 'Dark'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] text-[#1C1917] dark:text-[#ECEEF2] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D] transition-colors whitespace-nowrap shrink-0 min-h-[40px]"
-              aria-label="Sign out"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Sign out</span>
-            </button>
-          </div>
-        </header>
-
-        <main className="flex-1 px-5 sm:px-8 lg:px-10 py-8 sm:py-10">
-          {viewMode === 'drive' ? (
-            <DriveWorkspace
-              activeDoc={doc}
-              allDocs={flatFiles}
-              getToken={getToken}
-              googleSsoLinked={googleSsoLinked}
-              googleSsoEmail={currentUser.email}
-              initialAuthError={driveAutoError}
-              onDriveAuthChange={setDriveConnected}
-              onOpenSettings={() => setViewMode('settings')}
-              onBackToDocs={() => setViewMode('docs')}
-            />
-          ) : viewMode === 'settings' ? (
-            <AdminSettings
-              getToken={getToken}
-              activeDocPath={activePath}
-              currentUserDid={currentUser.didPeer}
-              currentUserEmail={currentUser.email}
-              isAdmin={currentUser.isAdmin}
-              linkedProviders={linkedProviders}
-              driveConnected={driveConnected}
-              onDriveAuthChange={setDriveConnected}
-              onOpenDrive={handleOpenDriveClick}
-              onBackToDocs={() => setViewMode('docs')}
-            />
-          ) : error ? (
-            <div className="max-w-xl rounded-lg border border-[#E5E0D5] dark:border-[#262B36] bg-[#F3F0EA]/70 dark:bg-[#171A21] p-6">
-              <h2 className="font-display text-lg font-semibold text-[#1C1917] dark:text-[#ECEEF2]">
-                Unable to load document
-              </h2>
-              <p className="mt-2 text-sm text-[#57534E] dark:text-[#9CA3AF]">{error}</p>
               <button
-                type="button"
-                onClick={handleManualRefresh}
-                className="mt-4 px-4 py-2 text-xs font-medium rounded-md bg-[#1D4ED8] text-white hover:bg-[#1E40AF] transition-colors whitespace-nowrap shrink-0 min-h-[40px]"
+                type="submit"
+                disabled={submitting || !passcode.trim()}
+                className="w-full px-4 py-2.5 text-sm font-medium rounded-md bg-[#1D4ED8] text-white hover:bg-[#1E40AF] transition-colors disabled:opacity-50 min-h-[42px]"
               >
-                Retry
+                {submitting
+                  ? 'Verifying...'
+                  : authStatus.claimed
+                    ? 'Unlock Workspace'
+                    : 'Set Passcode & Unlock'}
               </button>
-            </div>
-          ) : loadingTree || (loadingDoc && !doc) ? (
-            <div className="w-full space-y-4 animate-pulse">
-              <div className="h-4 w-48 rounded bg-[#E5E0D5] dark:bg-[#262B36]" />
-              <div className="h-10 w-3/4 rounded bg-[#E5E0D5] dark:bg-[#262B36]" />
-              <div className="h-4 w-full rounded bg-[#E5E0D5] dark:bg-[#262B36] mt-6" />
-              <div className="h-4 w-5/6 rounded bg-[#E5E0D5] dark:bg-[#262B36]" />
-              <div className="h-4 w-2/3 rounded bg-[#E5E0D5] dark:bg-[#262B36]" />
-            </div>
-          ) : doc ? (
-            <div className="w-full flex items-start gap-10">
-              <MarkdownReader
-                doc={doc}
-                prevDoc={prevDoc}
-                nextDoc={nextDoc}
-                onNavigateDoc={handleSelectDoc}
-              />
-              <TableOfContents headings={doc.headings} activeId={activeHeadingId} />
-            </div>
-          ) : (
-            <div className="max-w-xl rounded-lg border border-[#E5E0D5] dark:border-[#262B36] bg-[#F3F0EA]/60 dark:bg-[#171A21] p-6">
-              <h2 className="font-display text-lg font-semibold text-[#1C1917] dark:text-[#ECEEF2]">
-                No documentation files yet
-              </h2>
-              <p className="mt-2 text-sm text-[#57534E] dark:text-[#9CA3AF]">
-                Select or create a Markdown document to read it here.
-              </p>
-            </div>
-          )}
-        </main>
-      </div>
+            </form>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
