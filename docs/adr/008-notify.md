@@ -38,20 +38,21 @@ Notifications are generated once as structured events in Neon PostgreSQL / local
 ExoNovel adopts a **modern GitHub UI format** for both **Profile** (tabbed header workspace) and **Preferences** (left-rail category sidebar), with a strict boundary: **100% of commercial, wallet, purchase, and billing activity lives in Profile — zero commercial items live in Preferences**:
 
 - **Profile Page (Identity, Collaboration & ALL Commercial / Wallet Activity)**:
-  - *Tabs*: `Overview`, `Works`, `Groups & Invites`, **`Wallet, Paywalls & Purchases`**, `Personas`, `Notifications`.
-  - **Everything financial belongs here**, including:
-    - **Author Commercials**: Paywall pricing, connected payout accounts (`Stripe Connect`, `dLocal`, `Razorpay`, `Flutterwave`, `Airwallex`, `TON`, `Lightning`, `Reown AppKit` / `USDC`), and author earnings/payouts.
-    - **Reader Purchases & ExoNovel Sync Subscription**: History/receipts of works unlocked from other authors **plus** purchasing/renewing **ExoNovel Cloud + Device Sync** (`$9/month` or `$90/year` local-currency equivalent, paid directly to ExoNovel's own `did:peer` wallets—which in turn unlocks the Sync toggle in Preferences).
+  - *Tabs*: `Overview`, `Works`, `Groups & Invites`, **`Wallet`**, **`Paywalls`**, **`Plans`**, `Personas`, `Languages & Notifications`.
+  - **Everything financial belongs here**, divided cleanly by concept:
+    - **`Wallet`**: Payment rails (`Stripe Connect`, `dLocal`, `Razorpay`, `Flutterwave`, `Airwallex`, `TON`, `Lightning`, `Reown AppKit` / `USDC`) and full financial transaction ledger.
+    - **`Paywalls`**: Author paywall pricing, collaborator attribution splits, and reader purchase receipts for unlocked works.
+    - **`Plans`**: Free Web, Free Device, and Free Team Collaboration Sync overview plus optional **Personal Device Sync** subscription (`$9/month` or `$90/year` local-currency equivalent for keeping the user's own device drafts aligned with their own web profile).
     - **Profile Notification Checkboxes**:
       - `notify_author_earnings` — **Author Paywall Earnings & Payouts** (when readers pay for your works or payouts settle)
-      - `notify_reader_purchases` — **Reader Purchases & Sync Plan Billing** (receipts when you unlock another author's work or renew ExoNovel Sync)
+      - `notify_reader_purchases` — **Reader Purchases & Sync Plan Billing** (receipts when you unlock another author's work or renew ExoNovel Personal Sync)
       - `notify_group_invites` — Invitations to join a creative group
       - `notify_referral_signups` — New user signed up via your invite link
       - `notify_moderator_comments` — Moderator feedback on your creative objects
       - `notify_collaborator_comments` — Collaborator & reader comments/replies
       - `notify_mentions_and_forks` — `@mentions`, persona messages, and story architecture forks
-- **Preferences Page (Strictly Technical Preferences, Languages, Sync Mode & Admin Maturity)**:
-  - *Sidebar sections*: `Account & Security`, `Appearance & Languages` (Output UI locale, Default Input locale, pinned quick-switchers, offline `.ftl` pack downloads), `Sync & Storage` (enables Cloud + Device Meadowcap-delegated Willow sync once subscribed via Profile), `Notification Channels` (Web Push, Desktop/Mobile Push, transactional email & instant/daily/weekly digest cadence, paired devices), and *(Admin only)* `Docs Allowlist & Maturity Process`.
+- **Preferences Page (Strictly Technical Preferences, Languages, Web/Device Sync Overview & Admin Maturity)**:
+  - *Sidebar sections*: `Account & Sovereign Identity`, `Connected Apps & Google Docs`, `Languages (29)` (App Language, Writing Input default, offline `.ftl` pack downloads; theme switching lives in the top navbar), `Web, Device & Collaboration Sync` (informational overview of free web, free device, free cross-device collaboration sync, and optional paid personal sync handled in Profile → Plans), `Notification Channels` (Web Push, Desktop/Mobile Push, transactional email & digest cadence, paired devices), and *(Admin only)* `Docs Allowlist & Accounts`.
   - **Preferences Notification Checkboxes**:
     - `notify_security_signins` — New device login, `did:peer` key linkage, or password/session events
     - `notify_maturity_releases` *(Admin / Owner)* — Watched dependency announces an upcoming feature or ships a new release

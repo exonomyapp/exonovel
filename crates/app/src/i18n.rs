@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use gloo_net::http::Request;
 use leptos::prelude::*;
 
-use crate::models::{locale_flag_emoji, I18nCatalogResponse, LocaleDescriptor};
+use crate::{
+    models::{locale_flag_emoji, I18nCatalogResponse, LocaleDescriptor},
+    ui::{select_opt, ExoSelect},
+};
 
 #[derive(Clone, Copy)]
 pub struct I18nState {
@@ -12,6 +15,8 @@ pub struct I18nState {
     pub ui_locale: RwSignal<String>,
     pub input_locale: RwSignal<String>,
     pub dict: RwSignal<HashMap<String, String>>,
+    pub pinned_ui_locales: RwSignal<Vec<String>>,
+    pub persist_ui_locale: RwSignal<Option<Callback<String>>>,
 }
 
 impl I18nState {
@@ -24,6 +29,8 @@ impl I18nState {
             ui_locale: RwSignal::new("en".to_string()),
             input_locale: RwSignal::new("en".to_string()),
             dict: RwSignal::new(HashMap::new()),
+            pinned_ui_locales: RwSignal::new(Vec::new()),
+            persist_ui_locale: RwSignal::new(None),
         }
     }
 
@@ -130,6 +137,41 @@ pub fn InputLocaleBar(
     pinned_codes: Vec<String>,
 ) -> impl IntoView {
     let i18n = use_i18n();
+    let pinned_sv = StoredValue::new(pinned_codes);
+
+    let options = Signal::derive(move || {
+        let catalog = i18n.catalog.get();
+        let filtered: Vec<LocaleDescriptor> = pinned_sv.with_value(|pinned| {
+            if pinned.is_empty() {
+                catalog.clone()
+            } else {
+                let subset: Vec<LocaleDescriptor> = catalog
+                    .iter()
+                    .filter(|l| {
+                        pinned.contains(&l.code) || l.code == i18n.input_locale.get()
+                    })
+                    .cloned()
+                    .collect();
+                if subset.is_empty() {
+                    catalog.clone()
+                } else {
+                    subset
+                }
+            }
+        });
+        filtered
+            .into_iter()
+            .map(|loc| {
+                let label = format!(
+                    "{} {} — {}",
+                    locale_flag_emoji(&loc.code),
+                    loc.native_name,
+                    loc.english_name
+                );
+                select_opt(loc.code, label)
+            })
+            .collect()
+    });
 
     view! {
         <div class="exo-input-lang-bar">
@@ -143,41 +185,13 @@ pub fn InputLocaleBar(
                 {move || i18n.input_dir().to_uppercase()}
                 ")"
             </span>
-            <select
-                class="exo-input"
-                style="width: auto; min-width: 190px; padding: 6px 10px; font-size: 15px;"
-                aria-label=move || i18n.tr("input_lang_aria", "Writing Input Language")
-                prop:value=move || i18n.input_locale.get()
-                on:change=move |ev| {
-                    i18n.input_locale.set(event_target_value(&ev));
-                }
-            >
-                {move || {
-                    let catalog = i18n.catalog.get();
-                    let filtered: Vec<LocaleDescriptor> = if pinned_codes.is_empty() {
-                        catalog
-                    } else {
-                        let subset: Vec<LocaleDescriptor> = catalog
-                            .iter()
-                            .filter(|l| {
-                                pinned_codes.contains(&l.code)
-                                    || l.code == i18n.input_locale.get_untracked()
-                            })
-                            .cloned()
-                            .collect();
-                        if subset.is_empty() { catalog } else { subset }
-                    };
-                    filtered
-                        .into_iter()
-                        .map(|loc| {
-                            let label = format!("{} {} — {}", locale_flag_emoji(&loc.code), loc.native_name, loc.english_name);
-                            view! {
-                                <option value=loc.code>{label}</option>
-                            }
-                        })
-                        .collect_view()
-                }}
-            </select>
+            <ExoSelect
+                value=Signal::derive(move || i18n.input_locale.get())
+                options=options
+                aria_label=Signal::derive(move || i18n.tr("input_lang_aria", "Writing Input Language"))
+                style_extra="min-width: 210px;"
+                on_change=Callback::new(move |next| i18n.input_locale.set(next))
+            />
         </div>
     }
 }

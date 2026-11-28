@@ -1,8 +1,6 @@
 {
-  "name": "Remix ExoNovel",
+  "name": "ExoNovel Documentation",
   "description": "Interview-driven product documentation and Markdown reader for the ExoNovel collaborative creative writing project.",
   "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -11,7 +11,7 @@ ExoNovel działa w **przeglądarce** oraz na **5 platformach natywnych: Linux, m
 
 ### 1. Architektura wielokanałowego dostarczania
 Zdarzenia z `notifications`, `notification_devices` i `notification_preferences` trafiają równolegle przez:
-- **Kanał na żywo w aplikacji**: **Axum Server-Sent Events (SSE)** lub lokalne zdarzenia `iroh` w Trybie 2.
+- **Kanał na żywo w aplikacji**: **Axum Server-Sent Events (SSE)** lub lokalne zdarzenia `iroh` na urządzeniu.
 - **Web Push API**: Podpisywane przez bibliotekę Rust `web-push` (`0.11.0`).
 - **Desktop (`Linux`, `macOS`, `Windows`)**: Pierwszy plan przez `tauri-plugin-notification`; tło przez **UnifiedPush + D-Bus** (Linux), **APNs** (`a2`, macOS) i **WNS** (Windows).
 - **Mobile (`Android`, `iOS`)**: **Android** obsługuje **FCM HTTP v1** + **UnifiedPush**, rozpoczynając od czystej wersji **F-Droid `foss`** (wyłącznie UnifiedPush); **iOS** używa **APNs** (`a2`).
@@ -21,8 +21,8 @@ Zdarzenia z `notifications`, `notification_devices` i `notification_preferences`
   - `support@exosystems.net` (`"ExoSupport"`) — obsługa zgłoszeń wsparcia.
 
 ### 2. Ścisły podział Profil vs Preferencje (Styl GitHub)
-- **Profil**: Zawiera **100% wszystkich funkcji finansowych, portfeli, paywalli i zakupów** oraz powiadomienia o zarobkach i współpracy (`notify_author_earnings`, `notify_reader_purchases`, zaproszenia, polecenia, komentarze, wzmianki/forki).
-- **Preferencje**: Zawierają **preferencje techniczne, języki, tryb synchronizacji, kanały powiadomień i panel admina** (`notify_security_signins`, `notify_maturity_releases`, `notify_maturity_unblocked`), bez żadnych opcji finansowych.
+- **Profil**: Zawiera **100% wszystkich funkcji finansowych**, rozdzielonych na **Portfel** (metody płatności i transakcje), **Paywalle** (cenniki, udziały i zakupy czytelników) oraz **Plany** (darmowy dostęp w sieci/urządzeniu/współpracy oraz płatna synchronizacja osobista), a także powiadomienia o zarobkach i współpracy (`notify_author_earnings`, `notify_reader_purchases`, zaproszenia, polecenia, komentarze, wzmianki/forki).
+- **Preferencje**: Zawierają **preferencje techniczne (`Konto i suwerenna tożsamość`, `Połączone aplikacje i Dokumenty Google`, `Języki (29)` bez wyboru motywu, `Sieć, urządzenie i synchronizacja współpracy`, `Kanały powiadomień` i `Lista dostępu`)**, bez żadnych opcji finansowych.
 
 ### 3. Parytet zapisu Neon + Willow
 Wszystkie tabele powiadomień zachowują współrzędne `willow_*` dla pracy lokalnej bez dostępu do sieci.

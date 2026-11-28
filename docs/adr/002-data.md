@@ -17,13 +17,15 @@ ExoNovel spans a web application and native installations across **Linux, macOS,
    - **Willow Protocol Coordinates**: Centralized tables store deterministic Willow coordinates (`willow_namespace`, `willow_subspace`, `willow_path`, `willow_timestamp_us`, plus SHA-256 `payload_digest` and `byte_length` on binary payloads) under each owner's `did:peer` subspace so users can relocate their complete data set into a local Rust Willow store for mobile/offline collaboration.
    - **Multi-Size Media Assets**: Image uploads up to 2 MB are decoded server-side into UI-appropriate sizes (`thumb` 64×64, `medium` 256×256, `large` <= 1024px WebP/JPEG) stored with content digests so navigation chips and lists never load 2 MB originals.
    - **Neon Better Auth**: Managed authentication tables in `neon_auth` branching with the database.
-2. **Three Operating Modes, ExoNovel's `did:peer` Relay/Sync Nodes & Bidirectional Portability**:
-   - **Mode 1 — ExoNovel on the Web (`Free`)**: Cloud-backed web experience powered by **Neon PostgreSQL**.
-   - **Mode 2 — ExoNovel on Device (`Free`)**: Native **Linux, macOS, Windows, Android, and iOS** builds boot locally with **zero Neon requirement** using **`willow25`** (`0.7.11`) and **ExoNovel's free `iroh` (`v1.4.x`) discovery & relay zone**. **Blind Relay Mandate**: All content relayed or transiently buffered through ExoNovel's Mode 2 servers on its way to other peers is end-to-end encrypted on the sender's device so ExoNovel remains completely blind to any payload in transit.
-   - **Mode 3 — ExoNovel on Both with Managed Sync (`Paid: local-currency equivalent of $9/month or $90/year`)**:
-     - Activated and billed via the user's **Profile** page (with ExoNovel acting as a peer using its own **`did:peer` ID** and AOTA wallets to accept local currencies).
-     - Once active, **Sync Controls unlock inside Preferences**, registering the user's `did:peer` IDs with **ExoNovel's managed `willow25` sync node** via finalized **Meadowcap capability delegation** inside `willow25`—backing up decentralized Willow stores (with client-side AEAD-encrypted payloads so ExoNovel's backup node stays **cryptographically blind** to private content) and synchronizing Web ↔ Device natively without reinventing a custom sync protocol.
-     - Users can still export (`Neon → willow25`) or re-import (`willow25 → Neon`) deterministically via `willow_*` coordinates and causal **`loro` (`1.18.0`)** CRDT frontiers.
+2. **Web, Device, Collaboration Sync vs. Personal Device Sync (`did:peer` Portability)**:
+   - **On the Web (`Free`)**: Cloud-backed web workspace powered by PostgreSQL, accessible from any browser.
+   - **On Your Device (`Free`)**: Native **Linux, macOS, Windows, Android, and iOS** builds boot locally with **zero cloud database requirement** using **`willow25`** (`0.7.11`) and **ExoNovel's free `iroh` (`v1.4.x`) discovery & relay zone**. **Blind Relay Mandate**: All content relayed or transiently buffered through ExoNovel's relay servers on its way to other peers is end-to-end encrypted on the sender's device so ExoNovel remains completely blind to any payload in transit.
+   - **Free Automatic Collaboration Sync Across Web & Device (`Free for Co-Writers`)**: Whenever an author adds collaborators, synchronization between co-writers happens automatically so they can share and co-author work together—regardless of whether one writer uses a web browser and another works on a desktop or mobile device install.
+   - **Personal Device Sync Plan (`Paid: local-currency equivalent of $9/month or $90/year`)**:
+     - Covers **only** keeping an individual user's own offline device drafts continuously synced with that same user's own web profile.
+     - Activated and billed via **Profile → Plans** (configured with **Profile → Wallet**, with ExoNovel acting as a peer using its own **`did:peer` ID** and AOTA wallets to accept local currencies).
+     - Registers the user's `did:peer` IDs with **ExoNovel's managed `willow25` sync service** via finalized **Meadowcap capability delegation** inside `willow25`—backing up client-side AEAD-encrypted payloads (so ExoNovel stays **cryptographically blind** to private content) and synchronizing personal Web ↔ Device shelves seamlessly.
+     - Users can still export (`PostgreSQL → willow25`) or re-import (`willow25 → PostgreSQL`) deterministically via `willow_*` coordinates and causal **`loro` (`1.18.0`)** CRDT frontiers.
 
 ## Sub-ADRs
 

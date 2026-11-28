@@ -16,9 +16,9 @@ ExoNovel działa w przeglądarce oraz na pięciu platformach natywnych (Linux, m
 
 ## Decyzja
 
-1. **Ślepy przekaźnik i poufność treści w Trybie 2 ORAZ Trybie 3 (`willow25`)**:
-   - Darmowa strefa **`iroh` (`v1.4.x`)** z pełnym szyfrowaniem Noise + `ChaCha20-Poly1305`.
-   - Wszystkie utwory, migawki/delty Loro, wiadomości i media są przed wysłaniem z urządzenia autora **dopełniane, solone losowymi nonce i szyfrowane AEAD (`XChaCha20-Poly1305` / MLS)**, dzięki czemu węzły magazynujące Trybu 3 i przekaźniki Trybu 2 widzą wyłącznie nieczytelny szyfrogram.
+1. **Ślepy przekaźnik i poufność treści dla przekaźnika współpracy ORAZ osobistego syncu `willow25`**:
+   - Darmowa strefa **`iroh` (`v1.4.x`)** z pełnym szyfrowaniem Noise + `ChaCha20-Poly1305` zapewniająca darmową synchronizację współpracy między przeglądarką a urządzeniami.
+   - Wszystkie utwory, migawki/delty Loro, wiadomości i media są przed wysłaniem z urządzenia autora **dopełniane, solone losowymi nonce i szyfrowane AEAD (`XChaCha20-Poly1305` / MLS)**, dzięki czemu węzły synchronizacji osobistej i przekaźniki współpracy widzą wyłącznie nieczytelny szyfrogram.
 2. **Wbudowany węzeł natywny**: Kompilacje desktopowe i mobilne osadzają natywny węzeł `iroh` (`iroh-docs` + `iroh-blobs` + `iroh-gossip`).
 3. **Mostek Web i dwukierunkowa migracja Neon ↔ `willow25`**: Przeglądarki łączą się przez bezpieczne WebSockety (`wss://`), a aplikacje natywne działają bez Neon z możliwością późniejszego importu z powrotem do chmury.
 

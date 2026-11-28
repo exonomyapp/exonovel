@@ -19,9 +19,9 @@ ExoNovel erscheint im Web sowie auf fünf nativen Plattformen (Linux, macOS, Win
 
 ## Entscheidung
 
-1. **Blind-Relay & Inhaltsvertraulichkeit in Modus 2 UND Modus 3 (`willow25`)**:
-   - Betrieb von **ExoNovels kostenloser `iroh`**-Zone (`v1.4.x`) für NAT-Traversal mit durchgängiger Noise + `ChaCha20-Poly1305`-Verschlüsselung.
-   - **Clientseitige Nutzdatenverschlüsselung**: Während `willow25` + Meadowcap Transport und Pfadberechtigungen absichern, könnte ein Speicher-Peer im Modus 3 unverschlüsselte Bytes lesen. Daher werden alle Werke, Loro-Snapshots/Deltas, Chats und Medien vor Verlassen des Autorengeräts **gepolstert, mit Nonces gesalzen und per AEAD (`XChaCha20-Poly1305` / MLS) verschlüsselt**. Relays und Backup-Knoten halten ausschließlich opaken Chiffretext.
+1. **Blind-Relay & Inhaltsvertraulichkeit für Team-Relay & persönliche `willow25`-Sync**:
+   - Betrieb von **ExoNovels kostenloser `iroh`**-Zone (`v1.4.x`) für NAT-Traversal und kostenlose Web↔Gerät-Zusammenarbeit zwischen Schreibenden mit durchgängiger Noise + `ChaCha20-Poly1305`-Verschlüsselung.
+   - **Clientseitige Nutzdatenverschlüsselung**: Während `willow25` + Meadowcap Transport und Pfadberechtigungen absichern, könnte ein Speicher-Peer für die persönliche Synchronisation unverschlüsselte Bytes lesen. Daher werden alle Werke, Loro-Snapshots/Deltas, Chats und Medien vor Verlassen des Autorengeräts **gepolstert, mit Nonces gesalzen und per AEAD (`XChaCha20-Poly1305` / MLS) verschlüsselt**. Relays und Backup-Knoten halten ausschließlich opaken Chiffretext.
 2. **Eingebetteter nativer Knoten**: Desktop- und Mobil-Installationen betten einen nativen `iroh`-Knoten (`iroh-docs` + `iroh-blobs` + `iroh-gossip`) ein.
 3. **Web-Brücke & Bidirektionale Verlagerung Neon ↔ `willow25`**:
    - Webbrowser ohne rohe UDP-Sockets synchronisieren per `wss://`-Brücke mit Neon PostgreSQL unter identischem `loro` (`1.18.0`)-CRDT-Modell.

@@ -867,7 +867,7 @@ pub async fn api_test_notification(
 }
 
 // =========================================================================
-// Billing, Wallets, Paywalls, Reader Purchases & Mode 3 Sync Subscription
+// Billing, Wallets, Paywalls, Reader Purchases & Personal Sync Subscription
 // Strict architectural rule (ADR 004 / 008): Owned exclusively by Profile page
 // =========================================================================
 
@@ -1007,7 +1007,7 @@ pub async fn api_activate_sync_plan(
 
     let entry_id = format!("bil_{ts_us}");
     let note = format!(
-        "Mode 3 Managed Willow Sync ({}) via {}",
+        "ExoNovel Personal Web-Device Sync ({}) via {}",
         body.plan_tier,
         body.payment_rail.trim()
     );
@@ -1061,7 +1061,7 @@ pub async fn api_activate_sync_plan(
         "author_earnings",
         "ExoNovel Sync Subscription Updated",
         &format!(
-            "Mode 3 plan '{}' recorded ({} {:.2}). Preferences Sync & Storage controls updated.",
+            "Personal Sync plan '{}' recorded ({} {:.2}). Active under Profile -> Plans.",
             body.plan_tier,
             currency,
             amount_cents as f64 / 100.0

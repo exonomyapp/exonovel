@@ -52,6 +52,8 @@ pub struct UserProfile {
     pub preferred_input_locales: Vec<String>,
     pub sync_plan_tier: String,
     pub willow_sync_enabled: bool,
+    pub profile_nav_width: i32,
+    pub preferences_nav_width: i32,
     pub last_active_tab: String,
     pub last_doc_path: String,
     pub provider_given_name: String,
@@ -271,6 +273,8 @@ pub async fn ensure_schema(pool: &PgPool) -> Result<(), sqlx::Error> {
             timezone TEXT NOT NULL DEFAULT '',
             preferred_format TEXT NOT NULL DEFAULT 'novel',
             appearance_mode TEXT NOT NULL DEFAULT 'system',
+            profile_nav_width INTEGER NOT NULL DEFAULT 260,
+            preferences_nav_width INTEGER NOT NULL DEFAULT 260,
             last_active_tab TEXT NOT NULL DEFAULT 'workspace',
             last_doc_path TEXT NOT NULL DEFAULT '',
             provider_given_name TEXT NOT NULL DEFAULT '',
@@ -335,6 +339,15 @@ pub async fn ensure_schema(pool: &PgPool) -> Result<(), sqlx::Error> {
         .execute(pool)
         .await?;
     sqlx::query("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS willow_sync_enabled BOOLEAN NOT NULL DEFAULT FALSE;")
+        .execute(pool)
+        .await?;
+    sqlx::query("ALTER TABLE user_profiles DROP COLUMN IF EXISTS settings_nav_width;")
+        .execute(pool)
+        .await?;
+    sqlx::query("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS profile_nav_width INTEGER NOT NULL DEFAULT 260;")
+        .execute(pool)
+        .await?;
+    sqlx::query("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferences_nav_width INTEGER NOT NULL DEFAULT 260;")
         .execute(pool)
         .await?;
 
@@ -940,7 +953,7 @@ pub async fn resolve_and_sync_identity(
             avatar_asset_id, avatar_url, avatar_thumb_url, website, location,
             locale, timezone, preferred_format, appearance_mode,
             ui_locale, default_input_locale, preferred_ui_locales, preferred_input_locales,
-            sync_plan_tier, willow_sync_enabled,
+            sync_plan_tier, willow_sync_enabled, profile_nav_width, preferences_nav_width,
             last_active_tab, last_doc_path, provider_given_name, provider_family_name,
             provider_account_id, provider_name, provider_scopes, email_verified,
             to_char(auth_created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS auth_created_at,
@@ -1005,6 +1018,8 @@ fn profile_from_row(row: &sqlx::postgres::PgRow) -> Result<UserProfile, String> 
         preferred_input_locales: row.try_get("preferred_input_locales").unwrap_or_else(|_| vec!["en".to_string()]),
         sync_plan_tier: row.try_get("sync_plan_tier").unwrap_or_else(|_| "free".to_string()),
         willow_sync_enabled: row.try_get("willow_sync_enabled").unwrap_or(false),
+        profile_nav_width: row.try_get::<i32, _>("profile_nav_width").unwrap_or(260).clamp(200, 420),
+        preferences_nav_width: row.try_get::<i32, _>("preferences_nav_width").unwrap_or(260).clamp(200, 420),
         last_active_tab: row.try_get("last_active_tab").unwrap_or_else(|_| "workspace".to_string()),
         last_doc_path: row.try_get("last_doc_path").unwrap_or_default(),
         provider_given_name: row.try_get("provider_given_name").unwrap_or_default(),
@@ -1224,6 +1239,8 @@ pub struct ProfileUpdateInput {
     pub preferred_ui_locales: Option<Vec<String>>,
     pub preferred_input_locales: Option<Vec<String>>,
     pub willow_sync_enabled: Option<bool>,
+    pub profile_nav_width: Option<i32>,
+    pub preferences_nav_width: Option<i32>,
     pub last_active_tab: Option<String>,
     pub last_doc_path: Option<String>,
 }
@@ -1311,6 +1328,16 @@ pub async fn update_user_profile(
             return Err("Unsupported input language code.".to_string());
         }
     }
+    if let Some(w) = input.profile_nav_width {
+        if !(200..=420).contains(&w) {
+            return Err("Profile navigation panel width must be between 200 and 420 pixels.".to_string());
+        }
+    }
+    if let Some(w) = input.preferences_nav_width {
+        if !(200..=420).contains(&w) {
+            return Err("Preferences navigation panel width must be between 200 and 420 pixels.".to_string());
+        }
+    }
 
     let ts_us = now_timestamp_us();
     let row = sqlx::query(
@@ -1336,6 +1363,8 @@ pub async fn update_user_profile(
             preferred_ui_locales = COALESCE($20, preferred_ui_locales),
             preferred_input_locales = COALESCE($21, preferred_input_locales),
             willow_sync_enabled = COALESCE($22, willow_sync_enabled),
+            profile_nav_width = COALESCE($23, profile_nav_width),
+            preferences_nav_width = COALESCE($24, preferences_nav_width),
             willow_timestamp_us = $17,
             updated_at = NOW()
         WHERE did_peer = $1
@@ -1344,7 +1373,7 @@ pub async fn update_user_profile(
             avatar_asset_id, avatar_url, avatar_thumb_url, website, location,
             locale, timezone, preferred_format, appearance_mode,
             ui_locale, default_input_locale, preferred_ui_locales, preferred_input_locales,
-            sync_plan_tier, willow_sync_enabled,
+            sync_plan_tier, willow_sync_enabled, profile_nav_width, preferences_nav_width,
             last_active_tab, last_doc_path, provider_given_name, provider_family_name,
             provider_account_id, provider_name, provider_scopes, email_verified,
             to_char(auth_created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS auth_created_at,
@@ -1375,6 +1404,8 @@ pub async fn update_user_profile(
     .bind(input.preferred_ui_locales.as_deref())
     .bind(input.preferred_input_locales.as_deref())
     .bind(input.willow_sync_enabled)
+    .bind(input.profile_nav_width)
+    .bind(input.preferences_nav_width)
     .fetch_one(pool)
     .await
     .map_err(|e| format!("Failed to update profile: {e}"))?;
@@ -1656,6 +1687,8 @@ pub async fn list_identities(pool: &PgPool) -> Result<Vec<IdentityRecord>, Strin
             COALESCE(up.preferred_input_locales, ARRAY['en']::text[]) AS preferred_input_locales,
             COALESCE(up.sync_plan_tier, 'free') AS sync_plan_tier,
             COALESCE(up.willow_sync_enabled, FALSE) AS willow_sync_enabled,
+            COALESCE(up.profile_nav_width, 260) AS profile_nav_width,
+            COALESCE(up.preferences_nav_width, 260) AS preferences_nav_width,
             COALESCE(up.last_active_tab, 'workspace') AS last_active_tab,
             COALESCE(up.last_doc_path, '') AS last_doc_path,
             COALESCE(up.provider_given_name, '') AS provider_given_name,

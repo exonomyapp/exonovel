@@ -5,6 +5,7 @@ mod cms;
 mod connected_apps;
 mod db;
 mod docs;
+mod guides;
 mod i18n;
 mod live;
 mod media;
@@ -53,6 +54,7 @@ use crate::{
         extract_title_and_headings, get_docs_tree_for_locale, render_safe_gfm_html,
         resolve_safe_doc_path_for_locale, DocPayload,
     },
+    guides::{api_get_guide, api_list_guides, ensure_guides_schema, seed_guides_from_disk},
     i18n::{api_i18n_catalog, api_i18n_pack},
     live::{
         api_events_stream, api_issue_sse_ticket, emit_live_patch, spawn_pg_listener, LiveBus,
@@ -112,7 +114,11 @@ async fn main() {
         if let Err(err) = ensure_connected_apps_schema(pool).await {
             eprintln!("Connected apps schema warning: {err}");
         }
+        if let Err(err) = ensure_guides_schema(pool).await {
+            eprintln!("Dear World guides schema warning: {err}");
+        }
         seed_cms_from_disk(pool, &root_dir).await;
+        seed_guides_from_disk(pool, &root_dir).await;
     }
 
     let live_bus = LiveBus::new();
@@ -174,6 +180,8 @@ async fn main() {
         .route("/api/notifications/test", post(api_test_notification))
         .route("/api/billing", get(api_list_billing))
         .route("/api/billing/sync-plan", post(api_activate_sync_plan))
+        .route("/api/guides", get(api_list_guides))
+        .route("/api/guides/{slug}", get(api_get_guide))
         .route("/api/docs", get(api_docs))
         .route("/api/doc", get(api_doc))
         .route("/api/cms/adrs", get(api_cms_list_adrs).post(api_cms_upsert_adr))
@@ -342,7 +350,7 @@ async fn api_update_profile(
         return Err((
             StatusCode::PAYMENT_REQUIRED,
             Json(serde_json::json!({
-                "error": "Active ExoNovel Sync subscription required in Profile -> Wallet, Paywalls & Purchases."
+                "error": "Active ExoNovel Personal Sync subscription required in Profile -> Plans."
             })),
         ));
     }
@@ -958,6 +966,8 @@ async fn api_admin_update_identity_profile(
         preferred_ui_locales: None,
         preferred_input_locales: None,
         willow_sync_enabled: None,
+        profile_nav_width: None,
+        preferences_nav_width: None,
         last_active_tab: None,
         last_doc_path: None,
     };

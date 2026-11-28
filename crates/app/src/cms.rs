@@ -13,6 +13,7 @@ use crate::{
         DriveSaveResponse, MaturityNoteItem, OwnerExternalTask, ProviderModelInfo, ToolCatalogItem,
         VerifiedUser,
     },
+    ui::{select_opt, ExoSelect},
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1071,19 +1072,16 @@ pub fn DocsCmsView(
                                 </div>
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                <select
-                                    class="exo-input"
-                                    style="min-width: 190px;"
-                                    prop:value=move || backup_format.get()
-                                    on:change=move |ev| set_backup_format.set(event_target_value(&ev))
-                                >
-                                    <option value="google-doc">
-                                        {move || i18n.tr("cms_backup_fmt_gdoc", "Google Docs (Editable)")}
-                                    </option>
-                                    <option value="markdown">
-                                        {move || i18n.tr("cms_backup_fmt_md", "Markdown (.md)")}
-                                    </option>
-                                </select>
+                                <ExoSelect
+                                    value=Signal::derive(move || backup_format.get())
+                                    options=Signal::derive(move || vec![
+                                        select_opt("google-doc", i18n.tr("cms_backup_fmt_gdoc", "Google Docs (Editable)")),
+                                        select_opt("markdown", i18n.tr("cms_backup_fmt_md", "Markdown (.md)")),
+                                    ])
+                                    style_extra="min-width: 190px;".to_string()
+                                    aria_label=Signal::derive(move || i18n.tr("drive_target_fmt_label", "Target Format"))
+                                    on_change=Callback::new(move |val| set_backup_format.set(val))
+                                />
                                 <button
                                     type="button"
                                     class="exo-btn exo-btn-primary"
@@ -1256,16 +1254,15 @@ pub fn DocsCmsView(
 
                                         <Show when=is_admin>
                                             <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);">
-                                                <select
-                                                    class="exo-input"
-                                                    style="flex: 1; min-width: 150px;"
-                                                    prop:value=move || dep_tool_key.get()
-                                                    on:change=move |ev| set_dep_tool_key.set(event_target_value(&ev))
-                                                >
-                                                    {move || tools.get().into_iter().map(|t| {
-                                                        view! { <option value=t.tool_key>{t.name}</option> }
-                                                    }).collect_view()}
-                                                </select>
+                                                <ExoSelect
+                                                    value=Signal::derive(move || dep_tool_key.get())
+                                                    options=Signal::derive(move || {
+                                                        tools.get().into_iter().map(|t| select_opt(t.tool_key, t.name)).collect()
+                                                    })
+                                                    style_extra="flex: 1; min-width: 150px;".to_string()
+                                                    aria_label=Signal::derive(move || i18n.tr("cms_th_tool", "Tool"))
+                                                    on_change=Callback::new(move |val| set_dep_tool_key.set(val))
+                                                />
                                                 <input
                                                     type="text"
                                                     class="exo-input"
@@ -1352,19 +1349,20 @@ pub fn DocsCmsView(
                                                 <label class="exo-label">
                                                     {move || i18n.tr("cms_field_status", "Status")}
                                                 </label>
-                                                <select
-                                                    class="exo-input"
-                                                    prop:value=move || form_status.get()
-                                                    on:change=move |ev| set_form_status.set(event_target_value(&ev))
-                                                >
-                                                    <option value="proposed">{move || i18n.tr("cms_status_opt_proposed", "proposed")}</option>
-                                                    <option value="on-hold">{move || i18n.tr("cms_status_opt_on_hold", "on-hold (awaiting tooling)")}</option>
-                                                    <option value="ready-to-build">{move || i18n.tr("cms_status_opt_ready", "ready-to-build")}</option>
-                                                    <option value="accepted">{move || i18n.tr("cms_status_opt_accepted", "accepted")}</option>
-                                                    <option value="deprecated">{move || i18n.tr("cms_status_opt_deprecated", "deprecated")}</option>
-                                                    <option value="superseded">{move || i18n.tr("cms_status_opt_superseded", "superseded")}</option>
-                                                    <option value="rejected">{move || i18n.tr("cms_status_opt_rejected", "rejected")}</option>
-                                                </select>
+                                                <ExoSelect
+                                                    value=Signal::derive(move || form_status.get())
+                                                    options=Signal::derive(move || vec![
+                                                        select_opt("proposed", i18n.tr("cms_status_opt_proposed", "proposed")),
+                                                        select_opt("on-hold", i18n.tr("cms_status_opt_on_hold", "on-hold (awaiting tooling)")),
+                                                        select_opt("ready-to-build", i18n.tr("cms_status_opt_ready", "ready-to-build")),
+                                                        select_opt("accepted", i18n.tr("cms_status_opt_accepted", "accepted")),
+                                                        select_opt("deprecated", i18n.tr("cms_status_opt_deprecated", "deprecated")),
+                                                        select_opt("superseded", i18n.tr("cms_status_opt_superseded", "superseded")),
+                                                        select_opt("rejected", i18n.tr("cms_status_opt_rejected", "rejected")),
+                                                    ])
+                                                    aria_label=Signal::derive(move || i18n.tr("cms_field_status", "Status"))
+                                                    on_change=Callback::new(move |val| set_form_status.set(val))
+                                                />
                                             </div>
                                             <div class="exo-field">
                                                 <label class="exo-label">
@@ -1569,16 +1567,15 @@ pub fn DocsCmsView(
                                             </div>
                                             <Show when=is_admin>
                                                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                                    <select
-                                                        class="exo-input"
-                                                        style="width: auto; min-width: 170px;"
-                                                        prop:value=move || selected_scan_tool.get()
-                                                        on:change=move |ev| set_selected_scan_tool.set(event_target_value(&ev))
-                                                    >
-                                                        {move || tools.get().into_iter().map(|t| {
-                                                            view! { <option value=t.tool_key>{t.name}</option> }
-                                                        }).collect_view()}
-                                                    </select>
+                                                    <ExoSelect
+                                                        value=Signal::derive(move || selected_scan_tool.get())
+                                                        options=Signal::derive(move || {
+                                                            tools.get().into_iter().map(|t| select_opt(t.tool_key, t.name)).collect()
+                                                        })
+                                                        style_extra="width: auto; min-width: 170px;".to_string()
+                                                        aria_label=Signal::derive(move || i18n.tr("cms_th_tool", "Tool"))
+                                                        on_change=Callback::new(move |val| set_selected_scan_tool.set(val))
+                                                    />
                                                     <button type="button" class="exo-btn exo-btn-primary" on:click=generate_proposal>
                                                         {move || i18n.tr("cms_generate_proposal", "Generate Proposal Note")}
                                                     </button>

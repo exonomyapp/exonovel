@@ -5,8 +5,9 @@ mod connected_apps_ui;
 mod i18n;
 mod live;
 mod models;
-mod profile;
 mod preferences;
+mod profile;
+mod ui;
 
 use gloo_net::http::Request;
 use leptos::prelude::*;
@@ -20,16 +21,17 @@ use web_sys::RequestCredentials;
 
 use crate::{
     cms::DocsCmsView,
-    i18n::{fetch_locale_catalog, fetch_locale_pack, use_i18n, I18nState},
+    i18n::{fetch_locale_catalog, fetch_locale_pack, use_i18n, I18nState, InputLocaleBar},
     live::{spawn_live_sse_connector, use_live_sync, LiveSyncState},
     models::{
-        account_role_key, active_persona_for_user, copy_text_to_clipboard, detect_browser_timezone,
+        active_persona_for_user, copy_text_to_clipboard, detect_browser_timezone,
         display_name_for_user, is_safe_avatar_url, load_authenticated_user, read_session_storage,
-        remove_session_storage, resolve_fresh_jwt, save_profile_patch, sleep_ms,
-        write_session_storage, ActiveTab, AppearanceMode, AuthConfigResponse, BellIcon, CopyIcon,
-        GitHubLogoIcon, GoogleLogoIcon, InvitePreview, LocaleFlag, MonitorIcon, MoonIcon,
-        NotificationItem, NotificationsListResponse, PreferencesSection, ProfilePatchResponse,
-        ProfileTab, SunIcon, VerifiedUser,
+        remove_session_storage, resolve_fresh_jwt, save_profile_patch, short_did_preview,
+        sleep_ms, write_session_storage, ActiveTab, AppearanceMode, AuthConfigResponse, BellIcon,
+        CopyIcon, GitHubLogoIcon, GoogleLogoIcon, GuideChapterDetail, GuideChapterSummary,
+        GuidesListResponse, InvitePreview, LocaleFlag, MonitorIcon, MoonIcon, NotificationItem,
+        NotificationsListResponse, PreferencesSection, ProfilePatchResponse, ProfileTab, SunIcon,
+        VerifiedUser,
     },
     preferences::PreferencesView,
     profile::ProfileView,
@@ -125,6 +127,7 @@ pub fn App() -> impl IntoView {
         <Router>
             <Routes fallback=|| view! { <HomeView initial_show_signin=false /> }>
                 <Route path=path!("/") view=|| view! { <HomeView initial_show_signin=false /> } />
+                <Route path=path!("/dear-world") view=|| view! { <HomeView initial_show_signin=false initial_guides=true /> } />
                 <Route path=path!("/signin") view=|| view! { <HomeView initial_show_signin=true /> } />
                 <Route path=path!("/privacy") view=PrivacyPolicyView />
                 <Route path=path!("/terms") view=TermsOfServiceView />
@@ -134,7 +137,10 @@ pub fn App() -> impl IntoView {
 }
 
 #[component]
-fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView {
+fn HomeView(
+    #[prop(default = false)] initial_show_signin: bool,
+    #[prop(default = false)] initial_guides: bool,
+) -> impl IntoView {
     let live = LiveSyncState::new();
     provide_context(live);
     let i18n = use_i18n();
@@ -142,15 +148,23 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
     let (auth_config, set_auth_config) = signal::<Option<AuthConfigResponse>>(None);
     let (loading_session, set_loading_session) = signal(true);
     let (show_signin, set_show_signin) = signal(initial_show_signin);
+    let (show_guides, set_show_guides) = signal(initial_guides);
     let (current_user, set_current_user) = signal::<Option<VerifiedUser>>(None);
     let (session_jwt, set_session_jwt) = signal::<Option<String>>(None);
-    let (active_tab, set_active_tab) = signal(ActiveTab::Workspace);
+    let (active_tab, set_active_tab) = signal(if initial_guides {
+        ActiveTab::Guides
+    } else {
+        ActiveTab::Workspace
+    });
     let (appearance, set_appearance) = signal(AppearanceMode::System);
     let (active_doc_path, set_active_doc_path) = signal(String::new());
-    let (return_tab, set_return_tab) = signal(ActiveTab::Workspace);
+    let (return_tab, set_return_tab) = signal(if initial_guides {
+        ActiveTab::Guides
+    } else {
+        ActiveTab::Workspace
+    });
     let (chip_open, set_chip_open) = signal(false);
     let (bell_open, set_bell_open) = signal(false);
-    let (lang_open, set_lang_open) = signal(false);
     let (notifications, set_notifications) = signal::<Vec<NotificationItem>>(Vec::new());
     let (unread_count, set_unread_count) = signal(0_usize);
     let (toast_msg, set_toast_msg) = signal::<Option<String>>(None);
@@ -203,7 +217,33 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
         });
     };
 
+    let persist_profile_patch = move |patch: serde_json::Value| {
+        if current_user.get_untracked().is_none() {
+            return;
+        }
+        let auth_url = auth_config.get_untracked().and_then(|c| c.auth_url);
+        let jwt = session_jwt.get_untracked();
+        leptos::task::spawn_local(async move {
+            if let Ok(updated) =
+                save_profile_patch(auth_url.as_deref(), jwt.as_deref(), patch).await
+            {
+                i18n.pinned_ui_locales
+                    .set(updated.profile.preferred_ui_locales.clone());
+                set_current_user.update(|u_opt| {
+                    if let Some(u) = u_opt {
+                        u.profile = Some(updated.profile);
+                        u.personas = updated.personas;
+                        u.active_persona = updated.active_persona;
+                    }
+                });
+            }
+        });
+    };
+
     let apply_user_profile_state = move |user: &VerifiedUser| {
+        i18n.persist_ui_locale.set(Some(Callback::new(move |next_ui: String| {
+            persist_profile_patch(serde_json::json!({ "uiLocale": next_ui }));
+        })));
         if let Some(prof) = &user.profile {
             if !prof.appearance_mode.is_empty() {
                 set_appearance.set(AppearanceMode::from_str(&prof.appearance_mode));
@@ -211,16 +251,21 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
             if !prof.ui_locale.is_empty() {
                 i18n.ui_locale.set(prof.ui_locale.clone());
             }
+            i18n.pinned_ui_locales.set(prof.preferred_ui_locales.clone());
             if !prof.default_input_locale.is_empty() {
                 i18n.input_locale.set(prof.default_input_locale.clone());
             }
             if !prof.last_doc_path.is_empty() && active_doc_path.get_untracked().is_empty() {
                 set_active_doc_path.set(prof.last_doc_path.clone());
             }
-            if prof.last_active_tab == "docs" && user.authorized {
-                set_return_tab.set(ActiveTab::Docs);
-            } else {
-                set_return_tab.set(ActiveTab::Workspace);
+            if !initial_guides {
+                if prof.last_active_tab == "docs" && user.authorized {
+                    set_return_tab.set(ActiveTab::Docs);
+                } else if prof.last_active_tab == "guides" {
+                    set_return_tab.set(ActiveTab::Guides);
+                } else {
+                    set_return_tab.set(ActiveTab::Workspace);
+                }
             }
         }
     };
@@ -243,6 +288,11 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                             }
                             "docs" => {
                                 set_active_tab.set(ActiveTab::Docs);
+                                should_clean = true;
+                            }
+                            "guides" | "dear-world" => {
+                                set_active_tab.set(ActiveTab::Guides);
+                                set_show_guides.set(true);
                                 should_clean = true;
                             }
                             _ => {}
@@ -309,7 +359,7 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
         }
     });
 
-    // Apply Theme Appearance cleanly to <html>
+    // Apply selected theme cleanly to <html>
     Effect::new(move |_| {
         let mode = appearance.get();
         if let Some(root) = web_sys::window()
@@ -319,27 +369,6 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
             let _ = root.set_attribute("data-appearance", mode.as_str());
         }
     });
-
-    let persist_profile_patch = move |patch: serde_json::Value| {
-        if current_user.get_untracked().is_none() {
-            return;
-        }
-        let auth_url = auth_config.get_untracked().and_then(|c| c.auth_url);
-        let jwt = session_jwt.get_untracked();
-        leptos::task::spawn_local(async move {
-            if let Ok(updated) =
-                save_profile_patch(auth_url.as_deref(), jwt.as_deref(), patch).await
-            {
-                set_current_user.update(|u_opt| {
-                    if let Some(u) = u_opt {
-                        u.profile = Some(updated.profile);
-                        u.personas = updated.personas;
-                        u.active_persona = updated.active_persona;
-                    }
-                });
-            }
-        });
-    };
 
     // Start global real-time stream listener once signed in & react to notification events
     Effect::new(move |_| {
@@ -374,13 +403,14 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
         if current != ActiveTab::Preferences && current != ActiveTab::Profile {
             let tab_to_save = match current {
                 ActiveTab::Docs => ActiveTab::Docs,
+                ActiveTab::Guides => ActiveTab::Guides,
                 _ => ActiveTab::Workspace,
             };
             set_return_tab.set(tab_to_save);
-            let tab_str = if tab_to_save == ActiveTab::Docs {
-                "docs"
-            } else {
-                "workspace"
+            let tab_str = match tab_to_save {
+                ActiveTab::Docs => "docs",
+                ActiveTab::Guides => "guides",
+                _ => "workspace",
             };
             let doc_str = active_doc_path.get_untracked();
             persist_profile_patch(serde_json::json!({
@@ -390,7 +420,6 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
         }
         set_chip_open.set(false);
         set_bell_open.set(false);
-        set_lang_open.set(false);
         set_active_tab.set(dest);
     };
 
@@ -515,7 +544,6 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
         let auth_url = auth_config.get_untracked().and_then(|c| c.auth_url);
         set_chip_open.set(false);
         set_bell_open.set(false);
-        set_lang_open.set(false);
         leptos::task::spawn_local(async move {
             if let Some(url) = auth_url {
                 let endpoint = format!("{}/sign-out", url.trim_end_matches('/'));
@@ -526,23 +554,25 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                     let _ = req.send().await;
                 }
             }
+            i18n.persist_ui_locale.set(None);
+            i18n.pinned_ui_locales.set(Vec::new());
             set_current_user.set(None);
             set_session_jwt.set(None);
             set_sse_started.set(false);
             set_show_signin.set(false);
+            set_show_guides.set(false);
             set_active_tab.set(ActiveTab::Workspace);
         });
     };
 
     view! {
         <div class="exo-shell">
-            <Show when=move || chip_open.get() || bell_open.get() || lang_open.get()>
+            <Show when=move || chip_open.get() || bell_open.get()>
                 <div
                     class="exo-nav-backdrop"
                     on:click=move |_| {
                         set_chip_open.set(false);
                         set_bell_open.set(false);
-                        set_lang_open.set(false);
                     }
                 />
             </Show>
@@ -554,9 +584,10 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                     class="navbar-brand-link"
                     on:click=move |_| {
                         set_show_signin.set(false);
+                        set_show_guides.set(false);
                         set_chip_open.set(false);
                         set_bell_open.set(false);
-                        set_lang_open.set(false);
+                        set_active_tab.set(ActiveTab::Workspace);
                     }
                 >
                     <img src="/exonovel-logo.png" alt="ExoNovel" class="navbar-logo navbar-logo-light" />
@@ -584,133 +615,35 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                 .into_iter()
                                 .filter(|p| p.persona_did != active_did_cmp)
                                 .collect();
-                            let pinned_ui_sv = StoredValue::new(
-                                user.profile
-                                    .as_ref()
-                                    .map(|p| p.preferred_ui_locales.clone())
-                                    .unwrap_or_default(),
-                            );
 
                             view! {
                                 <>
                                     <div class="exo-desktop-nav-links">
-                                        <a href="https://exosystems.net/" class="nav-link">
-                                            {move || i18n.tr("nav_home", "Home")}
-                                        </a>
-
                                         <button
                                             type="button"
                                             class=move || if active_tab.get() == ActiveTab::Workspace { "nav-link nav-link-active" } else { "nav-link" }
                                             on:click=move |_| {
                                                 set_chip_open.set(false);
                                                 set_bell_open.set(false);
-                                                set_lang_open.set(false);
                                                 set_active_tab.set(ActiveTab::Workspace);
                                                 persist_profile_patch(serde_json::json!({ "lastActiveTab": "workspace" }));
                                             }
                                         >
-                                            {move || i18n.tr("nav_workspace", "ExoNovel")}
+                                            {move || i18n.tr("nav_desk", "Desk")}
                                         </button>
 
-                                        {if can_read_docs {
-                                            view! {
-                                                <button
-                                                    type="button"
-                                                    class=move || if active_tab.get() == ActiveTab::Docs { "nav-link nav-link-active" } else { "nav-link" }
-                                                    on:click=move |_| {
-                                                        set_chip_open.set(false);
-                                                        set_bell_open.set(false);
-                                                        set_lang_open.set(false);
-                                                        set_active_tab.set(ActiveTab::Docs);
-                                                        persist_profile_patch(serde_json::json!({ "lastActiveTab": "docs" }));
-                                                    }
-                                                >
-                                                    {move || i18n.tr("nav_docs", "Docs & ADRs")}
-                                                </button>
-                                            }.into_any()
-                                        } else {
-                                            view! { <span /> }.into_any()
-                                        }}
-
-                                        <div class="exo-live-indicator" title=move || i18n.tr("live_connection_title", "Global Real-Time Stream Connection")>
-                                            <span class=move || if live.connected.get() { "exo-live-dot exo-live-dot-on" } else { "exo-live-dot" } />
-                                            <span>{move || i18n.tr("live_sync_label", "Live")}</span>
-                                        </div>
-                                    </div>
-
-                                    <div class="exo-lang-wrap">
                                         <button
                                             type="button"
-                                            class="exo-lang-trigger"
-                                            aria-label=move || i18n.tr("ui_lang_aria", "App Output Language")
-                                            aria-expanded=move || if lang_open.get() { "true" } else { "false" }
+                                            class=move || if active_tab.get() == ActiveTab::Guides { "nav-link nav-link-active" } else { "nav-link" }
                                             on:click=move |_| {
                                                 set_chip_open.set(false);
                                                 set_bell_open.set(false);
-                                                set_lang_open.update(|v| *v = !*v);
+                                                set_active_tab.set(ActiveTab::Guides);
+                                                persist_profile_patch(serde_json::json!({ "lastActiveTab": "guides" }));
                                             }
                                         >
-                                            {move || {
-                                                let cur = i18n.ui_locale.get();
-                                                let name = i18n.catalog
-                                                    .get()
-                                                    .into_iter()
-                                                    .find(|l| l.code == cur)
-                                                    .map(|l| l.native_name)
-                                                    .unwrap_or_else(|| cur.clone());
-                                                view! {
-                                                    <>
-                                                        <LocaleFlag code=cur />
-                                                        <span class="exo-lang-trigger-name">{name}</span>
-                                                    </>
-                                                }
-                                            }}
-                                            <span style="font-size: 12px; opacity: 0.75;">"▾"</span>
+                                            {move || i18n.tr("nav_dear_world", "Dear World")}
                                         </button>
-                                        <Show when=move || lang_open.get()>
-                                            <div class="exo-chip-menu exo-lang-menu" role="menu">
-                                                <div class="exo-chip-menu-label">{move || i18n.tr("ui_lang_label", "App Language")}</div>
-                                                {move || {
-                                                    let catalog = i18n.catalog.get();
-                                                    let cur = i18n.ui_locale.get();
-                                                    let list = pinned_ui_sv.with_value(|pinned| {
-                                                        if pinned.is_empty() {
-                                                            catalog.clone()
-                                                        } else {
-                                                            let filtered: Vec<_> = catalog
-                                                                .iter()
-                                                                .filter(|l| pinned.contains(&l.code) || l.code == cur)
-                                                                .cloned()
-                                                                .collect();
-                                                            if filtered.is_empty() { catalog.clone() } else { filtered }
-                                                        }
-                                                    });
-                                                    list.into_iter().map(|loc| {
-                                                        let code_click = loc.code.clone();
-                                                        let code_flag = loc.code.clone();
-                                                        let is_active = loc.code == cur;
-                                                        view! {
-                                                            <button
-                                                                type="button"
-                                                                class=if is_active { "exo-chip-menu-item exo-chip-menu-item-active" } else { "exo-chip-menu-item" }
-                                                                on:click=move |_| {
-                                                                    let next = code_click.clone();
-                                                                    i18n.ui_locale.set(next.clone());
-                                                                    set_lang_open.set(false);
-                                                                    persist_profile_patch(serde_json::json!({ "uiLocale": next }));
-                                                                }
-                                                            >
-                                                                <span class="exo-lang-item-label">
-                                                                    <LocaleFlag code=code_flag />
-                                                                    <span>{loc.native_name}</span>
-                                                                </span>
-                                                                <span class="exo-eyebrow" style="margin: 0; font-size: 12px;">{loc.code}</span>
-                                                            </button>
-                                                        }
-                                                    }).collect_view()
-                                                }}
-                                            </div>
-                                        </Show>
                                     </div>
 
                                     <div class="exo-bell-wrap">
@@ -720,7 +653,6 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                             aria-label=move || i18n.tr("notifications_aria", "Notifications")
                                             on:click=move |_| {
                                                 set_chip_open.set(false);
-                                                set_lang_open.set(false);
                                                 set_bell_open.update(|v| *v = !*v);
                                             }
                                         >
@@ -808,7 +740,6 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                             aria-expanded=move || if chip_open.get() { "true" } else { "false" }
                                             on:click=move |_| {
                                                 set_bell_open.set(false);
-                                                set_lang_open.set(false);
                                                 set_chip_open.update(|v| *v = !*v);
                                             }
                                         >
@@ -830,13 +761,6 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                                             <span>{move || i18n.tr("live_sync_label", "Live")}</span>
                                                         </span>
                                                     </div>
-                                                    <a
-                                                        href="https://exosystems.net/"
-                                                        class="exo-chip-menu-item"
-                                                        on:click=move |_| set_chip_open.set(false)
-                                                    >
-                                                        <span>{move || i18n.tr("nav_home", "Home")}</span>
-                                                    </a>
                                                     <button
                                                         type="button"
                                                         class=move || if active_tab.get() == ActiveTab::Workspace { "exo-chip-menu-item exo-chip-menu-item-active" } else { "exo-chip-menu-item" }
@@ -846,25 +770,19 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                                             persist_profile_patch(serde_json::json!({ "lastActiveTab": "workspace" }));
                                                         }
                                                     >
-                                                        <span>{move || i18n.tr("nav_workspace", "ExoNovel")}</span>
+                                                        <span>{move || i18n.tr("nav_desk", "Desk")}</span>
                                                     </button>
-                                                    {if can_read_docs {
-                                                        view! {
-                                                            <button
-                                                                type="button"
-                                                                class=move || if active_tab.get() == ActiveTab::Docs { "exo-chip-menu-item exo-chip-menu-item-active" } else { "exo-chip-menu-item" }
-                                                                on:click=move |_| {
-                                                                    set_chip_open.set(false);
-                                                                    set_active_tab.set(ActiveTab::Docs);
-                                                                    persist_profile_patch(serde_json::json!({ "lastActiveTab": "docs" }));
-                                                                }
-                                                            >
-                                                                <span>{move || i18n.tr("nav_docs", "Docs & ADRs")}</span>
-                                                            </button>
-                                                        }.into_any()
-                                                    } else {
-                                                        view! { <span /> }.into_any()
-                                                    }}
+                                                    <button
+                                                        type="button"
+                                                        class=move || if active_tab.get() == ActiveTab::Guides { "exo-chip-menu-item exo-chip-menu-item-active" } else { "exo-chip-menu-item" }
+                                                        on:click=move |_| {
+                                                            set_chip_open.set(false);
+                                                            set_active_tab.set(ActiveTab::Guides);
+                                                            persist_profile_patch(serde_json::json!({ "lastActiveTab": "guides" }));
+                                                        }
+                                                    >
+                                                        <span>{move || i18n.tr("nav_dear_world", "Dear World")}</span>
+                                                    </button>
                                                     <div class="exo-chip-menu-divider" />
                                                 </div>
 
@@ -876,8 +794,26 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                                         navigate_to_subpage(ActiveTab::Profile);
                                                     }
                                                 >
-                                                    <span>{move || i18n.tr("nav_profile", "Profile & Billing")}</span>
+                                                    <span>{move || i18n.tr("nav_profile", "Profile")}</span>
                                                 </button>
+
+                                                {if can_read_docs {
+                                                    view! {
+                                                        <button
+                                                            type="button"
+                                                            class=move || if active_tab.get() == ActiveTab::Docs { "exo-chip-menu-item exo-chip-menu-item-active" } else { "exo-chip-menu-item" }
+                                                            on:click=move |_| {
+                                                                set_chip_open.set(false);
+                                                                set_active_tab.set(ActiveTab::Docs);
+                                                                persist_profile_patch(serde_json::json!({ "lastActiveTab": "docs" }));
+                                                            }
+                                                        >
+                                                            <span>{move || i18n.tr("nav_docs", "Docs & ADRs")}</span>
+                                                        </button>
+                                                    }.into_any()
+                                                } else {
+                                                    view! { <span /> }.into_any()
+                                                }}
 
                                                 <div class="exo-chip-menu-divider" />
                                                 {if other_personas.is_empty() {
@@ -964,6 +900,11 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                             </div>
                                         </Show>
                                     </div>
+
+                                    <div class="exo-live-indicator exo-desktop-live" title=move || i18n.tr("live_connection_title", "Global Real-Time Stream Connection")>
+                                        <span class=move || if live.connected.get() { "exo-live-dot exo-live-dot-on" } else { "exo-live-dot" } />
+                                        <span>{move || i18n.tr("live_sync_label", "Live")}</span>
+                                    </div>
                                 </>
                             }.into_any()
                         }
@@ -971,8 +912,21 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                             <>
                                 <button
                                     type="button"
+                                    class=move || if show_guides.get() && !show_signin.get() { "nav-link nav-link-active" } else { "nav-link" }
+                                    on:click=move |_| {
+                                        set_show_signin.set(false);
+                                        set_show_guides.set(true);
+                                    }
+                                >
+                                    {move || i18n.tr("nav_dear_world", "Dear World")}
+                                </button>
+                                <button
+                                    type="button"
                                     class="exo-btn exo-btn-primary"
-                                    on:click=move |_| set_show_signin.set(true)
+                                    on:click=move |_| {
+                                        set_show_guides.set(false);
+                                        set_show_signin.set(true);
+                                    }
                                 >
                                     {move || i18n.tr("nav_sign_in", "Sign in")}
                                 </button>
@@ -1039,6 +993,17 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                     on_signed_in=refresh_session
                                 />
                             }.into_any()
+                        } else if show_guides.get() {
+                            view! {
+                                <DearWorldGuidesView
+                                    is_authenticated=false
+                                    on_open_desk=move || set_show_guides.set(false)
+                                    on_open_signin=move || {
+                                        set_show_guides.set(false);
+                                        set_show_signin.set(true);
+                                    }
+                                />
+                            }.into_any()
                         } else {
                             view! {
                                 <PublicLandingView
@@ -1050,6 +1015,16 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                     Some((_uid, authorized, _is_admin)) => {
                         let tab = active_tab.get();
                         match tab {
+                            ActiveTab::Guides => view! {
+                                <DearWorldGuidesView
+                                    is_authenticated=true
+                                    on_open_desk=move || {
+                                        set_active_tab.set(ActiveTab::Workspace);
+                                        persist_profile_patch(serde_json::json!({ "lastActiveTab": "workspace" }));
+                                    }
+                                    on_open_signin=move || {}
+                                />
+                            }.into_any(),
                             ActiveTab::Docs if authorized => view! {
                                 <DocsCmsView
                                     auth_config=auth_config
@@ -1075,6 +1050,8 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                         let is_auth = current_user.get_untracked().is_some_and(|u| u.authorized);
                                         if dest == ActiveTab::Docs && is_auth {
                                             set_active_tab.set(ActiveTab::Docs);
+                                        } else if dest == ActiveTab::Guides {
+                                            set_active_tab.set(ActiveTab::Guides);
                                         } else {
                                             set_active_tab.set(ActiveTab::Workspace);
                                         }
@@ -1089,15 +1066,14 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                             initial_jwt=session_jwt
                                             user=user
                                             return_tab=return_tab
-                                            appearance=appearance
-                                            set_appearance=set_appearance
                                             on_copy_did=show_did_copied_toast
                                             on_toast=show_toast
-                                            on_open_profile_billing=move || {
-                                                profile_initial_tab.set(Some(ProfileTab::Overview));
+                                            on_open_profile_plans=move || {
+                                                profile_initial_tab.set(Some(ProfileTab::Plans));
                                                 navigate_to_subpage(ActiveTab::Profile);
                                             }
                                             on_profile_updated=move |updated: ProfilePatchResponse| {
+                                                i18n.pinned_ui_locales.set(updated.profile.preferred_ui_locales.clone());
                                                 set_current_user.update(|u_opt| {
                                                     if let Some(u) = u_opt {
                                                         u.profile = Some(updated.profile);
@@ -1112,6 +1088,8 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                                                 let is_auth = current_user.get_untracked().is_some_and(|u| u.authorized);
                                                 if dest == ActiveTab::Docs && is_auth {
                                                     set_active_tab.set(ActiveTab::Docs);
+                                                } else if dest == ActiveTab::Guides {
+                                                    set_active_tab.set(ActiveTab::Guides);
                                                 } else {
                                                     set_active_tab.set(ActiveTab::Workspace);
                                                 }
@@ -1125,19 +1103,6 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
                             _ => view! {
                                 <WorkspaceHomeView
                                     current_user=current_user
-                                    on_open_docs=move || {
-                                        set_active_tab.set(ActiveTab::Docs);
-                                        persist_profile_patch(serde_json::json!({ "lastActiveTab": "docs" }));
-                                    }
-                                    on_open_profile=move || {
-                                        profile_initial_tab.set(Some(ProfileTab::Overview));
-                                        navigate_to_subpage(ActiveTab::Profile);
-                                    }
-                                    on_open_preferences=move || navigate_to_subpage(ActiveTab::Preferences)
-                                    on_open_connected_apps=move || {
-                                        preferences_initial_section.set(Some(PreferencesSection::ConnectedApps));
-                                        navigate_to_subpage(ActiveTab::Preferences);
-                                    }
                                     on_copy_did=show_did_copied_toast
                                 />
                             }.into_any(),
@@ -1160,14 +1125,14 @@ fn HomeView(#[prop(default = false)] initial_show_signin: bool) -> impl IntoView
 #[component]
 fn WorkspaceHomeView(
     current_user: ReadSignal<Option<VerifiedUser>>,
-    on_open_docs: impl Fn() + Copy + Send + Sync + 'static,
-    on_open_profile: impl Fn() + Copy + Send + Sync + 'static,
-    on_open_preferences: impl Fn() + Copy + Send + Sync + 'static,
-    on_open_connected_apps: impl Fn() + Copy + Send + Sync + 'static,
     on_copy_did: impl Fn(String) + Copy + Send + Sync + 'static,
 ) -> impl IntoView {
     let i18n = use_i18n();
     let live = use_live_sync();
+    let (selected_format, set_selected_format) = signal("novel".to_string());
+    let (scratch_title, set_scratch_title) = signal(String::new());
+    let (scratch_body, set_scratch_body) = signal(String::new());
+    let (scratch_saved, set_scratch_saved) = signal(false);
 
     view! {
         <main class="page-main">
@@ -1176,8 +1141,6 @@ fn WorkspaceHomeView(
                     return view! { <div /> }.into_any();
                 };
                 let persona = active_persona_for_user(&user);
-                let display_name = display_name_for_user(&user);
-                let email_label = user.email.clone().unwrap_or_default();
                 let persona_did = if persona.persona_did.is_empty() {
                     user.did_peer
                         .clone()
@@ -1186,66 +1149,361 @@ fn WorkspaceHomeView(
                     persona.persona_did.clone()
                 };
                 let did_copy = persona_did.clone();
+                let did_title = persona_did.clone();
+                let did_preview = short_did_preview(&persona_did);
                 let did_anim = persona_did.clone();
-                let handle = persona.handle.clone();
-                let can_read_docs = user.authorized;
-                let role_label = i18n.tr(account_role_key(&user.account_role), "User");
-                let sync_tier = user.profile.as_ref().map(|p| p.sync_plan_tier.clone()).unwrap_or_else(|| "free".to_string());
+                let pinned_input = user
+                    .profile
+                    .as_ref()
+                    .map(|p| p.preferred_input_locales.clone())
+                    .unwrap_or_default();
+
+                let starter_formats = [
+                    ("novel", "format_novel_title", "Novels", "format_novel_desc", "Build entire worlds from scratch. Organize characters, plot twists, and chapters in one place so big stories never get messy.", "desk_starter_novel_hint", "Ready on your shelf: Story Outline · Character Cards · Chapter 1 Draft · World Timeline."),
+                    ("article", "format_article_title", "Articles & Nonfiction", "format_article_desc", "Turn ideas and research into sharp essays, blog posts, or school papers with clear outlines and neat sources.", "desk_starter_article_hint", "Ready on your shelf: Thesis Hook · Section Outline · Source Notes · Final Essay Draft."),
+                    ("short", "format_short_title", "Short Stories", "format_short_desc", "Nail the hook, the twist, and the ending—great for flash fiction, standalone stories, or your own story collection.", "desk_starter_short_hint", "Ready on your shelf: Opening Hook · Turning Point · Character Beat · Scene Draft."),
+                    ("screenplay", "format_screenplay_title", "Screenplays & Scripts", "format_screenplay_desc", "Write scenes and dialogue that look like real movie or video scripts, formatted cleanly as you type.", "desk_starter_script_hint", "Ready on your shelf: Scene Heading · Cast & Voices · Beat Sheet · Script Pages."),
+                    ("poetry", "format_poetry_title", "Poetry", "format_poetry_desc", "Shape rhythm, stanzas, and line breaks that stay right where you put them—from a single poem to a full book.", "desk_starter_poetry_hint", "Ready on your shelf: Stanza Draft · Line Rhythm Notes · Collection Order · Author Dedication."),
+                ];
 
                 view! {
-                    <>
-                        <div class=move || format!("exo-card {}", live.anim_class("profile", &did_anim))>
-                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                <h1 class="exo-h1">"ExoNovel"</h1>
-                                <span class="exo-tag exo-tag-accent">{role_label}</span>
-                                <span class="exo-tag tabular-nums">{i18n.tr("plan_label", "Plan:")} " " {sync_tier}</span>
+                    <div class=move || format!("exo-card exo-desk-card {}", live.anim_class("profile", &did_anim))>
+                        <div class="exo-desk-header">
+                            <div style="min-width: 0; flex: 1;">
+                                <h1 class="exo-h1">{move || i18n.tr("nav_desk", "Desk")}</h1>
+                                <p class="exo-sub" style="margin-top: 10px; max-width: 72ch;">
+                                    {move || i18n.tr(
+                                        "workspace_desc",
+                                        "Your writing desk keeps everything you're working on close at hand—whether you're outlining your very first story for class, shaping characters with friends, or drafting poems on your own. Every character, timeline, scene, and comment you add stays credited to your pen name, so you can share ideas freely, learn together, and know your work always remains yours.",
+                                    )}
+                                </p>
                             </div>
-                            <p class="exo-sub" style="margin-top: 8px;">
-                                {if !handle.is_empty() {
-                                    format!("{display_name} · {} {handle} · {email_label}", i18n.tr("pen_name_label", "Pen name:"))
-                                } else {
-                                    format!("{display_name} · {email_label}")
-                                }}
-                            </p>
-
-                            <p class="exo-sub" style="margin-top: 14px;">
-                                {i18n.tr("workspace_desc", "Your collaborative creative writing space anchored to your sovereign did:peer identity across Web Mode 1, Free Device Mode 2, and Managed Blind Sync Mode 3.")}
-                            </p>
-
-                            <div style="margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
-                                <button type="button" class="exo-btn exo-btn-primary" on:click=move |_| on_open_profile()>
-                                    {i18n.tr("btn_profile_billing", "Profile, Personas & Billing")}
-                                </button>
-                                <button type="button" class="exo-btn" on:click=move |_| on_open_connected_apps()>
-                                    {i18n.tr("btn_connected_apps", "Connected Apps & Google Docs")}
-                                </button>
-                                <button type="button" class="exo-btn" on:click=move |_| on_open_preferences()>
-                                    {i18n.tr("nav_preferences", "Preferences")}
-                                </button>
-                                {if can_read_docs {
-                                    view! {
-                                        <button type="button" class="exo-btn" on:click=move |_| on_open_docs()>
-                                            {i18n.tr("btn_open_cms", "Open MADR Docs CMS")}
-                                        </button>
-                                    }.into_any()
-                                } else {
-                                    view! { <span /> }.into_any()
-                                }}
-                            </div>
-                        </div>
-
-                        <div class="exo-card">
-                            <div class="exo-label">{i18n.tr("workspace_key_label", "Active Persona Workspace Key (did:peer)")}</div>
-                            <div class="exo-id-cell">
-                                <button type="button" class="exo-copy-btn" on:click=move |_| on_copy_did(did_copy.clone())>
+                            <div class="exo-desk-did-chip">
+                                <button
+                                    type="button"
+                                    class="exo-copy-btn"
+                                    title=move || i18n.tr("copy_text_label", "Copy Text")
+                                    aria-label=move || i18n.tr("copy_text_label", "Copy Text")
+                                    on:click=move |_| on_copy_did(did_copy.clone())
+                                >
                                     <CopyIcon />
                                 </button>
-                                <span class="exo-mono">{persona_did}</span>
+                                <span class="exo-mono" title=did_title>{did_preview}</span>
                             </div>
                         </div>
-                    </>
+
+                        <div class="exo-desk-sections">
+                            <section class="exo-desk-section">
+                                <div class="exo-eyebrow">{move || i18n.tr("desk_start_eyebrow", "Start a New Project")}</div>
+                                <h2 class="exo-h2">{move || i18n.tr("desk_start_title", "What would you like to write today?")}</h2>
+                                <div class="exo-desk-starter-grid">
+                                    {starter_formats.into_iter().map(|(id, t_key, t_fb, d_key, d_fb, _, _)| {
+                                        let id_str = id.to_string();
+                                        let id_cmp = id_str.clone();
+                                        let id_click = id_str.clone();
+                                        view! {
+                                            <button
+                                                type="button"
+                                                class=move || if selected_format.get() == id_cmp {
+                                                    "exo-desk-starter-btn exo-desk-starter-btn-active"
+                                                } else {
+                                                    "exo-desk-starter-btn"
+                                                }
+                                                on:click=move |_| set_selected_format.set(id_click.clone())
+                                            >
+                                                <strong>{move || i18n.tr(t_key, t_fb)}</strong>
+                                                <span>{move || i18n.tr(d_key, d_fb)}</span>
+                                            </button>
+                                        }
+                                    }).collect_view()}
+                                </div>
+                                <div class="exo-dep-card" style="margin-top: 12px;">
+                                    {move || {
+                                        let cur = selected_format.get();
+                                        let (_, t_key, t_fb, _, _, h_key, h_fb) = starter_formats
+                                            .iter()
+                                            .find(|(id, ..)| *id == cur)
+                                            .copied()
+                                            .unwrap_or(starter_formats[0]);
+                                        format!("{} — {}", i18n.tr(t_key, t_fb), i18n.tr(h_key, h_fb))
+                                    }}
+                                </div>
+                            </section>
+
+                            <section class="exo-desk-section">
+                                <div class="exo-eyebrow">{move || i18n.tr("desk_blocks_eyebrow", "Story Building Blocks")}</div>
+                                <h2 class="exo-h2">{move || i18n.tr("desk_blocks_title", "Your Shelf of Story Pieces")}</h2>
+                                <div class="exo-grid-2">
+                                    <div class="exo-format-tile">
+                                        <h3>{move || i18n.tr("desk_block_chars_title", "Characters")}</h3>
+                                        <p>{move || i18n.tr("desk_block_chars_desc", "Keep track of heroes, rivals, sidekicks, and their backstories—even bring a friend's character into a scene with clear credit.")}</p>
+                                    </div>
+                                    <div class="exo-format-tile">
+                                        <h3>{move || i18n.tr("desk_block_plots_title", "Plots")}</h3>
+                                        <p>{move || i18n.tr("desk_block_plots_desc", "Sketch turning points, chapter beats, and surprises so your story moves smoothly from beginning to ending.")}</p>
+                                    </div>
+                                    <div class="exo-format-tile">
+                                        <h3>{move || i18n.tr("desk_block_timelines_title", "Timelines")}</h3>
+                                        <p>{move || i18n.tr("desk_block_timelines_desc", "Line up what happened first, next, and years before—helpful when writing mysteries, trilogies, or class projects together.")}</p>
+                                    </div>
+                                    <div class="exo-format-tile">
+                                        <h3>{move || i18n.tr("desk_block_themes_title", "Themes")}</h3>
+                                        <p>{move || i18n.tr("desk_block_themes_desc", "Pin the big questions, moods, and motifs at the heart of your writing so every co-writer stays on the same page.")}</p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="exo-desk-section exo-desk-scratchpad">
+                                <div class="exo-eyebrow">{move || i18n.tr("desk_scratchpad_eyebrow", "Scratchpad")}</div>
+                                <h2 class="exo-h2">{move || i18n.tr("desk_scratchpad_title", "Jot Down a Quick Idea")}</h2>
+                                <InputLocaleBar
+                                    context_label=i18n.tr("desk_scratchpad_label", "Quick Idea Scratchpad")
+                                    pinned_codes=pinned_input
+                                />
+                                <div class="exo-field">
+                                    <label class="exo-label">{move || i18n.tr("desk_note_title_label", "Working title or prompt")}</label>
+                                    <input
+                                        type="text"
+                                        class="exo-input"
+                                        dir=move || i18n.input_dir()
+                                        placeholder=move || i18n.tr("desk_note_title_ph", "e.g. Rain over the library steps...")
+                                        prop:value=move || scratch_title.get()
+                                        on:input=move |ev| {
+                                            set_scratch_saved.set(false);
+                                            set_scratch_title.set(event_target_value(&ev));
+                                        }
+                                    />
+                                </div>
+                                <div class="exo-field">
+                                    <label class="exo-label">{move || i18n.tr("desk_note_body_label", "Opening lines or scene sketch")}</label>
+                                    <textarea
+                                        class="exo-input exo-textarea"
+                                        dir=move || i18n.input_dir()
+                                        placeholder=move || i18n.tr("desk_note_body_ph", "Write a few sentences, test dialogue, or switch your writing language above...")
+                                        prop:value=move || scratch_body.get()
+                                        on:input=move |ev| {
+                                            set_scratch_saved.set(false);
+                                            set_scratch_body.set(event_target_value(&ev));
+                                        }
+                                    />
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                    <button
+                                        type="button"
+                                        class="exo-btn exo-btn-primary"
+                                        on:click=move |_| set_scratch_saved.set(true)
+                                    >
+                                        {move || i18n.tr("desk_note_keep_btn", "Pin Idea on Desk")}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="exo-btn"
+                                        on:click=move |_| {
+                                            set_scratch_title.set(String::new());
+                                            set_scratch_body.set(String::new());
+                                            set_scratch_saved.set(false);
+                                        }
+                                    >
+                                        {move || i18n.tr("desk_note_clear_btn", "Clear")}
+                                    </button>
+                                    <Show when=move || scratch_saved.get()>
+                                        <span class="exo-tag exo-tag-ok">
+                                            {move || i18n.tr("desk_note_pinned_msg", "Idea pinned on your desk for this session")}
+                                        </span>
+                                    </Show>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
                 }.into_any()
             }}
+        </main>
+    }
+}
+
+#[component]
+fn DearWorldGuidesView(
+    is_authenticated: bool,
+    on_open_desk: impl Fn() + Copy + Send + Sync + 'static,
+    on_open_signin: impl Fn() + Copy + Send + Sync + 'static,
+) -> impl IntoView {
+    let i18n = use_i18n();
+    let (guides, set_guides) = signal::<Vec<GuideChapterSummary>>(Vec::new());
+    let (selected_slug, set_selected_slug) = signal("01-dear-world".to_string());
+    let (active_guide, set_active_guide) = signal::<Option<GuideChapterDetail>>(None);
+    let (loading, set_loading) = signal(true);
+
+    Effect::new(move |_| {
+        let loc = i18n.ui_locale.get();
+        let slug = selected_slug.get();
+        set_loading.set(true);
+        leptos::task::spawn_local(async move {
+            let mut target_slug = slug.clone();
+            let list_url = format!("/api/guides?locale={loc}");
+            if let Ok(resp) = Request::get(&list_url).send().await {
+                if resp.ok() {
+                    if let Ok(data) = resp.json::<GuidesListResponse>().await {
+                        if !data.guides.is_empty()
+                            && !data.guides.iter().any(|g| g.slug == target_slug)
+                        {
+                            target_slug = data.guides[0].slug.clone();
+                            set_selected_slug.set(target_slug.clone());
+                        }
+                        set_guides.set(data.guides);
+                    }
+                }
+            }
+            let detail_url = format!("/api/guides/{target_slug}?locale={loc}");
+            if let Ok(resp) = Request::get(&detail_url).send().await {
+                if resp.ok() {
+                    if let Ok(detail) = resp.json::<GuideChapterDetail>().await {
+                        set_active_guide.set(Some(detail));
+                    }
+                }
+            }
+            set_loading.set(false);
+        });
+    });
+
+    view! {
+        <main class="page-main">
+            <div class="exo-guides-layout">
+                <aside class="exo-guides-sidebar">
+                    <div class="exo-eyebrow">{move || i18n.tr("guides_eyebrow", "Dear World · User Guides")}</div>
+                    <h2 class="exo-h2" style="margin-bottom: 10px;">{move || i18n.tr("guides_sidebar_title", "Getting Started")}</h2>
+                    <p class="exo-sub" style="margin-top: 0; margin-bottom: 14px; font-size: 15px;">
+                        {move || i18n.tr("guides_sidebar_sub", "Step-by-step guides written for High School and University writers exploring collaborative storytelling on ExoNovel.")}
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        {move || {
+                            let cur = selected_slug.get();
+                            guides.get().into_iter().map(|g| {
+                                let slug_cmp = g.slug.clone();
+                                let slug_click = g.slug.clone();
+                                let mins_suffix = i18n.tr("cms_min_read_suffix", "min read");
+                                view! {
+                                    <button
+                                        type="button"
+                                        class=move || if cur == slug_cmp {
+                                            "exo-guides-chapter-btn exo-guides-chapter-active"
+                                        } else {
+                                            "exo-guides-chapter-btn"
+                                        }
+                                        on:click=move |_| set_selected_slug.set(slug_click.clone())
+                                    >
+                                        <div style="font-weight: 600;">{format!("{}. {}", g.chapter_order, g.title)}</div>
+                                        <div class="exo-eyebrow" style="margin: 2px 0 0; font-size: 13px;">
+                                            {format!("{} {}", g.reading_minutes, mins_suffix)}
+                                        </div>
+                                    </button>
+                                }
+                            }).collect_view()
+                        }}
+                    </div>
+
+                    <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border);">
+                        {if is_authenticated {
+                            view! {
+                                <button
+                                    type="button"
+                                    class="exo-btn exo-btn-primary"
+                                    style="width: 100%;"
+                                    on:click=move |_| on_open_desk()
+                                >
+                                    {move || i18n.tr("guides_open_desk_btn", "Go to Your Desk")}
+                                </button>
+                            }.into_any()
+                        } else {
+                            view! {
+                                <button
+                                    type="button"
+                                    class="exo-btn exo-btn-primary"
+                                    style="width: 100%;"
+                                    on:click=move |_| on_open_signin()
+                                >
+                                    {move || i18n.tr("guides_signin_btn", "Sign in to Start Writing")}
+                                </button>
+                            }.into_any()
+                        }}
+                    </div>
+                </aside>
+
+                <article class="exo-card exo-guides-article">
+                    {move || {
+                        if loading.get() && active_guide.get().is_none() {
+                            return view! {
+                                <p class="exo-sub">{i18n.tr("guides_loading", "Opening your Dear World guide...")}</p>
+                            }.into_any();
+                        }
+                        let Some(ch) = active_guide.get() else {
+                            return view! {
+                                <p class="exo-sub">{i18n.tr("guides_empty", "Select a guide chapter from the list to begin.")}</p>
+                            }.into_any();
+                        };
+                        let all = guides.get();
+                        let pos = all.iter().position(|g| g.slug == ch.slug);
+                        let prev_item = pos.and_then(|i| if i > 0 { all.get(i - 1).cloned() } else { None });
+                        let next_item = pos.and_then(|i| all.get(i + 1).cloned());
+
+                        view! {
+                            <>
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;">
+                                    <span class="exo-eyebrow" style="margin: 0;">
+                                        {format!(
+                                            "{} · {} {} · {} {}",
+                                            ch.audience,
+                                            ch.word_count,
+                                            i18n.tr("cms_words_suffix", "words"),
+                                            ch.reading_minutes,
+                                            i18n.tr("cms_min_read_suffix", "min read")
+                                        )}
+                                    </span>
+                                    {(ch.translation_status == "en-fallback").then(|| view! {
+                                        <span class="exo-trans-badge exo-trans-fallback">
+                                            {i18n.tr("cms_trans_fallback_en", "English Fallback")}
+                                        </span>
+                                    })}
+                                </div>
+
+                                <div class="exo-markdown" inner_html=ch.html />
+
+                                <div class="exo-prev-next">
+                                    <div>
+                                        {prev_item.map(|p| {
+                                            let s = p.slug.clone();
+                                            view! {
+                                                <button
+                                                    type="button"
+                                                    class="exo-btn"
+                                                    style="width: 100%; justify-content: flex-start;"
+                                                    on:click=move |_| set_selected_slug.set(s.clone())
+                                                >
+                                                    {format!("← {}", p.title)}
+                                                </button>
+                                            }
+                                        })}
+                                    </div>
+                                    <div>
+                                        {next_item.map(|n| {
+                                            let s = n.slug.clone();
+                                            view! {
+                                                <button
+                                                    type="button"
+                                                    class="exo-btn exo-btn-primary"
+                                                    style="width: 100%; justify-content: flex-end;"
+                                                    on:click=move |_| set_selected_slug.set(s.clone())
+                                                >
+                                                    {format!("{} →", n.title)}
+                                                </button>
+                                            }
+                                        })}
+                                    </div>
+                                </div>
+                            </>
+                        }.into_any()
+                    }}
+                </article>
+            </div>
         </main>
     }
 }
@@ -1282,11 +1540,11 @@ fn PublicLandingView(
             "slide_3_tab",
             "Write, Wherever You Are",
             "slide_3_title",
-            "Online and Offline, Sync All Your Devices",
+            "Online and Offline, Collaborate Across Any Screen",
             "slide_3_p1",
-            "Create right in your browser whenever you're online, or continue writing without the web using our free Linux, macOS, Windows, Android, and iOS apps. Using our free apps can keep you in sync with your work from the web, and for a small monthly fee (or even a smaller annual fee), your online and local creations are always within reach, together in your one virtual writing home.",
+            "Create right in your browser whenever you're online, or continue writing without the web using our free Linux, macOS, Windows, Android, and iOS apps. Whenever you collaborate with fellow writers, everyone stays synced automatically—even if one co-writer is in a web browser and another is working in a device app.",
             "slide_3_p2",
-            "Start a scene on your phone on the go, polish a chapter on your laptop later, and manually sync your work, on demand, between offline devices and the web whenever you want—or activate our automatic sync so that every draft stays up to date across all your screens.",
+            "Your own personal sync between your web account and your personal offline devices is always available manually on demand, or automatically for a small monthly fee (or even smaller annual fee) in Profile -> Plans.",
         ),
         (
             "slide_4_tab",
@@ -1480,29 +1738,29 @@ fn PublicLandingView(
                     </div>
                 </section>
 
-                <section id="modes" class="exo-card">
-                    <h2 class="exo-h2">{move || i18n.tr("landing_modes_title", "Choose How You Write and Sync")}</h2>
+                <section id="sync" class="exo-card">
+                    <h2 class="exo-h2">{move || i18n.tr("landing_modes_title", "On the Web, On Your Device, and Synced Together")}</h2>
                     <p class="exo-sub">
                         {move || i18n.tr(
                             "landing_modes_sub",
-                            "Start completely free in your browser and on your own devices—or turn on automatic encrypted sync monthly or annually to keep every screen united in one virtual writing home."
+                            "Write for free in your web browser and in our native device apps. Collaborating with other writers syncs automatically across web and device for free—while keeping your own personal web and device shelves synced automatically is a small monthly or annual fee.",
                         )}
                     </p>
                     <div class="exo-grid-3">
                         <div class="exo-format-tile">
                             <div class="exo-eyebrow">{move || i18n.tr("mode_free_badge", "Free Forever")}</div>
-                            <h3>{move || i18n.tr("mode_free_title", "Web & Offline Device Apps")}</h3>
-                            <p>{move || i18n.tr("mode_free_desc", "Create, collaborate live, and publish right in your browser for free—plus download our free Linux, macOS, Windows, Android, and iOS apps to write offline and manually sync your drafts with the web on demand.")}</p>
+                            <h3>{move || i18n.tr("mode_free_title", "On the Web & On Your Device")}</h3>
+                            <p>{move || i18n.tr("mode_free_desc", "Create, invite co-writers, and collaborate across web browsers and our free Linux, macOS, Windows, Android, and iOS apps—with free automatic collaboration sync between co-writers on web and device.")}</p>
                         </div>
                         <div class="exo-format-tile">
-                            <div class="exo-eyebrow">{move || i18n.tr("mode_monthly_badge", "Monthly Sync")}</div>
-                            <h3>{move || i18n.tr("mode_monthly_title", "Automatic Sync — $9 / month")}</h3>
-                            <p>{move || i18n.tr("mode_monthly_desc", "Keep your browser workspace and all offline devices continuously connected for a small monthly fee (local currency equivalent), uniting online and local creations automatically with end-to-end encryption.")}</p>
+                            <div class="exo-eyebrow">{move || i18n.tr("mode_monthly_badge", "Personal Sync")}</div>
+                            <h3>{move || i18n.tr("mode_monthly_title", "Personal Sync — $9 / month")}</h3>
+                            <p>{move || i18n.tr("mode_monthly_desc", "Keep your own personal drafts on the web and on your offline devices automatically synced with end-to-end encryption ($9/month local currency equivalent).")}</p>
                         </div>
                         <div class="exo-format-tile">
-                            <div class="exo-eyebrow">{move || i18n.tr("mode_annual_badge", "Annual Sync")}</div>
-                            <h3>{move || i18n.tr("mode_annual_title", "Automatic Sync — $90 / year")}</h3>
-                            <p>{move || i18n.tr("mode_annual_desc", "Enjoy full automatic Web + Device sync at an even smaller monthly cost on the annual plan ($7.50/month effective rate in local currency equivalent—two months free compared to monthly).")}</p>
+                            <div class="exo-eyebrow">{move || i18n.tr("mode_annual_badge", "Annual Personal Sync")}</div>
+                            <h3>{move || i18n.tr("mode_annual_title", "Personal Sync — $90 / year")}</h3>
+                            <p>{move || i18n.tr("mode_annual_desc", "Full automatic sync between your own web profile and your personal devices ($7.50/month effective rate in local currency equivalent—two months free compared to monthly).")}</p>
                         </div>
                     </div>
                 </section>
@@ -1642,7 +1900,7 @@ fn SignInView(
                         class="exo-btn"
                         on:click=move |_| on_back_home()
                     >
-                        {move || i18n.tr("signin_back_home", "← Back to ExoNovel overview")}
+                        {move || i18n.tr("signin_back_home", "← Back")}
                     </button>
                 </div>
                 <h1>{move || i18n.tr("signin_title", "Sign in to ExoNovel")}</h1>
@@ -1760,16 +2018,110 @@ fn SignInView(
 #[component]
 fn PublicFooter() -> impl IntoView {
     let i18n = use_i18n();
+    let (lang_open, set_lang_open) = signal(false);
+
     view! {
-        <footer class="exo-footer">
-            <span>{move || i18n.tr("footer_operator", "ExoNovel · Operated by Exosystems (exosystems.net)")}</span>
-            <div class="exo-footer-links">
-                <a href="/">{move || i18n.tr("nav_home", "Home")}</a>
-                <a href="/privacy">{move || i18n.tr("nav_privacy", "Privacy Policy")}</a>
-                <a href="/terms">{move || i18n.tr("nav_terms", "Terms of Service")}</a>
-                <a href="mailto:support@exosystems.net">"support@exosystems.net"</a>
-            </div>
-        </footer>
+        <>
+            <Show when=move || lang_open.get()>
+                <div
+                    class="exo-nav-backdrop"
+                    on:click=move |_| set_lang_open.set(false)
+                />
+            </Show>
+            <footer class="exo-footer">
+                <span class="exo-footer-brand">
+                    {move || i18n.tr("footer_brand_prefix", "ExoNovel, from")}
+                    " "
+                    <a
+                        href="https://exosystems.net"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="exo-stealth-brand-btn"
+                    >
+                        "Exosystems"
+                    </a>
+                </span>
+
+                <div class="exo-footer-links">
+                    <a href="/privacy">{move || i18n.tr("nav_privacy", "Privacy Policy")}</a>
+                    <a href="/terms">{move || i18n.tr("nav_terms", "Terms of Service")}</a>
+                    <a href="mailto:support@exosystems.net">"support@exosystems.net"</a>
+                </div>
+
+                <div class="exo-footer-lang-wrap">
+                    <button
+                        type="button"
+                        class="exo-lang-trigger"
+                        aria-label=move || i18n.tr("ui_lang_aria", "App Output Language")
+                        aria-expanded=move || if lang_open.get() { "true" } else { "false" }
+                        on:click=move |_| set_lang_open.update(|v| *v = !*v)
+                    >
+                        {move || {
+                            let cur = i18n.ui_locale.get();
+                            let name = i18n.catalog
+                                .get()
+                                .into_iter()
+                                .find(|l| l.code == cur)
+                                .map(|l| l.native_name)
+                                .unwrap_or_else(|| cur.clone());
+                            view! {
+                                <>
+                                    <LocaleFlag code=cur />
+                                    <span class="exo-lang-trigger-name">{name}</span>
+                                </>
+                            }
+                        }}
+                        <span style="font-size: 12px; opacity: 0.75;">"▴"</span>
+                    </button>
+
+                    <Show when=move || lang_open.get()>
+                        <div class="exo-chip-menu exo-lang-menu exo-lang-menu-up" role="menu">
+                            <div class="exo-chip-menu-label">{move || i18n.tr("ui_lang_label", "App Language")}</div>
+                            {move || {
+                                let catalog = i18n.catalog.get();
+                                let cur = i18n.ui_locale.get();
+                                let pinned = i18n.pinned_ui_locales.get();
+                                let list = if pinned.is_empty() {
+                                    catalog.clone()
+                                } else {
+                                    let filtered: Vec<_> = catalog
+                                        .iter()
+                                        .filter(|l| pinned.contains(&l.code) || l.code == cur)
+                                        .cloned()
+                                        .collect();
+                                    if filtered.is_empty() { catalog.clone() } else { filtered }
+                                };
+                                list.into_iter().map(|loc| {
+                                    let code_click = loc.code.clone();
+                                    let code_flag = loc.code.clone();
+                                    let is_active = loc.code == cur;
+                                    view! {
+                                        <button
+                                            type="button"
+                                            class=if is_active { "exo-chip-menu-item exo-chip-menu-item-active" } else { "exo-chip-menu-item" }
+                                            on:click=move |_| {
+                                                let next = code_click.clone();
+                                                i18n.ui_locale.set(next.clone());
+                                                set_lang_open.set(false);
+                                                if let Some(cb) = i18n.persist_ui_locale.get_untracked() {
+                                                    cb.run(next);
+                                                }
+                                            }
+                                        >
+                                            <span class="exo-lang-item-label">
+                                                <LocaleFlag code=code_flag />
+                                                <span>{loc.native_name}</span>
+                                            </span>
+                                            <span class="exo-eyebrow" style="margin: 0; font-size: 12px;">{loc.code}</span>
+                                        </button>
+                                    }
+                                }).collect_view()
+                            }}
+                        </div>
+                    </Show>
+                </div>
+            </footer>
+        </>
     }
 }
 
@@ -1786,7 +2138,7 @@ fn PrivacyPolicyView() -> impl IntoView {
                     <img src="/exonovel-logo-dark.png" alt="ExoNovel" class="navbar-logo navbar-logo-dark" />
                 </a>
                 <div class="navbar-menu">
-                    <a href="/" class="nav-link">{move || i18n.tr("nav_home", "Home")}</a>
+                    <a href="/dear-world" class="nav-link">{move || i18n.tr("nav_dear_world", "Dear World")}</a>
                     <a href="/signin" class="exo-btn exo-btn-primary">{move || i18n.tr("nav_sign_in", "Sign in")}</a>
                 </div>
             </nav>
@@ -1862,7 +2214,7 @@ fn PrivacyPolicyView() -> impl IntoView {
 
                     <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("privacy_s3_title", "3. How We Use Your Information")}</h2>
                     <ul class="exo-legal-list">
-                        <li>{move || i18n.tr("privacy_s3_li1", "Authenticate your session and resolve your authoritative did:peer identity across Web, Desktop, and Mobile modes.")}</li>
+                        <li>{move || i18n.tr("privacy_s3_li1", "Authenticate your session and resolve your authoritative did:peer identity across web, desktop, and mobile.")}</li>
                         <li>{move || i18n.tr("privacy_s3_li2", "Display your chosen author persona, pen name, avatar, and language preferences (including right-to-left layout preferences).")}</li>
                         <li>{move || i18n.tr("privacy_s3_li3", "Operate collaborative story groups, contributor attribution, and group/referral invitations you initiate.")}</li>
                         <li>{move || i18n.tr("privacy_s3_li4", "Execute user-initiated backups or exports to your connected Google Drive workspace when you explicitly trigger them.")}</li>
@@ -1976,7 +2328,7 @@ fn TermsOfServiceView() -> impl IntoView {
                     <img src="/exonovel-logo-dark.png" alt="ExoNovel" class="navbar-logo navbar-logo-dark" />
                 </a>
                 <div class="navbar-menu">
-                    <a href="/" class="nav-link">{move || i18n.tr("nav_home", "Home")}</a>
+                    <a href="/dear-world" class="nav-link">{move || i18n.tr("nav_dear_world", "Dear World")}</a>
                     <a href="/signin" class="exo-btn exo-btn-primary">{move || i18n.tr("nav_sign_in", "Sign in")}</a>
                 </div>
             </nav>
@@ -2042,7 +2394,7 @@ fn TermsOfServiceView() -> impl IntoView {
                         )}
                     </p>
 
-                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("terms_s5_title", "5. Service Modes, Availability & Contact")}</h2>
+                    <h2 class="exo-h2" style="margin-top: 24px;">{move || i18n.tr("terms_s5_title", "5. Service Availability, Sync Plans & Contact")}</h2>
                     <p class="exo-legal-body">
                         {move || i18n.tr(
                             "terms_s5_body",

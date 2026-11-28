@@ -1,6 +1,5 @@
 use gloo_net::http::Request;
 use leptos::prelude::*;
-use wasm_bindgen::JsCast;
 
 use crate::{
     i18n::{use_i18n, InputLocaleBar},
@@ -12,6 +11,10 @@ use crate::{
         BillingResponse, CopyIcon, CreateInviteResponse, GroupView, GroupsResponse, InviteView,
         InvitesResponse, LocaleFlag, NotificationPreferences, NotificationPrefsResponse,
         PersonasResponse, ProfileTab, ReferralView, VerifiedUser,
+    },
+    ui::{
+        select_opt, ExoFileButton, ExoSelect, ExoSettingsPage, ExoSettingsSplit, SettingsNavGroup,
+        SettingsNavIcon, SettingsNavItem, normalize_settings_nav_width, use_settings_resize,
     },
 };
 
@@ -53,7 +56,7 @@ pub fn ProfileView(
     let (notif_prefs, set_notif_prefs) = signal(NotificationPreferences::default());
     let (profile_notice, set_profile_notice) = signal::<Option<String>>(None);
 
-    // Mode 3 Managed Willow Sync Subscription form (100% Commercial on Profile per ADR 004 / 008)
+    // Personal Web <-> Device Sync Plan form (100% Commercial on Profile -> Plans per ADR 004 / 008)
     let (billing_currency, set_billing_currency) = signal("USD".to_string());
     let (billing_rail, set_billing_rail) = signal("card-stripe".to_string());
 
@@ -67,7 +70,6 @@ pub fn ProfileView(
     let (edit_p_name, set_edit_p_name) = signal(String::new());
     let (edit_p_handle, set_edit_p_handle) = signal(String::new());
     let (edit_p_bio, set_edit_p_bio) = signal(String::new());
-    let persona_avatar_ref = NodeRef::<leptos::html::Input>::new();
 
     // Create Group form
     let (new_group_name, set_new_group_name) = signal(String::new());
@@ -266,56 +268,30 @@ pub fn ProfileView(
         });
     };
 
-    let on_persona_avatar_file = move |target_did: String| {
-        if let Some(input) = persona_avatar_ref.get() {
-            if let Some(files) = input.files() {
-                if let Some(file) = files.get(0) {
-                    if file.size() > 2_097_152.0 {
-                        set_profile_notice.set(Some(i18n.tr_untracked(
-                            "profile_msg_img_size",
-                            "Image must be 2 MB or smaller.",
-                        )));
-                        return;
-                    }
-                    let auth_url = auth_config.get_untracked().and_then(|c| c.auth_url);
-                    let fallback_jwt = initial_jwt.get_untracked();
-                    if let Ok(reader) = web_sys::FileReader::new() {
-                        let reader_clone = reader.clone();
-                        let cb = wasm_bindgen::closure::Closure::once_into_js(move || {
-                            if let Ok(res) = reader_clone.result() {
-                                if let Some(data_url) = res.as_string() {
-                                    leptos::task::spawn_local(async move {
-                                        if upload_avatar_file(
-                                            auth_url.as_deref(),
-                                            fallback_jwt.as_deref(),
-                                            data_url,
-                                            Some(target_did),
-                                        )
-                                        .await
-                                        .is_ok()
-                                        {
-                                            if let Some(url) = auth_url.as_deref() {
-                                                if let Some((fresh_user, _)) =
-                                                    load_authenticated_user(url, None).await
-                                                {
-                                                    set_current_user.set(Some(fresh_user));
-                                                }
-                                            }
-                                            on_toast(i18n.tr_untracked(
-                                                "profile_toast_avatar_done",
-                                                "Persona avatar processed",
-                                            ));
-                                        }
-                                    });
-                                }
-                            }
-                        });
-                        reader.set_onload(Some(cb.unchecked_ref()));
-                        let _ = reader.read_as_data_url(&file);
+    let upload_persona_avatar_data_url = move |target_did: String, data_url: String| {
+        let auth_url = auth_config.get_untracked().and_then(|c| c.auth_url);
+        let fallback_jwt = initial_jwt.get_untracked();
+        leptos::task::spawn_local(async move {
+            if upload_avatar_file(
+                auth_url.as_deref(),
+                fallback_jwt.as_deref(),
+                data_url,
+                Some(target_did),
+            )
+            .await
+            .is_ok()
+            {
+                if let Some(url) = auth_url.as_deref() {
+                    if let Some((fresh_user, _)) = load_authenticated_user(url, None).await {
+                        set_current_user.set(Some(fresh_user));
                     }
                 }
+                on_toast(i18n.tr_untracked(
+                    "profile_toast_avatar_done",
+                    "Persona avatar processed",
+                ));
             }
-        }
+        });
     };
 
     let create_new_group = move |ev: web_sys::SubmitEvent| {
@@ -529,7 +505,8 @@ pub fn ProfileView(
 
     let back_label = move || match return_tab.get() {
         ActiveTab::Docs => format!("← {}", i18n.tr("nav_docs", "Docs & ADRs")),
-        _ => i18n.tr("back_to_workspace", "← Back to Workspace"),
+        ActiveTab::Guides => format!("← {}", i18n.tr("nav_dear_world", "Dear World")),
+        _ => i18n.tr("back_to_desk", "← Back to Desk"),
     };
 
     let plan_badge = move || {
@@ -540,9 +517,184 @@ pub fn ProfileView(
             .unwrap_or_else(|| "free".to_string())
     };
 
+    let currency_options = Signal::derive(move || {
+        vec![
+            select_opt("USD", i18n.tr("wallet_cur_usd", "USD ($9/mo · $90/yr)")),
+            select_opt("EUR", i18n.tr("wallet_cur_eur", "EUR (€9/mo · €90/yr)")),
+            select_opt("GBP", i18n.tr("wallet_cur_gbp", "GBP (£7/mo · £70/yr)")),
+            select_opt("PLN", i18n.tr("wallet_cur_pln", "PLN (36 zł/mo · 360 zł/yr)")),
+            select_opt("NGN", i18n.tr("wallet_cur_ngn", "NGN (₦13,500/mo · ₦135,000/yr)")),
+            select_opt("KES", i18n.tr("wallet_cur_kes", "KES (KSh 1,200/mo · KSh 12,000/yr)")),
+            select_opt("INR", i18n.tr("wallet_cur_inr", "INR (₹750/mo · ₹7,500/yr)")),
+            select_opt("BRL", i18n.tr("wallet_cur_brl", "BRL (R$45/mo · R$450/yr)")),
+        ]
+    });
+
+    let rail_options = Signal::derive(move || {
+        vec![
+            select_opt("card-stripe", i18n.tr("wallet_rail_card", "Card / Local Currency Gateway")),
+            select_opt("solana-usdc", i18n.tr("wallet_rail_solana", "Solana Pay / USDC")),
+            select_opt("bitcoin-lightning", i18n.tr("wallet_rail_btc", "Bitcoin Lightning (L402)")),
+            select_opt("ethereum-base", i18n.tr("wallet_rail_eth", "Base / Arbitrum / Ethereum")),
+            select_opt("mobile-money", i18n.tr("wallet_rail_mobile", "Mobile Money / PIX / UPI")),
+        ]
+    });
+
+    let initial_nav_w = current_user
+        .get_untracked()
+        .and_then(|u| u.profile)
+        .map(|p| p.profile_nav_width)
+        .unwrap_or(260);
+
+    let resize = use_settings_resize(
+        initial_nav_w,
+        Callback::new(move |new_w: i32| {
+            let auth_url = auth_config.get_untracked().and_then(|c| c.auth_url);
+            let fallback_jwt = initial_jwt.get_untracked();
+            leptos::task::spawn_local(async move {
+                if let Ok(updated) = save_profile_patch(
+                    auth_url.as_deref(),
+                    fallback_jwt.as_deref(),
+                    serde_json::json!({ "profileNavWidth": new_w }),
+                )
+                .await
+                {
+                    set_current_user.update(|u_opt| {
+                        if let Some(u) = u_opt {
+                            u.profile = Some(updated.profile);
+                            u.personas = updated.personas;
+                            u.active_persona = updated.active_persona;
+                        }
+                    });
+                }
+            });
+        }),
+    );
+
+    Effect::new(move |_| {
+        if !resize.dragging.get_untracked() {
+            if let Some(w) = current_user
+                .get()
+                .and_then(|u| u.profile)
+                .map(|p| normalize_settings_nav_width(p.profile_nav_width))
+            {
+                resize.width.set(w);
+            }
+        }
+    });
+
+    let nav_groups = vec![
+        SettingsNavGroup {
+            divider_before: false,
+            heading: None,
+            visible: true,
+            items: vec![SettingsNavItem {
+                icon: SettingsNavIcon::Overview,
+                label_key: "tab_overview",
+                label_fallback: "Overview",
+                is_active: Signal::derive(move || {
+                    active_profile_tab.get() == ProfileTab::Overview
+                }),
+                on_click: Callback::new(move |_| set_active_profile_tab.set(ProfileTab::Overview)),
+            }],
+        },
+        SettingsNavGroup {
+            divider_before: true,
+            heading: Some(("nav_group_writing", "Writing & Collaboration")),
+            visible: true,
+            items: vec![
+                SettingsNavItem {
+                    icon: SettingsNavIcon::Book,
+                    label_key: "tab_works",
+                    label_fallback: "Works",
+                    is_active: Signal::derive(move || {
+                        active_profile_tab.get() == ProfileTab::Works
+                    }),
+                    on_click: Callback::new(move |_| set_active_profile_tab.set(ProfileTab::Works)),
+                },
+                SettingsNavItem {
+                    icon: SettingsNavIcon::Users,
+                    label_key: "tab_groups",
+                    label_fallback: "Groups & Invites",
+                    is_active: Signal::derive(move || {
+                        active_profile_tab.get() == ProfileTab::Groups
+                    }),
+                    on_click: Callback::new(move |_| {
+                        set_active_profile_tab.set(ProfileTab::Groups)
+                    }),
+                },
+                SettingsNavItem {
+                    icon: SettingsNavIcon::Personas,
+                    label_key: "tab_personas",
+                    label_fallback: "Personas",
+                    is_active: Signal::derive(move || {
+                        active_profile_tab.get() == ProfileTab::Personas
+                    }),
+                    on_click: Callback::new(move |_| {
+                        set_active_profile_tab.set(ProfileTab::Personas)
+                    }),
+                },
+            ],
+        },
+        SettingsNavGroup {
+            divider_before: true,
+            heading: Some(("nav_group_commerce", "Billing & Reader Access")),
+            visible: true,
+            items: vec![
+                SettingsNavItem {
+                    icon: SettingsNavIcon::Wallet,
+                    label_key: "tab_wallet",
+                    label_fallback: "Wallet",
+                    is_active: Signal::derive(move || {
+                        active_profile_tab.get() == ProfileTab::Wallet
+                    }),
+                    on_click: Callback::new(move |_| {
+                        set_active_profile_tab.set(ProfileTab::Wallet)
+                    }),
+                },
+                SettingsNavItem {
+                    icon: SettingsNavIcon::Lock,
+                    label_key: "tab_paywalls",
+                    label_fallback: "Paywalls",
+                    is_active: Signal::derive(move || {
+                        active_profile_tab.get() == ProfileTab::Paywalls
+                    }),
+                    on_click: Callback::new(move |_| {
+                        set_active_profile_tab.set(ProfileTab::Paywalls)
+                    }),
+                },
+                SettingsNavItem {
+                    icon: SettingsNavIcon::Layers,
+                    label_key: "tab_plans",
+                    label_fallback: "Plans",
+                    is_active: Signal::derive(move || {
+                        active_profile_tab.get() == ProfileTab::Plans
+                    }),
+                    on_click: Callback::new(move |_| set_active_profile_tab.set(ProfileTab::Plans)),
+                },
+            ],
+        },
+        SettingsNavGroup {
+            divider_before: true,
+            heading: Some(("nav_group_personalization", "Personalization")),
+            visible: true,
+            items: vec![SettingsNavItem {
+                icon: SettingsNavIcon::Globe,
+                label_key: "tab_langs_alerts",
+                label_fallback: "Languages & Notifications",
+                is_active: Signal::derive(move || {
+                    active_profile_tab.get() == ProfileTab::LanguagesAndAlerts
+                }),
+                on_click: Callback::new(move |_| {
+                    set_active_profile_tab.set(ProfileTab::LanguagesAndAlerts)
+                }),
+            }],
+        },
+    ];
+
     view! {
-        <main class="page-main">
-            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px;">
+        <ExoSettingsPage resize=resize>
+            <div class="exo-gh-header">
                 <div class="exo-home-hero">
                     {move || {
                         let Some(user) = current_user.get() else {
@@ -565,7 +717,7 @@ pub fn ProfileView(
                                     <div class="exo-sub" style="margin-top: 4px;">
                                         {move || i18n.tr("active_persona_label", "Active persona")} " "
                                         <strong>{ap.handle}</strong>
-                                        " · " {move || i18n.tr("sync_tier_label", "Sync tier:")} " "
+                                        " · " {move || i18n.tr("profile_sync_plan_label", "Personal sync plan:")} " "
                                         <strong class="tabular-nums">{plan_badge()}</strong>
                                     </div>
                                     <div class="exo-mono" style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
@@ -585,33 +737,12 @@ pub fn ProfileView(
                 <div class="exo-alert-error">{m}</div>
             })}
 
-            <nav class="exo-gh-tabs" aria-label=move || i18n.tr("profile_tabs_aria", "Profile sections")>
-                {[
-                    (ProfileTab::Overview, "tab_overview", "Overview"),
-                    (ProfileTab::Works, "tab_works", "Works"),
-                    (ProfileTab::Groups, "tab_groups", "Groups & Invites"),
-                    (ProfileTab::Wallet, "tab_wallet", "Wallet, Paywalls & Purchases"),
-                    (ProfileTab::Personas, "tab_personas", "Personas"),
-                    (ProfileTab::LanguagesAndAlerts, "tab_langs_alerts", "Languages & Notifications"),
-                ]
-                .into_iter()
-                .map(|(tab, tr_key, fallback)| {
-                    view! {
-                        <button
-                            type="button"
-                            class=move || if active_profile_tab.get() == tab {
-                                "exo-gh-tab exo-gh-tab-active"
-                            } else {
-                                "exo-gh-tab"
-                            }
-                            on:click=move |_| set_active_profile_tab.set(tab)
-                        >
-                            {move || i18n.tr(tr_key, fallback)}
-                        </button>
-                    }
-                })
-                .collect_view()}
-            </nav>
+            <ExoSettingsSplit
+                resize=resize
+                nav_aria_label=Signal::derive(move || i18n.tr("profile_tabs_aria", "Profile sections"))
+                groups=nav_groups
+            >
+
 
             {move || match active_profile_tab.get() {
                 ProfileTab::Overview => view! {
@@ -653,7 +784,7 @@ pub fn ProfileView(
                         <div class="exo-format-grid">
                             <div class="exo-format-tile">
                                 <h3>{move || i18n.tr("works_novels_title", "Novels & Serials")}</h3>
-                                <p>{move || i18n.tr("works_novels_desc", "LoroText chapters + paywalled or free public reader tiers configured in Wallet, Paywalls & Purchases.")}</p>
+                                <p>{move || i18n.tr("works_novels_desc", "Chapters and scenes saved with free public or paid reader tiers configured in Paywalls.")}</p>
                             </div>
                             <div class="exo-format-tile">
                                 <h3>{move || i18n.tr("works_scripts_title", "Screenplays & Poetry")}</h3>
@@ -773,7 +904,7 @@ pub fn ProfileView(
                         </div>
 
                         <div class="exo-card">
-                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <div class="exo-gh-section-head-row">
                                 <div>
                                     <h2 class="exo-h2" style="margin-bottom: 4px;">{move || i18n.tr("invites_title", "Invites & Referrals")}</h2>
                                     <p class="exo-sub" style="margin: 0;">{move || i18n.tr("invites_sub", "Invite writers and track joined referrals.")}</p>
@@ -842,9 +973,9 @@ pub fn ProfileView(
                 ProfileTab::Wallet => view! {
                     <div>
                         <div class="exo-card">
-                            <h2 class="exo-h2">{move || i18n.tr("wallet_title", "Mode 3 Managed Willow Sync Subscription")}</h2>
+                            <h2 class="exo-h2">{move || i18n.tr("wallet_tab_title", "Connected Wallets & Payment Rails")}</h2>
                             <p class="exo-sub">
-                                {move || i18n.tr("wallet_sub", "Mode 1 (Web) and Mode 2 (Local Device Willow + Free ExoNovel Relay Discovery) are completely free. Subscribe here to register your did:peer IDs for blind encrypted Mode 3 server-to-device Meadowcap sync ($9/month or $90/year local currency equivalent).")}
+                                {move || i18n.tr("wallet_tab_sub", "Choose how you receive reader payments and pay for personal device sync plans across all supported local currency, card, and crypto rails.")}
                             </p>
                             <div class="exo-eyebrow" style="margin-top: 12px;">
                                 {move || i18n.tr("wallet_peer_prefix", "ExoNovel Service Recipient Peer:")} " "
@@ -853,94 +984,43 @@ pub fn ProfileView(
 
                             <div class="exo-grid-2" style="margin-top: 16px;">
                                 <div class="exo-field">
-                                    <label class="exo-label">{move || i18n.tr("wallet_currency_label", "Local Currency")}</label>
-                                    <select
-                                        class="exo-input"
-                                        prop:value=move || billing_currency.get()
-                                        on:change=move |ev| set_billing_currency.set(event_target_value(&ev))
-                                    >
-                                        <option value="USD">{move || i18n.tr("wallet_cur_usd", "USD ($9/mo · $90/yr)")}</option>
-                                        <option value="EUR">{move || i18n.tr("wallet_cur_eur", "EUR (€9/mo · €90/yr)")}</option>
-                                        <option value="GBP">{move || i18n.tr("wallet_cur_gbp", "GBP (£7/mo · £70/yr)")}</option>
-                                        <option value="PLN">{move || i18n.tr("wallet_cur_pln", "PLN (36 zł/mo · 360 zł/yr)")}</option>
-                                        <option value="NGN">{move || i18n.tr("wallet_cur_ngn", "NGN (₦13,500/mo · ₦135,000/yr)")}</option>
-                                        <option value="KES">{move || i18n.tr("wallet_cur_kes", "KES (KSh 1,200/mo · KSh 12,000/yr)")}</option>
-                                        <option value="INR">{move || i18n.tr("wallet_cur_inr", "INR (₹750/mo · ₹7,500/yr)")}</option>
-                                        <option value="BRL">{move || i18n.tr("wallet_cur_brl", "BRL (R$45/mo · R$450/yr)")}</option>
-                                    </select>
+                                    <label class="exo-label">{move || i18n.tr("wallet_rail_label", "Default Payment Rail (AOTA)")}</label>
+                                    <ExoSelect
+                                        value=Signal::derive(move || billing_rail.get())
+                                        options=rail_options
+                                        aria_label=Signal::derive(move || i18n.tr("wallet_rail_label", "Default Payment Rail (AOTA)"))
+                                        on_change=Callback::new(move |val| set_billing_rail.set(val))
+                                    />
                                 </div>
-                                <div class="exo-field">
-                                    <label class="exo-label">{move || i18n.tr("wallet_rail_label", "Payment Rail (AOTA)")}</label>
-                                    <select
-                                        class="exo-input"
-                                        prop:value=move || billing_rail.get()
-                                        on:change=move |ev| set_billing_rail.set(event_target_value(&ev))
-                                    >
-                                        <option value="card-stripe">{move || i18n.tr("wallet_rail_card", "Card / Local Currency Gateway")}</option>
-                                        <option value="solana-usdc">{move || i18n.tr("wallet_rail_solana", "Solana Pay / USDC")}</option>
-                                        <option value="bitcoin-lightning">{move || i18n.tr("wallet_rail_btc", "Bitcoin Lightning (L402)")}</option>
-                                        <option value="ethereum-base">{move || i18n.tr("wallet_rail_eth", "Base / Arbitrum / Ethereum")}</option>
-                                        <option value="mobile-money">{move || i18n.tr("wallet_rail_mobile", "Mobile Money / PIX / UPI")}</option>
-                                    </select>
+                                <div class="exo-format-tile">
+                                    <h3>{move || i18n.tr("wallet_selected_rail_title", "Active Settlement Rail")}</h3>
+                                    <p class="exo-mono" style="margin-top: 6px;">{move || billing_rail.get()}</p>
+                                    <p style="margin-top: 8px;">
+                                        {move || i18n.tr("wallet_selected_rail_desc", "Used when activating personal sync plans or receiving writer payouts.")}
+                                    </p>
                                 </div>
                             </div>
 
-                            <div class="exo-grid-3" style="margin-top: 14px;">
+                            <div class="exo-grid-3" style="margin-top: 16px;">
                                 <div class="exo-format-tile">
-                                    <h3>{move || i18n.tr("wallet_free_title", "Free Modes (1 & 2)")}</h3>
-                                    <p>{move || i18n.tr("wallet_free_desc", "Cloud Web App or Device Local Willow Store + Free Discovery Relay")}</p>
-                                    <button
-                                        type="button"
-                                        class="exo-btn"
-                                        style="margin-top: 12px; width: 100%;"
-                                        on:click=move |_| activate_sync_plan("free", 0)
-                                    >
-                                        {move || if plan_badge() == "free" {
-                                            i18n.tr("wallet_free_current", "Current Plan (Free)")
-                                        } else {
-                                            i18n.tr("wallet_free_switch", "Switch to Free")
-                                        }}
-                                    </button>
+                                    <h3>{move || i18n.tr("wallet_rail_card", "Card / Local Currency Gateway")}</h3>
+                                    <p>{move || i18n.tr("wallet_card_desc", "Cards, Apple Pay, Google Pay, and local regional currency settlements.")}</p>
                                 </div>
-                                <div class="exo-format-tile" style="border-color: var(--accent);">
-                                    <h3>{move || i18n.tr("wallet_mo_title", "Sync Monthly ($9/mo eq.)")}</h3>
-                                    <p>{move || i18n.tr("wallet_mo_desc", "Authorizes Mode 3 Preferences toggle & blind Meadowcap replication.")}</p>
-                                    <button
-                                        type="button"
-                                        class="exo-btn exo-btn-primary"
-                                        style="margin-top: 12px; width: 100%;"
-                                        on:click=move |_| activate_sync_plan("sync-monthly", 900)
-                                    >
-                                        {move || if plan_badge() == "sync-monthly" {
-                                            i18n.tr("wallet_mo_active", "Active Monthly")
-                                        } else {
-                                            i18n.tr("wallet_mo_activate", "Activate $9/month")
-                                        }}
-                                    </button>
+                                <div class="exo-format-tile">
+                                    <h3>{move || i18n.tr("wallet_rail_solana", "Solana Pay / USDC")}</h3>
+                                    <p>{move || i18n.tr("wallet_solana_desc", "Sub-second stablecoin creator payouts and instant reader unlocks.")}</p>
                                 </div>
-                                <div class="exo-format-tile" style="border-color: var(--accent);">
-                                    <h3>{move || i18n.tr("wallet_yr_title", "Sync Annual ($90/yr eq.)")}</h3>
-                                    <p>{move || i18n.tr("wallet_yr_desc", "2 months free · full blind Willow server-to-device sync.")}</p>
-                                    <button
-                                        type="button"
-                                        class="exo-btn exo-btn-primary"
-                                        style="margin-top: 12px; width: 100%;"
-                                        on:click=move |_| activate_sync_plan("sync-annual", 9000)
-                                    >
-                                        {move || if plan_badge() == "sync-annual" {
-                                            i18n.tr("wallet_yr_active", "Active Annual")
-                                        } else {
-                                            i18n.tr("wallet_yr_activate", "Activate $90/year")
-                                        }}
-                                    </button>
+                                <div class="exo-format-tile">
+                                    <h3>{move || i18n.tr("wallet_rail_btc", "Bitcoin Lightning (L402)")}</h3>
+                                    <p>{move || i18n.tr("wallet_btc_desc", "Low-fee Lightning invoices for global micro-unlocks and subscriptions.")}</p>
                                 </div>
                             </div>
                         </div>
 
                         <div class="exo-card">
-                            <h2 class="exo-h2">{move || i18n.tr("ledger_title", "Author Paywalls, Reader Purchases & Sync Ledger")}</h2>
+                            <h2 class="exo-h2">{move || i18n.tr("ledger_wallet_title", "Wallet Transactions & Receipts")}</h2>
                             <p class="exo-sub">
-                                {move || i18n.tr("ledger_sub", "All commercial records—connected wallets, paywall earnings, reader purchases of works you buy, and Sync receipts—live exclusively here in Profile.")}
+                                {move || i18n.tr("ledger_wallet_sub", "Complete record of writer earnings, reader unlock receipts, and sync plan charges.")}
                             </p>
                             <div style="overflow-x: auto; margin-top: 14px;">
                                 <table class="exo-table">
@@ -973,6 +1053,176 @@ pub fn ProfileView(
                                         />
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                    </div>
+                }.into_any(),
+
+                ProfileTab::Paywalls => view! {
+                    <div>
+                        <div class="exo-card">
+                            <h2 class="exo-h2">{move || i18n.tr("paywalls_title", "Author Paywalls & Reader Access")}</h2>
+                            <p class="exo-sub">
+                                {move || i18n.tr("paywalls_sub", "Decide which stories, chapters, or reusable worldbuilding blocks stay free for everyone and which unlock for paying readers—with automatic attribution splits for collaborators.")}
+                            </p>
+
+                            <div class="exo-grid-3" style="margin-top: 16px;">
+                                <div class="exo-format-tile">
+                                    <h3>{move || i18n.tr("paywalls_free_tier_title", "Free Public Chapters")}</h3>
+                                    <p>{move || i18n.tr("paywalls_free_tier_desc", "Keep opening chapters or whole books open to all readers so newcomers can discover your writing.")}</p>
+                                </div>
+                                <div class="exo-format-tile">
+                                    <h3>{move || i18n.tr("paywalls_unlock_title", "Per-Story & Chapter Paywalls")}</h3>
+                                    <p>{move || i18n.tr("paywalls_unlock_desc", "Set direct reader unlock prices in your preferred currency across cards, mobile money, and crypto wallets.")}</p>
+                                </div>
+                                <div class="exo-format-tile">
+                                    <h3>{move || i18n.tr("paywalls_splits_title", "Collaborator Attribution Splits")}</h3>
+                                    <p>{move || i18n.tr("paywalls_splits_desc", "When you co-write in a group, paywall revenue traces cleanly to each credited creator.")}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="exo-card">
+                            <h2 class="exo-h2">{move || i18n.tr("paywalls_ledger_title", "Reader Unlocks & Paywall Activity")}</h2>
+                            <p class="exo-sub">
+                                {move || i18n.tr("paywalls_ledger_sub", "Works you unlocked as a reader and paid reader unlocks across your own paywalled stories.")}
+                            </p>
+                            {move || {
+                                let items: Vec<_> = billing_entries
+                                    .get()
+                                    .into_iter()
+                                    .filter(|b| b.kind != "sync_subscription")
+                                    .collect();
+                                if items.is_empty() {
+                                    view! {
+                                        <p class="exo-sub" style="margin-top: 14px;">
+                                            {move || i18n.tr("paywalls_empty", "No paywall sales or reader unlock receipts recorded yet.")}
+                                        </p>
+                                    }.into_any()
+                                } else {
+                                    view! {
+                                        <div style="overflow-x: auto; margin-top: 14px;">
+                                            <table class="exo-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>{move || i18n.tr("ledger_th_type", "Type")}</th>
+                                                        <th>{move || i18n.tr("ledger_th_amount", "Amount")}</th>
+                                                        <th>{move || i18n.tr("ledger_th_details", "Details")}</th>
+                                                        <th>{move || i18n.tr("ledger_th_date", "Date")}</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {items.into_iter().map(|b| {
+                                                        let amt = format!("{:.2} {}", b.amount_cents as f64 / 100.0, b.currency);
+                                                        view! {
+                                                            <tr>
+                                                                <td><span class="exo-tag">{b.kind}</span></td>
+                                                                <td class="tabular-nums"><strong>{amt}</strong></td>
+                                                                <td>{b.note}</td>
+                                                                <td>{b.created_at}</td>
+                                                            </tr>
+                                                        }
+                                                    }).collect_view()}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }.into_any()
+                                }
+                            }}
+                        </div>
+                    </div>
+                }.into_any(),
+
+                ProfileTab::Plans => view! {
+                    <div>
+                        <div class="exo-card">
+                            <h2 class="exo-h2">{move || i18n.tr("plans_title", "Writing Access & Personal Device Sync Plans")}</h2>
+                            <p class="exo-sub">
+                                {move || i18n.tr("plans_sub", "Writing on the web is free, writing on your own devices is free, and team collaboration sync between writers is always free—even when one writer is on the web and another works offline on a device. A paid plan is only for keeping your own offline device drafts synced with your own web profile.")}
+                            </p>
+
+                            <div class="exo-format-tile" style="margin-top: 16px; border-color: var(--accent);">
+                                <h3>{move || i18n.tr("sync_collab_title", "Collaborating With Other Writers Is Free Everywhere")}</h3>
+                                <p>
+                                    {move || i18n.tr("sync_collab_desc", "Whenever you add collaborators, sync between collaborators happens automatically so you can share your work and collaborate—no matter whether one writer is in a browser and another is on a desktop or phone app. Only syncing your own device content with your own web profile carries a fee.")}
+                                </p>
+                            </div>
+
+                            <div class="exo-grid-2" style="margin-top: 16px;">
+                                <div class="exo-field">
+                                    <label class="exo-label">{move || i18n.tr("wallet_currency_label", "Local Currency")}</label>
+                                    <ExoSelect
+                                        value=Signal::derive(move || billing_currency.get())
+                                        options=currency_options
+                                        aria_label=Signal::derive(move || i18n.tr("wallet_currency_label", "Local Currency"))
+                                        on_change=Callback::new(move |val| set_billing_currency.set(val))
+                                    />
+                                </div>
+                                <div class="exo-format-tile" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                                    <div>
+                                        <div class="exo-label" style="margin-bottom: 2px;">{move || i18n.tr("plans_payment_rail_note", "Selected Payment Rail")}</div>
+                                        <span class="exo-mono" style="font-size: 14px;">{move || billing_rail.get()}</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        class="exo-btn"
+                                        style="min-height: 36px; font-size: 14px;"
+                                        on:click=move |_| set_active_profile_tab.set(ProfileTab::Wallet)
+                                    >
+                                        {move || i18n.tr("plans_change_wallet_btn", "Configure in Wallet →")}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="exo-grid-3" style="margin-top: 14px;">
+                                <div class="exo-format-tile">
+                                    <h3>{move || i18n.tr("plans_free_title", "Web, Device & Collaboration (Free)")}</h3>
+                                    <p>{move || i18n.tr("plans_free_desc", "Free writing on the web, free local writing on your devices, and free collaboration sync between you and your writing team.")}</p>
+                                    <button
+                                        type="button"
+                                        class="exo-btn"
+                                        style="margin-top: 12px; width: 100%;"
+                                        on:click=move |_| activate_sync_plan("free", 0)
+                                    >
+                                        {move || if plan_badge() == "free" {
+                                            i18n.tr("wallet_free_current", "Current Plan (Free)")
+                                        } else {
+                                            i18n.tr("wallet_free_switch", "Switch to Free")
+                                        }}
+                                    </button>
+                                </div>
+                                <div class="exo-format-tile" style="border-color: var(--accent);">
+                                    <h3>{move || i18n.tr("wallet_mo_title", "Personal Sync Monthly ($9/mo eq.)")}</h3>
+                                    <p>{move || i18n.tr("wallet_mo_desc", "Encrypted sync connecting your own offline device drafts with your own web profile.")}</p>
+                                    <button
+                                        type="button"
+                                        class="exo-btn exo-btn-primary"
+                                        style="margin-top: 12px; width: 100%;"
+                                        on:click=move |_| activate_sync_plan("sync-monthly", 900)
+                                    >
+                                        {move || if plan_badge() == "sync-monthly" {
+                                            i18n.tr("wallet_mo_active", "Active Monthly")
+                                        } else {
+                                            i18n.tr("wallet_mo_activate", "Activate $9/month")
+                                        }}
+                                    </button>
+                                </div>
+                                <div class="exo-format-tile" style="border-color: var(--accent);">
+                                    <h3>{move || i18n.tr("wallet_yr_title", "Personal Sync Annual ($90/yr eq.)")}</h3>
+                                    <p>{move || i18n.tr("wallet_yr_desc", "2 months free · full encrypted sync between your own devices and your own web profile.")}</p>
+                                    <button
+                                        type="button"
+                                        class="exo-btn exo-btn-primary"
+                                        style="margin-top: 12px; width: 100%;"
+                                        on:click=move |_| activate_sync_plan("sync-annual", 9000)
+                                    >
+                                        {move || if plan_badge() == "sync-annual" {
+                                            i18n.tr("wallet_yr_active", "Active Annual")
+                                        } else {
+                                            i18n.tr("wallet_yr_activate", "Activate $90/year")
+                                        }}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1086,11 +1336,10 @@ pub fn ProfileView(
                                                         prop:value=move || edit_p_bio.get()
                                                         on:input=move |ev| set_edit_p_bio.set(event_target_value(&ev))
                                                     />
-                                                    <input
-                                                        type="file"
-                                                        accept="image/png,image/jpeg,image/webp,image/gif"
-                                                        node_ref=persona_avatar_ref
-                                                        on:change=move |_| on_persona_avatar_file(p_did_val.get_value())
+                                                    <ExoFileButton
+                                                        label=Signal::derive(move || i18n.tr("persona_choose_avatar_btn", "Choose Persona Photo"))
+                                                        on_data_url=Callback::new(move |url| upload_persona_avatar_data_url(p_did_val.get_value(), url))
+                                                        on_error=Callback::new(move |err| set_profile_notice.set(Some(err)))
                                                     />
                                                     <button
                                                         type="button"
@@ -1315,6 +1564,7 @@ pub fn ProfileView(
                     </div>
                 }.into_any(),
             }}
-        </main>
+            </ExoSettingsSplit>
+        </ExoSettingsPage>
     }
 }

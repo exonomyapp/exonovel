@@ -13,12 +13,15 @@ ExoNovel działa w przeglądarce oraz natywnie na **Linux, macOS, Windows, Andro
    - **PostgreSQL**: Centralny magazyn relacyjny dla `did:peer`, `user_personas`, `user_profiles`, `media_assets`, grup, zaproszeń, powiązań SSO i architektury fabularnej.
    - **Współrzędne protokołu Willow**: Tabele zachowują deterministyczne pola `willow_namespace`, `willow_subspace`, `willow_path`, `willow_timestamp_us`, `payload_digest` i `byte_length`, umożliwiając bezstratną migrację do lokalnego magazynu Rust `willow25`.
    - **Wielorozmiarowe media**: Przesyłane obrazy do 2 MB są przetwarzane po stronie serwera do wariantów `64×64`, `256×256` oraz `<= 1024px` (WebP/JPEG).
-2. **Trzy tryby pracy, węzły `did:peer` ExoNovel i dwukierunkowa przenośność**:
-   - **Tryb 1 — ExoNovel w sieci (`Darmowy`)**: Przeglądarkowa obsługa oparta na **Neon PostgreSQL**.
-   - **Tryb 2 — ExoNovel na urządzeniu (`Darmowy`)**: Aplikacje natywne uruchamiają się lokalnie **bez wymagania Neon**, używając **`willow25`** (`0.7.11`) i darmowej strefy **relay/discovery `iroh`** (`v1.4.x`). **Zasada ślepego przekaźnika**: wszystkie dane buforowane w trybie 2 są szyfrowane end-to-end na urządzeniu nadawcy.
-   - **Tryb 3 — Sieć + Urządzenie z zarządzanym synciem (`Płatny: równowartość 9 USD/mies. lub 90 USD/rok w walucie lokalnej`)**:
-     - Aktywacja i rozliczenie w **Profilu** (ExoNovel działa jako partner z własnym `did:peer`), odblokowując przełącznik **Synchronizacji w Preferencjach** oparty o delegację uprawnień **Meadowcap** w `willow25` i pełne szyfrowanie AEAD po stronie klienta.
-     - Dwukierunkowy eksport (`Neon -> willow25`) i import (`willow25 -> Neon`) z zachowaniem przyczynowej historii **`loro` (`1.18.0`)**.
+2. **Sieć, urządzenie, synchronizacja współpracy a synchronizacja własnych urządzeń (`did:peer`)**:
+   - **W przeglądarce (`Darmowy`)**: Przestrzeń robocza w chmurze oparta na PostgreSQL, dostępna z każdej przeglądarki.
+   - **Na urządzeniu (`Darmowy`)**: Aplikacje natywne na **Linux, macOS, Windows, Android i iOS** uruchamiają się lokalnie **bez wymogu bazy w chmurze**, używając **`willow25`** (`0.7.11`) i darmowej strefy **relay/discovery `iroh`** (`v1.4.x`). **Zasada ślepego przekaźnika**: wszystkie dane przesyłane przez przekaźniki ExoNovel są szyfrowane end-to-end na urządzeniu nadawcy.
+   - **Darmowa automatyczna synchronizacja współpracy między siecią a urządzeniami**: Gdy autor doda współpracowników, synchronizacja między nimi działa automatycznie za darmo — niezależnie od tego, czy jedna osoba korzysta z przeglądarki, a druga z aplikacji na urządzeniu.
+   - **Plan synchronizacji własnych urządzeń (`Płatny: równowartość 9 USD/mies. lub 90 USD/rok w walucie lokalnej`)**:
+     - Obejmuje **wyłącznie** ciągłą synchronizację własnych szkiców offline użytkownika z jego własnym profilem w przeglądarce.
+     - Aktywacja i rozliczenie w **Profil → Plany** (z metodami płatności w **Profil → Portfel**, gdzie ExoNovel działa jako partner z własnym `did:peer` i portfelami AOTA).
+     - Rejestruje identyfikatory `did:peer` w usłudze synchronizacji **`willow25`** przez delegację uprawnień **Meadowcap** z pełnym szyfrowaniem AEAD po stronie klienta.
+     - Dwukierunkowy eksport (`PostgreSQL -> willow25`) i import (`willow25 -> PostgreSQL`) z zachowaniem przyczynowej historii **`loro` (`1.18.0`)**.
 
 ## Dokumenty podrzędne (Sub-ADRs)
 

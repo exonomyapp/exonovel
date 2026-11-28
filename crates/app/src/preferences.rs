@@ -1,6 +1,5 @@
 use gloo_net::http::Request;
 use leptos::prelude::*;
-use wasm_bindgen::JsCast;
 
 use crate::{
     connected_apps_ui::ConnectedAppsPreferencesPanel,
@@ -10,9 +9,13 @@ use crate::{
         account_role_key, account_status_key, allowlist_status_key, detect_browser_timezone,
         display_name_for_user, is_safe_avatar_url, locale_flag_emoji, resolve_fresh_jwt,
         save_profile_patch, upload_avatar_file, ActiveTab, AllowlistEntry, AllowlistResponse,
-        AppearanceMode, AuthConfigResponse, CopyIcon, IdentitiesResponse, IdentityRecord,
-        NotificationDevice, NotificationPreferences, NotificationPrefsResponse, PreferencesSection,
+        AuthConfigResponse, CopyIcon, IdentitiesResponse, IdentityRecord, NotificationDevice,
+        NotificationPreferences, NotificationPrefsResponse, PreferencesSection,
         ProfilePatchResponse, VerifiedUser,
+    },
+    ui::{
+        select_opt, ExoFileButton, ExoSelect, ExoSettingsPage, ExoSettingsSplit, SettingsNavGroup,
+        SettingsNavIcon, SettingsNavItem, use_settings_resize,
     },
 };
 
@@ -40,11 +43,9 @@ pub fn PreferencesView(
     initial_jwt: ReadSignal<Option<String>>,
     user: VerifiedUser,
     return_tab: ReadSignal<ActiveTab>,
-    appearance: ReadSignal<AppearanceMode>,
-    set_appearance: WriteSignal<AppearanceMode>,
     on_copy_did: impl Fn(String) + Copy + Send + Sync + 'static,
     on_toast: impl Fn(String) + Copy + Send + Sync + 'static,
-    on_open_profile_billing: impl Fn() + Copy + Send + Sync + 'static,
+    on_open_profile_plans: impl Fn() + Copy + Send + Sync + 'static,
     on_profile_updated: impl Fn(ProfilePatchResponse) + Copy + Send + Sync + 'static,
     on_back: impl Fn() + Copy + Send + Sync + 'static,
     #[prop(optional)] initial_section: Option<RwSignal<Option<PreferencesSection>>>,
@@ -59,13 +60,6 @@ pub fn PreferencesView(
         .unwrap_or_else(|| prof.did_peer.clone());
     let user_did = StoredValue::new(user_did_str);
     let is_admin = user.is_admin;
-    let sync_plan_tier_str = if prof.sync_plan_tier.is_empty() {
-        "free".to_string()
-    } else {
-        prof.sync_plan_tier.clone()
-    };
-    let can_enable_mode3 = sync_plan_tier_str != "free";
-    let sync_plan_tier = StoredValue::new(sync_plan_tier_str);
 
     let (active_section, set_active_section) = signal(
         initial_section
@@ -114,10 +108,8 @@ pub fn PreferencesView(
     } else {
         prof.default_input_locale.clone()
     });
-    let (willow_sync_enabled, set_willow_sync_enabled) = signal(prof.willow_sync_enabled);
     let (profile_msg, set_profile_msg) = signal::<Option<String>>(None);
     let (saving_profile, set_saving_profile) = signal(false);
-    let avatar_input_ref = NodeRef::<leptos::html::Input>::new();
 
     // Notification Channels & Devices
     let (notif_prefs, set_notif_prefs) = signal(NotificationPreferences::default());
@@ -207,68 +199,44 @@ pub fn PreferencesView(
         }
     });
 
-    let on_avatar_file = move |_| {
-        if let Some(input) = avatar_input_ref.get() {
-            if let Some(files) = input.files() {
-                if let Some(file) = files.get(0) {
-                    if file.size() > 2_097_152.0 {
-                        set_profile_msg.set(Some(i18n.tr_untracked(
-                            "preferences_msg_avatar_size",
-                            "Avatar file must be 2 MB or smaller.",
-                        )));
-                        return;
+    let handle_avatar_data_url = move |data_url: String| {
+        let auth_url = auth_config.get_untracked().and_then(|c| c.auth_url);
+        let fallback_jwt = initial_jwt.get_untracked();
+        let target_did = user_did.get_value();
+        set_profile_msg.set(Some(i18n.tr_untracked(
+            "preferences_msg_avatar_processing",
+            "Processing avatar derivatives...",
+        )));
+        leptos::task::spawn_local(async move {
+            match upload_avatar_file(
+                auth_url.as_deref(),
+                fallback_jwt.as_deref(),
+                data_url,
+                Some(target_did),
+            )
+            .await
+            {
+                Ok(uploaded) => {
+                    set_avatar_asset_id.set(uploaded.asset_id);
+                    set_avatar_url.set(uploaded.medium_url);
+                    set_avatar_thumb_url.set(uploaded.thumb_url);
+                    if let Ok(updated) = save_profile_patch(
+                        auth_url.as_deref(),
+                        fallback_jwt.as_deref(),
+                        serde_json::json!({}),
+                    )
+                    .await
+                    {
+                        on_profile_updated(updated);
                     }
-                    let auth_url = auth_config.get_untracked().and_then(|c| c.auth_url);
-                    let fallback_jwt = initial_jwt.get_untracked();
-                    let target_did = user_did.get_value();
-                    if let Ok(reader) = web_sys::FileReader::new() {
-                        let reader_clone = reader.clone();
-                        let cb = wasm_bindgen::closure::Closure::once_into_js(move || {
-                            if let Ok(res) = reader_clone.result() {
-                                if let Some(data_url) = res.as_string() {
-                                    set_profile_msg.set(Some(i18n.tr_untracked(
-                                        "preferences_msg_avatar_processing",
-                                        "Processing avatar derivatives...",
-                                    )));
-                                    leptos::task::spawn_local(async move {
-                                        match upload_avatar_file(
-                                            auth_url.as_deref(),
-                                            fallback_jwt.as_deref(),
-                                            data_url,
-                                            Some(target_did),
-                                        )
-                                        .await
-                                        {
-                                            Ok(uploaded) => {
-                                                set_avatar_asset_id.set(uploaded.asset_id);
-                                                set_avatar_url.set(uploaded.medium_url);
-                                                set_avatar_thumb_url.set(uploaded.thumb_url);
-                                                if let Ok(updated) = save_profile_patch(
-                                                    auth_url.as_deref(),
-                                                    fallback_jwt.as_deref(),
-                                                    serde_json::json!({}),
-                                                )
-                                                .await
-                                                {
-                                                    on_profile_updated(updated);
-                                                }
-                                                set_profile_msg.set(Some(i18n.tr_untracked(
-                                                    "preferences_msg_avatar_saved",
-                                                    "Avatar saved.",
-                                                )));
-                                            }
-                                            Err(e) => set_profile_msg.set(Some(e)),
-                                        }
-                                    });
-                                }
-                            }
-                        });
-                        reader.set_onload(Some(cb.unchecked_ref()));
-                        let _ = reader.read_as_data_url(&file);
-                    }
+                    set_profile_msg.set(Some(i18n.tr_untracked(
+                        "preferences_msg_avatar_saved",
+                        "Avatar saved.",
+                    )));
                 }
+                Err(e) => set_profile_msg.set(Some(e)),
             }
-        }
+        });
     };
 
     let save_preferences_profile = move || {
@@ -289,10 +257,8 @@ pub fn PreferencesView(
             "location": location.get_untracked(),
             "timezone": timezone.get_untracked(),
             "preferredFormat": preferred_format.get_untracked(),
-            "appearanceMode": appearance.get_untracked().as_str(),
             "uiLocale": next_ui,
             "defaultInputLocale": next_in,
-            "willowSyncEnabled": willow_sync_enabled.get_untracked(),
         });
         i18n.ui_locale.set(next_ui);
         i18n.input_locale.set(next_in);
@@ -526,16 +492,221 @@ pub fn PreferencesView(
 
     let back_label = move || match return_tab.get() {
         ActiveTab::Docs => format!("← {}", i18n.tr("nav_docs", "Docs & ADRs")),
-        _ => i18n.tr("back_to_workspace", "← Back to Workspace"),
+        ActiveTab::Guides => format!("← {}", i18n.tr("nav_dear_world", "Dear World")),
+        _ => i18n.tr("back_to_desk", "← Back to Desk"),
     };
 
+    let format_options = Signal::derive(move || {
+        vec![
+            select_opt("novel", i18n.tr("format_opt_novel", "Novels")),
+            select_opt("article", i18n.tr("format_opt_article", "Articles & Nonfiction")),
+            select_opt("short-story", i18n.tr("format_opt_short", "Short Stories")),
+            select_opt("screenplay", i18n.tr("format_opt_screenplay", "Screenplays")),
+            select_opt("poetry", i18n.tr("format_opt_poetry", "Poetry")),
+        ]
+    });
+
+    let ui_lang_options = Signal::derive(move || {
+        i18n.catalog
+            .get()
+            .into_iter()
+            .map(|loc| {
+                let lbl = format!(
+                    "{} {} — {} [{}]",
+                    locale_flag_emoji(&loc.code),
+                    loc.native_name,
+                    loc.english_name,
+                    loc.dir.to_uppercase()
+                );
+                select_opt(loc.code, lbl)
+            })
+            .collect()
+    });
+
+    let in_lang_options = Signal::derive(move || {
+        i18n.catalog
+            .get()
+            .into_iter()
+            .map(|loc| {
+                let lbl = format!(
+                    "{} {} — {}",
+                    locale_flag_emoji(&loc.code),
+                    loc.native_name,
+                    loc.english_name
+                );
+                select_opt(loc.code, lbl)
+            })
+            .collect()
+    });
+
+    let digest_options = Signal::derive(move || {
+        vec![
+            select_opt("instant", i18n.tr("notif_digest_instant", "Instant Email")),
+            select_opt("daily", i18n.tr("notif_digest_daily", "Daily Digest")),
+            select_opt("off", i18n.tr("notif_digest_off", "Email Disabled")),
+        ]
+    });
+
+    let platform_options = Signal::derive(move || {
+        vec![
+            select_opt("android", i18n.tr("device_plat_android", "Android")),
+            select_opt("ios", i18n.tr("device_plat_ios", "iOS")),
+            select_opt("linux", i18n.tr("device_plat_linux", "Linux")),
+            select_opt("macos", i18n.tr("device_plat_macos", "macOS")),
+            select_opt("windows", i18n.tr("device_plat_windows", "Windows")),
+            select_opt("web", i18n.tr("device_plat_web", "Web Browser")),
+        ]
+    });
+
+    let transport_options = Signal::derive(move || {
+        vec![
+            select_opt("unifiedpush", i18n.tr("device_tr_unifiedpush", "UnifiedPush (Open Standard)")),
+            select_opt("fcm", i18n.tr("device_tr_fcm", "FCM (Firebase Cloud Messaging)")),
+            select_opt("apns", i18n.tr("device_tr_apns", "APNs (Apple Push Notification service)")),
+            select_opt("wns", i18n.tr("device_tr_wns", "WNS (Windows Push Notification Services)")),
+            select_opt("web_push", i18n.tr("device_tr_webpush", "Web Push (VAPID)")),
+        ]
+    });
+
+    let allowlist_status_options = Signal::derive(move || {
+        vec![
+            select_opt("reader", i18n.tr("status_reader", "Reader")),
+            select_opt("moderator", i18n.tr("role_moderator", "Moderator")),
+            select_opt("pending", i18n.tr("status_pending", "Pending")),
+            select_opt("suspended", i18n.tr("status_suspended", "Suspended")),
+        ]
+    });
+
+    let account_role_options = Signal::derive(move || {
+        vec![
+            select_opt("user", i18n.tr("role_user", "User")),
+            select_opt("moderator", i18n.tr("role_moderator", "Moderator")),
+            select_opt("admin", i18n.tr("role_admin", "Admin")),
+        ]
+    });
+
+    let account_status_options = Signal::derive(move || {
+        vec![
+            select_opt("active", i18n.tr("active_badge", "Active")),
+            select_opt("restricted", i18n.tr("status_restricted", "Restricted")),
+            select_opt("suspended", i18n.tr("status_suspended", "Suspended")),
+        ]
+    });
+
+    let resize = use_settings_resize(
+        prof.preferences_nav_width,
+        Callback::new(move |new_w: i32| {
+            let auth_url = auth_config.get_untracked().and_then(|c| c.auth_url);
+            let fallback_jwt = initial_jwt.get_untracked();
+            leptos::task::spawn_local(async move {
+                if let Ok(updated) = save_profile_patch(
+                    auth_url.as_deref(),
+                    fallback_jwt.as_deref(),
+                    serde_json::json!({ "preferencesNavWidth": new_w }),
+                )
+                .await
+                {
+                    on_profile_updated(updated);
+                }
+            });
+        }),
+    );
+
+    let nav_groups = vec![
+        SettingsNavGroup {
+            divider_before: false,
+            heading: Some(("nav_group_account", "Account")),
+            visible: true,
+            items: vec![
+                SettingsNavItem {
+                    icon: SettingsNavIcon::User,
+                    label_key: "sec_account",
+                    label_fallback: "Account & Sovereign Identity",
+                    is_active: Signal::derive(move || {
+                        active_section.get() == PreferencesSection::Account
+                    }),
+                    on_click: Callback::new(move |_| {
+                        set_active_section.set(PreferencesSection::Account)
+                    }),
+                },
+                SettingsNavItem {
+                    icon: SettingsNavIcon::Apps,
+                    label_key: "sec_connected_apps",
+                    label_fallback: "Connected Apps & Google Docs",
+                    is_active: Signal::derive(move || {
+                        active_section.get() == PreferencesSection::ConnectedApps
+                    }),
+                    on_click: Callback::new(move |_| {
+                        set_active_section.set(PreferencesSection::ConnectedApps)
+                    }),
+                },
+            ],
+        },
+        SettingsNavGroup {
+            divider_before: true,
+            heading: Some(("nav_group_workspace", "Workspace & Delivery")),
+            visible: true,
+            items: vec![
+                SettingsNavItem {
+                    icon: SettingsNavIcon::Globe,
+                    label_key: "sec_appearance_langs",
+                    label_fallback: "Languages (29)",
+                    is_active: Signal::derive(move || {
+                        active_section.get() == PreferencesSection::AppearanceAndLanguages
+                    }),
+                    on_click: Callback::new(move |_| {
+                        set_active_section.set(PreferencesSection::AppearanceAndLanguages)
+                    }),
+                },
+                SettingsNavItem {
+                    icon: SettingsNavIcon::Sync,
+                    label_key: "sec_sync_storage",
+                    label_fallback: "Web, Device & Collaboration Sync",
+                    is_active: Signal::derive(move || {
+                        active_section.get() == PreferencesSection::SyncAndStorage
+                    }),
+                    on_click: Callback::new(move |_| {
+                        set_active_section.set(PreferencesSection::SyncAndStorage)
+                    }),
+                },
+                SettingsNavItem {
+                    icon: SettingsNavIcon::Bell,
+                    label_key: "sec_notifications",
+                    label_fallback: "Notification Channels",
+                    is_active: Signal::derive(move || {
+                        active_section.get() == PreferencesSection::NotificationChannels
+                    }),
+                    on_click: Callback::new(move |_| {
+                        set_active_section.set(PreferencesSection::NotificationChannels)
+                    }),
+                },
+            ],
+        },
+        SettingsNavGroup {
+            divider_before: true,
+            heading: Some(("nav_group_admin", "Administration")),
+            visible: is_admin,
+            items: vec![SettingsNavItem {
+                icon: SettingsNavIcon::Shield,
+                label_key: "sec_admin_allowlist",
+                label_fallback: "Docs Allowlist & Accounts",
+                is_active: Signal::derive(move || {
+                    active_section.get() == PreferencesSection::AdminDocsAndMaturity
+                }),
+                on_click: Callback::new(move |_| {
+                    set_active_section.set(PreferencesSection::AdminDocsAndMaturity)
+                }),
+            }],
+        },
+    ];
+
     view! {
-        <main class="page-main">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px;">
+        <ExoSettingsPage resize=resize>
+            <div class="exo-gh-header">
                 <div>
                     <h1 class="exo-h1">{move || i18n.tr("preferences_title", "Preferences")}</h1>
                     <p class="exo-sub" style="margin: 4px 0 0;">
-                        {move || i18n.tr("preferences_subtitle", "Account, language, operating mode, and notification delivery preferences (commercial purchases & subscriptions stay in Profile).")}
+                        {move || i18n.tr("preferences_subtitle", "Account, language, sync overview, and notification delivery preferences (purchases, paywalls, and plans live in Profile).")}
                     </p>
                 </div>
                 <button type="button" class="exo-btn" on:click=move |_| on_back()>
@@ -543,55 +714,11 @@ pub fn PreferencesView(
                 </button>
             </div>
 
-            <div class="exo-gh-preferences">
-                <nav class="exo-gh-nav" aria-label=move || i18n.tr("preferences_nav_aria", "Preferences sections")>
-                    <button
-                        type="button"
-                        class=move || if active_section.get() == PreferencesSection::Account { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
-                        on:click=move |_| set_active_section.set(PreferencesSection::Account)
-                    >
-                        <span>{move || i18n.tr("sec_account", "Account & Security")}</span>
-                    </button>
-                    <button
-                        type="button"
-                        class=move || if active_section.get() == PreferencesSection::ConnectedApps { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
-                        on:click=move |_| set_active_section.set(PreferencesSection::ConnectedApps)
-                    >
-                        <span>{move || i18n.tr("sec_connected_apps", "Connected Apps & Google Docs")}</span>
-                    </button>
-                    <button
-                        type="button"
-                        class=move || if active_section.get() == PreferencesSection::AppearanceAndLanguages { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
-                        on:click=move |_| set_active_section.set(PreferencesSection::AppearanceAndLanguages)
-                    >
-                        <span>{move || i18n.tr("sec_appearance_langs", "Appearance & Languages (29)")}</span>
-                    </button>
-                    <button
-                        type="button"
-                        class=move || if active_section.get() == PreferencesSection::SyncAndStorage { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
-                        on:click=move |_| set_active_section.set(PreferencesSection::SyncAndStorage)
-                    >
-                        <span>{move || i18n.tr("sec_sync_storage", "Sync & Storage (3 Modes)")}</span>
-                    </button>
-                    <button
-                        type="button"
-                        class=move || if active_section.get() == PreferencesSection::NotificationChannels { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
-                        on:click=move |_| set_active_section.set(PreferencesSection::NotificationChannels)
-                    >
-                        <span>{move || i18n.tr("sec_notifications", "Notification Channels")}</span>
-                    </button>
-                    <Show when=move || is_admin>
-                        <button
-                            type="button"
-                            class=move || if active_section.get() == PreferencesSection::AdminDocsAndMaturity { "exo-gh-nav-item exo-gh-nav-item-active" } else { "exo-gh-nav-item" }
-                            on:click=move |_| set_active_section.set(PreferencesSection::AdminDocsAndMaturity)
-                        >
-                            <span>{move || i18n.tr("sec_admin_allowlist", "Docs Allowlist & Accounts")}</span>
-                        </button>
-                    </Show>
-                </nav>
-
-                <div class="exo-gh-content">
+            <ExoSettingsSplit
+                resize=resize
+                nav_aria_label=Signal::derive(move || i18n.tr("preferences_nav_aria", "Preferences sections"))
+                groups=nav_groups
+            >
                     {move || match active_section.get() {
                         PreferencesSection::Account => {
                             let avatar_preview = avatar_url.get();
@@ -609,11 +736,10 @@ pub fn PreferencesView(
                                         }}
                                         <div>
                                             <label class="exo-label">{move || i18n.tr("upload_avatar_label", "Upload Profile Photo (64px / 256px / 1024px WebP)")}</label>
-                                            <input
-                                                type="file"
-                                                accept="image/png,image/jpeg,image/webp,image/gif"
-                                                node_ref=avatar_input_ref
-                                                on:change=on_avatar_file
+                                            <ExoFileButton
+                                                label=Signal::derive(move || i18n.tr("choose_image_btn", "Choose Profile Photo"))
+                                                on_data_url=Callback::new(handle_avatar_data_url)
+                                                on_error=Callback::new(move |err| set_profile_msg.set(Some(err)))
                                             />
                                         </div>
                                     </div>
@@ -667,17 +793,12 @@ pub fn PreferencesView(
                                         </div>
                                         <div class="exo-field">
                                             <label class="exo-label">{move || i18n.tr("preferred_format_label", "Preferred Writing Format")}</label>
-                                            <select
-                                                class="exo-input"
-                                                prop:value=move || preferred_format.get()
-                                                on:change=move |ev| set_preferred_format.set(event_target_value(&ev))
-                                            >
-                                                <option value="novel">{move || i18n.tr("format_opt_novel", "Novels")}</option>
-                                                <option value="article">{move || i18n.tr("format_opt_article", "Articles & Nonfiction")}</option>
-                                                <option value="short-story">{move || i18n.tr("format_opt_short", "Short Stories")}</option>
-                                                <option value="screenplay">{move || i18n.tr("format_opt_screenplay", "Screenplays")}</option>
-                                                <option value="poetry">{move || i18n.tr("format_opt_poetry", "Poetry")}</option>
-                                            </select>
+                                            <ExoSelect
+                                                value=Signal::derive(move || preferred_format.get())
+                                                options=format_options
+                                                aria_label=Signal::derive(move || i18n.tr("preferred_format_label", "Preferred Writing Format"))
+                                                on_change=Callback::new(move |val| set_preferred_format.set(val))
+                                            />
                                         </div>
                                         <div class="exo-field">
                                             <label class="exo-label">{move || i18n.tr("timezone_label", "Timezone")}</label>
@@ -722,58 +843,37 @@ pub fn PreferencesView(
 
                         PreferencesSection::AppearanceAndLanguages => view! {
                             <div class="exo-card">
-                                <h2 class="exo-h2">{move || i18n.tr("appearance_title", "Theme & Dual Language Architecture")}</h2>
+                                <h2 class="exo-h2">{move || i18n.tr("appearance_title", "Dual Language Architecture (29 Languages)")}</h2>
                                 <p class="exo-sub">
-                                    {move || i18n.tr("appearance_desc", "Output UI Language controls menus and layout direction (auto RTL for Arabic and Hebrew). Default Input Language controls composers independently and saves directly to your account.")}
+                                    {move || i18n.tr("appearance_desc", "App Language controls menus, navigation, and layout direction (automatic right-to-left for Arabic and Hebrew). Writing Input controls composers independently and saves directly to your account.")}
                                 </p>
 
                                 <div class="exo-grid-2" style="margin-top: 16px;">
                                     <div class="exo-field">
-                                        <label class="exo-label">{move || i18n.tr("theme_label", "Theme Appearance")}</label>
-                                        <select
-                                            class="exo-input"
-                                            prop:value=move || appearance.get().as_str().to_string()
-                                            on:change=move |ev| set_appearance.set(AppearanceMode::from_str(&event_target_value(&ev)))
-                                        >
-                                            <option value="system">{move || i18n.tr("theme_opt_system", "System")}</option>
-                                            <option value="light">{move || i18n.tr("theme_opt_light", "Light")}</option>
-                                            <option value="dark">{move || i18n.tr("theme_opt_dark", "Dark")}</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="exo-field">
                                         <label class="exo-label">{move || i18n.tr("ui_lang_label", "App Language")}</label>
-                                        <select
-                                            class="exo-input"
-                                            prop:value=move || ui_loc.get()
-                                            on:change=move |ev| set_ui_loc.set(event_target_value(&ev))
-                                        >
-                                            {move || i18n.catalog.get().into_iter().map(|loc| {
-                                                let lbl = format!("{} {} — {} [{}]", locale_flag_emoji(&loc.code), loc.native_name, loc.english_name, loc.dir.to_uppercase());
-                                                view! { <option value=loc.code>{lbl}</option> }
-                                            }).collect_view()}
-                                        </select>
+                                        <ExoSelect
+                                            value=Signal::derive(move || ui_loc.get())
+                                            options=ui_lang_options
+                                            aria_label=Signal::derive(move || i18n.tr("ui_lang_label", "App Language"))
+                                            on_change=Callback::new(move |val| set_ui_loc.set(val))
+                                        />
                                     </div>
 
                                     <div class="exo-field">
                                         <label class="exo-label">{move || i18n.tr("input_lang_label", "Writing Input")}</label>
-                                        <select
-                                            class="exo-input"
-                                            prop:value=move || in_loc.get()
-                                            on:change=move |ev| set_in_loc.set(event_target_value(&ev))
-                                        >
-                                            {move || i18n.catalog.get().into_iter().map(|loc| {
-                                                let lbl = format!("{} {} — {}", locale_flag_emoji(&loc.code), loc.native_name, loc.english_name);
-                                                view! { <option value=loc.code>{lbl}</option> }
-                                            }).collect_view()}
-                                        </select>
+                                        <ExoSelect
+                                            value=Signal::derive(move || in_loc.get())
+                                            options=in_lang_options
+                                            aria_label=Signal::derive(move || i18n.tr("input_lang_label", "Writing Input"))
+                                            on_change=Callback::new(move |val| set_in_loc.set(val))
+                                        />
                                     </div>
                                 </div>
 
                                 <div class="exo-format-tile" style="margin-top: 14px;">
                                     <h3>{move || i18n.tr("offline_packs_title", "Decentralized Offline Language Packs")}</h3>
                                     <p>
-                                        {move || i18n.tr("offline_packs_desc", "Decentralized Mode 2 installs download any selected language pack directly from ExoNovel's public read-only Willow namespace: ")}
+                                        {move || i18n.tr("offline_packs_desc", "ExoNovel device installs download any selected language pack directly from ExoNovel's public read-only Willow namespace: ")}
                                         " "
                                         <span class="exo-mono">{move || i18n.willow_namespace.get()}</span>
                                     </p>
@@ -785,80 +885,55 @@ pub fn PreferencesView(
                                     style="margin-top: 18px;"
                                     on:click=move |_| save_preferences_profile()
                                 >
-                                    {move || i18n.tr("save_theme_lang_btn", "Save Theme & Language Defaults")}
+                                    {move || i18n.tr("save_theme_lang_btn", "Save Language Preferences")}
                                 </button>
                             </div>
                         }.into_any(),
 
                         PreferencesSection::SyncAndStorage => view! {
                             <div class="exo-card">
-                                <h2 class="exo-h2">{move || i18n.tr("sync_title", "Three Operating Modes & Cryptographic Blindness")}</h2>
+                                <h2 class="exo-h2">{move || i18n.tr("sync_title", "Writing on Web, on Device & Collaboration Sync")}</h2>
                                 <p class="exo-sub">
-                                    {move || i18n.tr("sync_sub", "Choose how ExoNovel stores and synchronizes your writing across Web and Device installs.")}
+                                    {move || i18n.tr("sync_sub", "Use ExoNovel for free in your browser and free offline on your devices. Team collaboration sync between writers is free across both.")}
                                 </p>
 
                                 <div class="exo-grid-3" style="margin-top: 16px;">
                                     <div class="exo-format-tile">
-                                        <h3>{move || i18n.tr("sync_m1_title", "Mode 1 · ExoNovel on Web (Free)")}</h3>
-                                        <p>{move || i18n.tr("sync_m1_desc", "Cloud workspace backed by managed PostgreSQL with instant real-time updates across tabs.")}</p>
+                                        <h3>{move || i18n.tr("sync_m1_title", "On the Web (Free)")}</h3>
+                                        <p>{move || i18n.tr("sync_m1_desc", "Cloud workspace accessible from any browser with live collaboration across writers and groups.")}</p>
                                     </div>
                                     <div class="exo-format-tile">
-                                        <h3>{move || i18n.tr("sync_m2_title", "Mode 2 · Sovereign Device (Free)")}</h3>
-                                        <p>{move || i18n.tr("sync_m2_desc", "100% local Willow store on Windows, macOS, Linux, Android, and iOS. Includes free ExoNovel iroh discovery & blind relay transit.")}</p>
+                                        <h3>{move || i18n.tr("sync_m2_title", "On Your Device (Free)")}</h3>
+                                        <p>{move || i18n.tr("sync_m2_desc", "Offline-first storage on Windows, macOS, Linux, Android, and iOS—write anywhere and keep full local control of your library.")}</p>
                                     </div>
                                     <div class="exo-format-tile" style="border-color: var(--accent);">
-                                        <h3>{move || i18n.tr("sync_m3_title", "Mode 3 · Web + Device Managed Sync")}</h3>
-                                        <p>{move || i18n.tr("sync_m3_desc", "Paid ($9/mo or $90/yr in Profile). Meadowcap-authorized blind backup and bidirectional Web-to-Device Willow sync.")}</p>
+                                        <h3>{move || i18n.tr("sync_m3_title", "Sync Your Own Devices ($9/mo · $90/yr)")}</h3>
+                                        <p>{move || i18n.tr("sync_m3_desc", "End-to-end encrypted sync keeping your own offline device drafts continuously aligned with your own web profile.")}</p>
                                     </div>
                                 </div>
 
-                                <div class="exo-format-tile" style="margin-top: 16px;">
-                                    <h3>{move || i18n.tr("sync_zk_title", "Zero-Knowledge Cryptographic Blindness")}</h3>
+                                <div class="exo-format-tile" style="margin-top: 16px; border-color: var(--accent);">
+                                    <h3>{move || i18n.tr("sync_collab_title", "Collaboration Between Writers Is Always Free (Web ↔ Device)")}</h3>
                                     <p>
-                                        {move || i18n.tr("sync_zk_desc", "In Modes 2 and 3, drafts and private synced Willow entries are end-to-end encrypted by the sender before touching ExoNovel's relay or storage. Only routing frames and Meadowcap capability tokens are visible.")}
+                                        {move || i18n.tr("sync_collab_desc", "Whenever you add collaborators, sync between collaborators happens automatically so you can share your work and write together—even if one writer works on the web while another writes offline on a device. Collaboration exchange between users is always free; only syncing your own device content with your own web profile carries a fee in Profile -> Plans.")}
                                     </p>
                                 </div>
 
-                                <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border);">
-                                    <label class="exo-check-row">
-                                        <input
-                                            type="checkbox"
-                                            prop:disabled=move || !can_enable_mode3
-                                            prop:checked=move || willow_sync_enabled.get()
-                                            on:change=move |ev| set_willow_sync_enabled.set(event_target_checked(&ev))
-                                        />
-                                        <span>
-                                            <strong>{move || i18n.tr("sync_enable_m3", "Enable Mode 3 Managed Willow Sync on this account")}</strong>
-                                            " — " {move || i18n.tr("sync_current_tier", "Current tier:")} " "
-                                            <span class="exo-mono">{sync_plan_tier.get_value()}</span>
-                                        </span>
-                                    </label>
+                                <div class="exo-format-tile" style="margin-top: 16px;">
+                                    <h3>{move || i18n.tr("sync_zk_title", "Zero-Knowledge Cryptographic Privacy")}</h3>
+                                    <p>
+                                        {move || i18n.tr("sync_zk_desc", "Device-synced drafts and shared payloads are end-to-end encrypted by the sender before passing through ExoNovel's relay infrastructure.")}
+                                    </p>
+                                </div>
 
-                                    {if !can_enable_mode3 {
-                                        view! {
-                                            <div class="exo-invite-banner" style="margin-top: 14px; justify-content: space-between; flex-wrap: wrap;">
-                                                <span>{move || i18n.tr("sync_requires_sub", "Mode 3 Managed Sync requires an active subscription managed in Profile.")}</span>
-                                                <button
-                                                    type="button"
-                                                    class="exo-btn exo-btn-primary"
-                                                    on:click=move |_| on_open_profile_billing()
-                                                >
-                                                    {move || i18n.tr("sync_manage_in_profile", "Manage Subscription in Profile →")}
-                                                </button>
-                                            </div>
-                                        }.into_any()
-                                    } else {
-                                        view! {
-                                            <button
-                                                type="button"
-                                                class="exo-btn exo-btn-primary"
-                                                style="margin-top: 14px;"
-                                                on:click=move |_| save_preferences_profile()
-                                            >
-                                                {move || i18n.tr("sync_save_toggle", "Save Sync Toggle")}
-                                            </button>
-                                        }.into_any()
-                                    }}
+                                <div style="margin-top: 18px; display: flex; justify-content: flex-end;">
+                                    <button
+                                        type="button"
+                                        class="exo-btn exo-btn-primary"
+                                        on:click=move |_| on_open_profile_plans()
+                                    >
+                                        {move || i18n.tr("sync_manage_in_profile", "View Sync Plans in Profile →")}
+                                    </button>
                                 </div>
                             </div>
                         }.into_any(),
@@ -866,9 +941,9 @@ pub fn PreferencesView(
                         PreferencesSection::NotificationChannels => view! {
                             <div>
                                 <div class="exo-card">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                                    <div class="exo-gh-section-head-row">
                                         <div>
-                                            <h2 class="exo-h2" style="margin: 0;">{move || i18n.tr("notif_channels_title", "Multi-Platform Delivery Channels")}</h2>
+                                            <h2 class="exo-h2">{move || i18n.tr("notif_channels_title", "Multi-Platform Delivery Channels")}</h2>
                                             <p class="exo-sub" style="margin: 4px 0 0;">
                                                 {move || i18n.tr("notif_email_prefix", "Transactional Email Service (notes@exosystems.net)")}
                                                 " "
@@ -938,20 +1013,16 @@ pub fn PreferencesView(
                                                     <span><strong>{move || i18n.tr("notif_email_title", "Transactional Email (Notes from ExoNovel)")}</strong></span>
                                                 </label>
                                                 <div class="exo-field" style="margin-top: 14px;">
-                                                    <label class="exo-label">{move || i18n.tr("notif_digest_label", "Email Digest Mode")}</label>
-                                                    <select
-                                                        class="exo-input"
-                                                        style="max-width: 280px;"
-                                                        prop:value=p.email_digest_mode
-                                                        on:change=move |ev| {
-                                                            let v = event_target_value(&ev);
-                                                            set_notif_prefs.update(|np| np.email_digest_mode = v);
-                                                        }
-                                                    >
-                                                        <option value="instant">{move || i18n.tr("notif_digest_instant", "Instant Email")}</option>
-                                                        <option value="daily">{move || i18n.tr("notif_digest_daily", "Daily Digest")}</option>
-                                                        <option value="off">{move || i18n.tr("notif_digest_off", "Email Disabled")}</option>
-                                                    </select>
+                                                    <label class="exo-label">{move || i18n.tr("notif_digest_label", "Email Digest Frequency")}</label>
+                                                    <ExoSelect
+                                                        value=Signal::derive(move || notif_prefs.get().email_digest_mode)
+                                                        options=digest_options
+                                                        style_extra="max-width: 280px;"
+                                                        aria_label=Signal::derive(move || i18n.tr("notif_digest_label", "Email Digest Frequency"))
+                                                        on_change=Callback::new(move |val| {
+                                                            set_notif_prefs.update(|np| np.email_digest_mode = val);
+                                                        })
+                                                    />
                                                 </div>
                                                 <label class="exo-check-row">
                                                     <input
@@ -998,32 +1069,21 @@ pub fn PreferencesView(
                                         <div class="exo-grid-2">
                                             <div class="exo-field">
                                                 <label class="exo-label">{move || i18n.tr("device_platform_label", "Platform")}</label>
-                                                <select
-                                                    class="exo-input"
-                                                    prop:value=move || dev_platform.get()
-                                                    on:change=move |ev| set_dev_platform.set(event_target_value(&ev))
-                                                >
-                                                    <option value="android">{move || i18n.tr("device_plat_android", "Android")}</option>
-                                                    <option value="ios">{move || i18n.tr("device_plat_ios", "iOS")}</option>
-                                                    <option value="linux">{move || i18n.tr("device_plat_linux", "Linux")}</option>
-                                                    <option value="macos">{move || i18n.tr("device_plat_macos", "macOS")}</option>
-                                                    <option value="windows">{move || i18n.tr("device_plat_windows", "Windows")}</option>
-                                                    <option value="web">{move || i18n.tr("device_plat_web", "Web Browser")}</option>
-                                                </select>
+                                                <ExoSelect
+                                                    value=Signal::derive(move || dev_platform.get())
+                                                    options=platform_options
+                                                    aria_label=Signal::derive(move || i18n.tr("device_platform_label", "Platform"))
+                                                    on_change=Callback::new(move |val| set_dev_platform.set(val))
+                                                />
                                             </div>
                                             <div class="exo-field">
                                                 <label class="exo-label">{move || i18n.tr("device_transport_label", "Push Transport")}</label>
-                                                <select
-                                                    class="exo-input"
-                                                    prop:value=move || dev_transport.get()
-                                                    on:change=move |ev| set_dev_transport.set(event_target_value(&ev))
-                                                >
-                                                    <option value="unifiedpush">{move || i18n.tr("device_tr_unifiedpush", "UnifiedPush (Open Standard)")}</option>
-                                                    <option value="fcm">{move || i18n.tr("device_tr_fcm", "FCM (Firebase Cloud Messaging)")}</option>
-                                                    <option value="apns">{move || i18n.tr("device_tr_apns", "APNs (Apple Push Notification service)")}</option>
-                                                    <option value="wns">{move || i18n.tr("device_tr_wns", "WNS (Windows Push Notification Services)")}</option>
-                                                    <option value="web_push">{move || i18n.tr("device_tr_webpush", "Web Push (VAPID)")}</option>
-                                                </select>
+                                                <ExoSelect
+                                                    value=Signal::derive(move || dev_transport.get())
+                                                    options=transport_options
+                                                    aria_label=Signal::derive(move || i18n.tr("device_transport_label", "Push Transport"))
+                                                    on_change=Callback::new(move |val| set_dev_transport.set(val))
+                                                />
                                             </div>
                                             <div class="exo-field">
                                                 <label class="exo-label">{move || i18n.tr("device_label_field", "Device Label")}</label>
@@ -1101,17 +1161,13 @@ pub fn PreferencesView(
                                             prop:value=move || grant_did.get()
                                             on:input=move |ev| set_grant_did.set(event_target_value(&ev))
                                         />
-                                        <select
-                                            class="exo-input"
-                                            style="flex: 1; min-width: 140px;"
-                                            prop:value=move || grant_status.get()
-                                            on:change=move |ev| set_grant_status.set(event_target_value(&ev))
-                                        >
-                                            <option value="reader">{move || i18n.tr("status_reader", "Reader")}</option>
-                                            <option value="moderator">{move || i18n.tr("role_moderator", "Moderator")}</option>
-                                            <option value="pending">{move || i18n.tr("status_pending", "Pending")}</option>
-                                            <option value="suspended">{move || i18n.tr("status_suspended", "Suspended")}</option>
-                                        </select>
+                                        <ExoSelect
+                                            value=Signal::derive(move || grant_status.get())
+                                            options=allowlist_status_options
+                                            style_extra="flex: 1; min-width: 140px;"
+                                            aria_label=Signal::derive(move || i18n.tr("admin_th_status", "Status"))
+                                            on_change=Callback::new(move |val| set_grant_status.set(val))
+                                        />
                                         <input
                                             type="text"
                                             class="exo-input"
@@ -1163,18 +1219,15 @@ pub fn PreferencesView(
                                                                     {if is_admin_row {
                                                                         view! { <span class="exo-tag exo-tag-accent">{move || i18n.tr(allowlist_status_key(&cur_status_lbl), &cur_status_lbl)}</span> }.into_any()
                                                                     } else {
+                                                                        let cur_status_sv = cur_status.clone();
                                                                         view! {
-                                                                            <select
-                                                                                class="exo-input"
-                                                                                style="min-width: 140px; padding: 6px 10px;"
-                                                                                prop:value=cur_status
-                                                                                on:change=move |ev| update_entry_status(did_toggle.clone(), email_toggle.clone(), event_target_value(&ev))
-                                                                            >
-                                                                                <option value="reader">{move || i18n.tr("status_reader", "Reader")}</option>
-                                                                                <option value="moderator">{move || i18n.tr("role_moderator", "Moderator")}</option>
-                                                                                <option value="pending">{move || i18n.tr("status_pending", "Pending")}</option>
-                                                                                <option value="suspended">{move || i18n.tr("status_suspended", "Suspended")}</option>
-                                                                            </select>
+                                                                            <ExoSelect
+                                                                                value=Signal::derive(move || cur_status_sv.clone())
+                                                                                options=allowlist_status_options
+                                                                                style_extra="min-width: 140px;"
+                                                                                aria_label=Signal::derive(move || i18n.tr("admin_th_status", "Status"))
+                                                                                on_change=Callback::new(move |val| update_entry_status(did_toggle.clone(), email_toggle.clone(), val))
+                                                                            />
                                                                         }.into_any()
                                                                     }}
                                                                 </td>
@@ -1272,16 +1325,18 @@ pub fn PreferencesView(
                                                                     <tr class="exo-accordion-row">
                                                                         <td colspan="4">
                                                                             <div class="exo-grid-2">
-                                                                                <select class="exo-input" prop:value=move || edit_account_role.get() on:change=move |ev| set_edit_account_role.set(event_target_value(&ev))>
-                                                                                    <option value="user">{move || i18n.tr("role_user", "User")}</option>
-                                                                                    <option value="moderator">{move || i18n.tr("role_moderator", "Moderator")}</option>
-                                                                                    <option value="admin">{move || i18n.tr("role_admin", "Admin")}</option>
-                                                                                </select>
-                                                                                <select class="exo-input" prop:value=move || edit_account_status.get() on:change=move |ev| set_edit_account_status.set(event_target_value(&ev))>
-                                                                                    <option value="active">{move || i18n.tr("active_badge", "Active")}</option>
-                                                                                    <option value="restricted">{move || i18n.tr("status_restricted", "Restricted")}</option>
-                                                                                    <option value="suspended">{move || i18n.tr("status_suspended", "Suspended")}</option>
-                                                                                </select>
+                                                                                <ExoSelect
+                                                                                    value=Signal::derive(move || edit_account_role.get())
+                                                                                    options=account_role_options
+                                                                                    aria_label=Signal::derive(move || i18n.tr("admin_th_role", "Role"))
+                                                                                    on_change=Callback::new(move |val| set_edit_account_role.set(val))
+                                                                                />
+                                                                                <ExoSelect
+                                                                                    value=Signal::derive(move || edit_account_status.get())
+                                                                                    options=account_status_options
+                                                                                    aria_label=Signal::derive(move || i18n.tr("admin_th_status", "Status"))
+                                                                                    on_change=Callback::new(move |val| set_edit_account_status.set(val))
+                                                                                />
                                                                                 <input type="text" class="exo-input" placeholder=move || i18n.tr("admin_display_name_ph", "Display Name") prop:value=move || edit_display_name.get() on:input=move |ev| set_edit_display_name.set(event_target_value(&ev)) />
                                                                                 <input type="text" class="exo-input" placeholder=move || i18n.tr("admin_pen_name_ph", "Pen Name") prop:value=move || edit_pen_name.get() on:input=move |ev| set_edit_pen_name.set(event_target_value(&ev)) />
                                                                             </div>
@@ -1305,8 +1360,7 @@ pub fn PreferencesView(
                             </div>
                         }.into_any(),
                     }}
-                </div>
-            </div>
-        </main>
+            </ExoSettingsSplit>
+        </ExoSettingsPage>
     }
 }

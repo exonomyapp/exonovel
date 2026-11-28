@@ -24,8 +24,8 @@ struct LocaleSeed {
     english_name: &'static str,
     dir: &'static str,
     region: &'static str,
-    nav_home: &'static str,
-    nav_workspace: &'static str,
+    nav_desk: &'static str,
+    nav_dear_world: &'static str,
     nav_docs: &'static str,
     nav_profile: &'static str,
     nav_preferences: &'static str,
@@ -46,8 +46,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "English",
         dir: "ltr",
         region: "Global",
-        nav_home: "Home",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Desk",
+        nav_dear_world: "Dear World",
         nav_docs: "Docs & ADRs",
         nav_profile: "Profile",
         nav_preferences: "Preferences",
@@ -66,8 +66,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "German",
         dir: "ltr",
         region: "Europe",
-        nav_home: "Start",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Schreibtisch",
+        nav_dear_world: "Dear World",
         nav_docs: "Doku & ADRs",
         nav_profile: "Profil",
         nav_preferences: "Präferenzen",
@@ -86,8 +86,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Polish",
         dir: "ltr",
         region: "Europe",
-        nav_home: "Start",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Biurko",
+        nav_dear_world: "Dear World",
         nav_docs: "Dokumentacja i ADR",
         nav_profile: "Profil",
         nav_preferences: "Preferencje",
@@ -106,8 +106,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "French",
         dir: "ltr",
         region: "Europe",
-        nav_home: "Accueil",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Bureau",
+        nav_dear_world: "Dear World",
         nav_docs: "Docs et ADR",
         nav_profile: "Profil",
         nav_preferences: "Préférences",
@@ -126,8 +126,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Spanish",
         dir: "ltr",
         region: "Europe & Americas",
-        nav_home: "Inicio",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Escritorio",
+        nav_dear_world: "Dear World",
         nav_docs: "Docs y ADRs",
         nav_profile: "Perfil",
         nav_preferences: "Preferencias",
@@ -146,8 +146,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Italian",
         dir: "ltr",
         region: "Europe",
-        nav_home: "Home",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Scrivania",
+        nav_dear_world: "Dear World",
         nav_docs: "Docs e ADR",
         nav_profile: "Profilo",
         nav_preferences: "Preferenze",
@@ -166,8 +166,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Dutch",
         dir: "ltr",
         region: "Europe",
-        nav_home: "Start",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Bureau",
+        nav_dear_world: "Dear World",
         nav_docs: "Docs & ADR's",
         nav_profile: "Profiel",
         nav_preferences: "Voorkeuren",
@@ -186,8 +186,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Portuguese",
         dir: "ltr",
         region: "Europe & Americas",
-        nav_home: "Início",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Mesa",
+        nav_dear_world: "Dear World",
         nav_docs: "Docs e ADRs",
         nav_profile: "Perfil",
         nav_preferences: "Preferências",
@@ -206,8 +206,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Hungarian",
         dir: "ltr",
         region: "Europe",
-        nav_home: "Főoldal",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Íróasztal",
+        nav_dear_world: "Dear World",
         nav_docs: "Doksi és ADR-ek",
         nav_profile: "Profil",
         nav_preferences: "Preferenciák",
@@ -226,8 +226,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Romanian",
         dir: "ltr",
         region: "Europe",
-        nav_home: "Acasă",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Birou",
+        nav_dear_world: "Dear World",
         nav_docs: "Documente și ADR",
         nav_profile: "Profil",
         nav_preferences: "Preferințe",
@@ -246,8 +246,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Ukrainian",
         dir: "ltr",
         region: "Europe",
-        nav_home: "Головна",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Стіл",
+        nav_dear_world: "Dear World",
         nav_docs: "Документація і ADR",
         nav_profile: "Профіль",
         nav_preferences: "Вподобання",
@@ -266,8 +266,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Russian",
         dir: "ltr",
         region: "Europe & Eurasia",
-        nav_home: "Главная",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Стол",
+        nav_dear_world: "Dear World",
         nav_docs: "Документация и ADR",
         nav_profile: "Профиль",
         nav_preferences: "Предпочтения",
@@ -286,8 +286,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Serbian",
         dir: "ltr",
         region: "Europe",
-        nav_home: "Почетна",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Радни сто",
+        nav_dear_world: "Dear World",
         nav_docs: "Документација и ADR",
         nav_profile: "Профил",
         nav_preferences: "Преференције",
@@ -306,8 +306,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Greek",
         dir: "ltr",
         region: "Europe",
-        nav_home: "Αρχική",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Γραφείο",
+        nav_dear_world: "Dear World",
         nav_docs: "Έγγραφα & ADR",
         nav_profile: "Προφίλ",
         nav_preferences: "Προτιμήσεις",
@@ -326,8 +326,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Arabic",
         dir: "rtl",
         region: "MENA",
-        nav_home: "الرئيسية",
-        nav_workspace: "ExoNovel",
+        nav_desk: "المكتب",
+        nav_dear_world: "Dear World",
         nav_docs: "الوثائق و ADRs",
         nav_profile: "الملف الشخصي",
         nav_preferences: "التفضيلات",
@@ -346,8 +346,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Hebrew",
         dir: "rtl",
         region: "MENA",
-        nav_home: "בית",
-        nav_workspace: "ExoNovel",
+        nav_desk: "שולחן כתיבה",
+        nav_dear_world: "Dear World",
         nav_docs: "מסמכים ו-ADR",
         nav_profile: "פרופיל",
         nav_preferences: "העדפות",
@@ -366,8 +366,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Chinese (Simplified)",
         dir: "ltr",
         region: "East Asia",
-        nav_home: "首页",
-        nav_workspace: "ExoNovel",
+        nav_desk: "书桌",
+        nav_dear_world: "Dear World",
         nav_docs: "文档与架构决策",
         nav_profile: "个人资料",
         nav_preferences: "偏好设置",
@@ -386,8 +386,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Chinese (Traditional)",
         dir: "ltr",
         region: "East Asia",
-        nav_home: "首頁",
-        nav_workspace: "ExoNovel",
+        nav_desk: "書桌",
+        nav_dear_world: "Dear World",
         nav_docs: "文件與架構決策",
         nav_profile: "個人檔案",
         nav_preferences: "偏好設定",
@@ -406,8 +406,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Hindi",
         dir: "ltr",
         region: "South Asia",
-        nav_home: "होम",
-        nav_workspace: "ExoNovel",
+        nav_desk: "डेस्क",
+        nav_dear_world: "Dear World",
         nav_docs: "दस्तावेज़ और ADR",
         nav_profile: "प्रोफ़ाइल",
         nav_preferences: "प्राथमिकताएँ",
@@ -426,8 +426,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Bengali",
         dir: "ltr",
         region: "South Asia",
-        nav_home: "হোম",
-        nav_workspace: "ExoNovel",
+        nav_desk: "ডেস্ক",
+        nav_dear_world: "Dear World",
         nav_docs: "ডক্স ও ADR",
         nav_profile: "প্রোফাইল",
         nav_preferences: "পছন্দসমূহ",
@@ -446,8 +446,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Marathi",
         dir: "ltr",
         region: "South Asia",
-        nav_home: "मुख्यपृष्ठ",
-        nav_workspace: "ExoNovel",
+        nav_desk: "डेस्क",
+        nav_dear_world: "Dear World",
         nav_docs: "दस्तऐवज आणि ADR",
         nav_profile: "प्रोफाइल",
         nav_preferences: "प्राधान्ये",
@@ -466,8 +466,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Telugu",
         dir: "ltr",
         region: "South Asia",
-        nav_home: "హోమ్",
-        nav_workspace: "ExoNovel",
+        nav_desk: "డెస్క్",
+        nav_dear_world: "Dear World",
         nav_docs: "డాక్స్ & ADRలు",
         nav_profile: "ప్రొఫైల్",
         nav_preferences: "ప్రాధాన్యతలు",
@@ -486,8 +486,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Tamil",
         dir: "ltr",
         region: "South Asia",
-        nav_home: "முகப்பு",
-        nav_workspace: "ExoNovel",
+        nav_desk: "மேசை",
+        nav_dear_world: "Dear World",
         nav_docs: "ஆவணங்கள் & ADR",
         nav_profile: "சுயவிவரம்",
         nav_preferences: "விருப்பத்தேர்வுகள்",
@@ -506,8 +506,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Swahili",
         dir: "ltr",
         region: "Africa",
-        nav_home: "Nyumbani",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Dawati",
+        nav_dear_world: "Dear World",
         nav_docs: "Nyaraka na ADR",
         nav_profile: "Wasifu",
         nav_preferences: "Mapendeleo",
@@ -526,8 +526,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Hausa",
         dir: "ltr",
         region: "Africa",
-        nav_home: "Gida",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Tebur",
+        nav_dear_world: "Dear World",
         nav_docs: "Takardu da ADR",
         nav_profile: "Bayanan Kaina",
         nav_preferences: "Abubuwan da aka fi so",
@@ -546,8 +546,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Yoruba",
         dir: "ltr",
         region: "Africa",
-        nav_home: "Ilé",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Tábìlì",
+        nav_dear_world: "Dear World",
         nav_docs: "Àwọn Ìwé àti ADR",
         nav_profile: "Àpèjúwe Mi",
         nav_preferences: "Àwọn ohun ààyò",
@@ -566,8 +566,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Igbo",
         dir: "ltr",
         region: "Africa",
-        nav_home: "Ụlọ",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Teebụl",
+        nav_dear_world: "Dear World",
         nav_docs: "Akwụkwọ na ADR",
         nav_profile: "Profaịlụ",
         nav_preferences: "Mmasị",
@@ -586,8 +586,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Amharic",
         dir: "ltr",
         region: "Africa",
-        nav_home: "መነሻ",
-        nav_workspace: "ExoNovel",
+        nav_desk: "ጠረጴዛ",
+        nav_dear_world: "Dear World",
         nav_docs: "ሰነዶች እና ADR",
         nav_profile: "መገለጫ",
         nav_preferences: "ምርጫዎች",
@@ -606,8 +606,8 @@ const LOCALES: &[LocaleSeed] = &[
         english_name: "Zulu",
         dir: "ltr",
         region: "Africa",
-        nav_home: "Ikhaya",
-        nav_workspace: "ExoNovel",
+        nav_desk: "Idesika",
+        nav_dear_world: "Dear World",
         nav_docs: "Amadokhumenti ne-ADR",
         nav_profile: "Iphrofayela",
         nav_preferences: "Okuncamelayo",
@@ -675,15 +675,49 @@ dismiss-label = Zamknij\n\
 save-changes-short = Zapisz\n\
 confirm-label = Potwierdź\n\
 copy-text-label = Kopiuj tekst\n\
-back-to-workspace = ← Powrót do obszaru roboczego\n\
-plan-label = Plan:\n\
 pen-name-label = Pseudonim:\n\
 pending-did-label = Oczekujące did:peer\n\
-workspace-desc = Twoja przestrzeń twórcza oparta na tożsamości kryptograficznej did:peer w trybie Web 1, trybie lokalnym 2 i zarządzanej synchronizacji 3.\n\
+workspace-desc = Twoje biurko pisarskie trzyma wszystko, nad czym pracujesz, pod ręką — niezależnie od tego, czy tworzysz pierwsze opowiadanie do szkoły, wymyślasz postacie ze znajomymi, czy piszesz wiersze w pojedynkę. Każda postać, oś czasu, scena i komentarz pozostają przypisane do Twojego pseudonimu, więc możesz swobodnie dzielić się pomysłami, uczyć się razem i mieć pewność, że Twoje teksty zawsze należą do Ciebie.\n\
 btn-profile-billing = Profil, persony i rozliczenia\n\
 btn-connected-apps = Połączone aplikacje i Dokumenty Google\n\
 btn-open-cms = Otwórz MADR Docs CMS\n\
 workspace-key-label = Aktywny klucz obszaru roboczego persony (did:peer)\n\
+choose-image-btn = Wybierz zdjęcie profilowe\n\
+persona-choose-avatar-btn = Wybierz zdjęcie persony\n\
+desk-start-eyebrow = Rozpocznij nowy projekt\n\
+desk-start-title = Co chcesz dzisiaj napisać?\n\
+desk-starter-novel-hint = Gotowe na półce: Konspekt fabuły · Karty postaci · Szkic 1. rozdziału · Oś czasu świata.\n\
+desk-starter-article-hint = Gotowe na półce: Teza otwierająca · Konspekt sekcji · Notatki źródłowe · Szkic eseju.\n\
+desk-starter-short-hint = Gotowe na półce: Haczyk otwarcia · Punkt zwrotny · Scena postaci · Szkic opowiadania.\n\
+desk-starter-script-hint = Gotowe na półce: Nagłówek sceny · Obsada i głosy · Plan scen · Strony scenariusza.\n\
+desk-starter-poetry-hint = Gotowe na półce: Szkic strofy · Notatki rytmu · Kolejność w tomiku · Dedykacja autora.\n\
+desk-blocks-eyebrow = Elementy składowe historii\n\
+desk-blocks-title = Twoja półka z elementami opowieści\n\
+desk-block-chars-title = Postacie\n\
+desk-block-chars-desc = Zbieraj bohaterów, rywali i ich historie — możesz nawet zaprosić postać znajomego do wspólnej sceny z czytelnym przypisaniem autorstwa.\n\
+desk-block-plots-title = Wątki i fabuła\n\
+desk-block-plots-desc = Rozpisuj punkty zwrotne, rozdziały i niespodzianki, aby opowieść płynęła gładko od początku do finału.\n\
+desk-block-timelines-title = Osie czasu\n\
+desk-block-timelines-desc = Układaj, co wydarzyło się najpierw, co potem, a co przed laty — idealne przy kryminałach, trylogiach i projektach szkolnych.\n\
+desk-block-themes-title = Motywy i tematy\n\
+desk-block-themes-desc = Zapisuj główne pytania, nastrój i motywy przewodnie historii, aby cały zespół pisał w jednym tonie.\n\
+desk-scratchpad-eyebrow = Brudnopis\n\
+desk-scratchpad-label = Szybki notatnik pomysłów\n\
+desk-scratchpad-title = Zapisz szybki pomysł\n\
+desk-note-title-label = Roboczy tytuł lub temat\n\
+desk-note-title-ph = np. Deszcz na schodach biblioteki...\n\
+desk-note-body-label = Pierwsze zdania lub szkic sceny\n\
+desk-note-body-ph = Zapisz kilka zdań, sprawdź dialog albo przełącz język pisania powyżej...\n\
+desk-note-keep-btn = Przypnij pomysł na biurku\n\
+desk-note-clear-btn = Wyczyść\n\
+desk-note-pinned-msg = Pomysł przypięty na Twoim biurku na czas tej sesji\n\
+guides-eyebrow = Dear World · Przewodniki użytkownika\n\
+guides-sidebar-title = Pierwsze kroki\n\
+guides-sidebar-sub = Przewodniki krok po kroku dla uczniów i studentów odkrywających wspólne pisanie w ExoNovel.\n\
+guides-open-desk-btn = Przejdź do Biurka\n\
+guides-signin-btn = Zaloguj się, aby zacząć pisać\n\
+guides-loading = Otwieranie przewodnika Dear World...\n\
+guides-empty = Wybierz rozdział przewodnika z listy, aby zacząć.\n\
 toast-did-copied = Skopiowano ID did:peer\n\
 toast-switched-persona = Przełączono personę\n\
 oauth-connected-google = Pomyślnie połączono Dysk i Dokumenty Google.\n\
@@ -724,17 +758,17 @@ slide-4-tab = Łącz po swojemu\n\
 slide-4-title = Podłącz swoje narzędzia i zachowaj pełną swobodę\n\
 slide-4-p1 = Twoje pisanie nie powinno być uwięzione na jednej platformie. Loguj się tak, jak wolisz, pisz w formatach dopasowanych do Twojego projektu i łącz zewnętrzne dyski w chmurze, narzędzia oraz procesy robocze na potrzeby kopii zapasowych, szybkiego eksportu, publikacji, projektów wieloplatformowych lub czegokolwiek innego, czego wymaga Twój proces twórczy.\n\
 slide-4-p2 = W ExoNovel wszystko współpracuje ze sobą bez zamykania Cię w jednym ekosystemie. Dodawaj połączenia zawsze, gdy pomagają, łącz narzędzia wraz z rozwojem projektów i odłączaj dowolną usługę w każdej chwili, zachowując pełny dostęp do swojego konta, Person i dzieł.\n\
-landing-modes-title = Wybierz sposób pisania i synchronizacji\n\
-landing-modes-sub = Zacznij całkowicie za darmo w przeglądarce i na własnych urządzeniach — lub włącz automatyczną szyfrowaną synchronizację w planie miesięcznym albo rocznym, aby wszystkie ekrany były połączone w jednym wirtualnym domu pisarskim.\n\
+landing-modes-title = W sieci, na Twoim urządzeniu i razem w synchronizacji\n\
+landing-modes-sub = Pisz za darmo w przeglądarce i w naszych aplikacjach na urządzenia. Współpraca między pisarzami synchronizuje się automatycznie w sieci i na urządzeniach za darmo — a drobna opłata miesięczna lub roczna dotyczy wyłącznie automatycznej synchronizacji Twojej własnej półki między przeglądarką a urządzeniami.\n\
 mode-free-badge = Zawsze za darmo\n\
-mode-free-title = Przeglądarka i aplikacje offline\n\
-mode-free-desc = Twórz, współpracuj na żywo i publikuj bezpośrednio w przeglądarce za darmo — a do tego pobierz darmowe aplikacje na Linuxa, macOS, Windows, Androida i iOS, aby pisać offline i ręcznie synchronizować szkice z siecią na żądanie.\n\
-mode-monthly-badge = Plan miesięczny\n\
-mode-monthly-title = Automatyczna synchronizacja — $9 / mies.\n\
-mode-monthly-desc = Utrzymuj stałe połączenie między przestrzenią w przeglądarce a wszystkimi urządzeniami offline za niewielką opłatą miesięczną (równowartość w lokalnej walucie), łącząc dzieła online i lokalne automatycznie z pełnym szyfrowaniem end-to-end.\n\
-mode-annual-badge = Plan roczny\n\
-mode-annual-title = Automatyczna synchronizacja — $90 / rok\n\
-mode-annual-desc = Korzystaj z pełnej automatycznej synchronizacji Web + urządzenia w jeszcze niższym koszcie miesięcznym w planie rocznym (efektywnie $7,50 / mies. w lokalnej walucie — dwa miesiące gratis względem planu miesięcznego).\n\
+mode-free-title = W przeglądarce i na urządzeniu\n\
+mode-free-desc = Twórz, zapraszaj współautorów i pisz wspólnie w przeglądarce oraz w darmowych aplikacjach na Linuxa, macOS, Windows, Androida i iOS — z darmową automatyczną synchronizacją współpracy między pisarzami w sieci i na urządzeniach.\n\
+mode-monthly-badge = Synchronizacja osobista\n\
+mode-monthly-title = Synchronizacja osobista — $9 / mies.\n\
+mode-monthly-desc = Utrzymuj własne szkice w przeglądarce i na urządzeniach offline w automatycznej synchronizacji end-to-end ($9/mies. lub równowartość w lokalnej walucie).\n\
+mode-annual-badge = Roczna synchronizacja osobista\n\
+mode-annual-title = Synchronizacja osobista — $90 / rok\n\
+mode-annual-desc = Pełna automatyczna synchronizacja między Twoim profilem w sieci a własnymi urządzeniami ($7,50/mies. efektywnie w lokalnej walucie — dwa miesiące gratis względem planu miesięcznego).\n\
 landing-formats-title = Wybierz format i zacznij tworzyć\n\
 landing-formats-sub = Niezależnie od tego, czy piszesz pierwszą powieść, wypracowanie do szkoły czy scenariusz krótkiego filmu — zacznij w przejrzystym układzie stworzonym dla Twojego stylu pisania.\n\
 format-novel-title = Powieści\n\
@@ -747,7 +781,7 @@ format-screenplay-title = Scenariusze i skrypty\n\
 format-screenplay-desc = Pisz sceny i dialogi wyglądające jak prawdziwe scenariusze filmowe lub wideo — formatowane automatycznie podczas pisania.\n\
 format-poetry-title = Poezja\n\
 format-poetry-desc = Dopasowuj rytm, strofy i podziały wersów, które zostają dokładnie tam, gdzie je ustawisz — od jednego wiersza po cały tomik.\n\
-signin-back-home = ← Powrót do przeglądu ExoNovel\n\
+signin-back-home = ← Wstecz\n\
 signin-title = Zaloguj się do ExoNovel\n\
 signin-subtitle = Uwierzytelnij się, aby rozwiązać swoją autorytatywną tożsamość did:peer i otworzyć obszar roboczy.\n\
 signin-checking-session = Sprawdzanie istniejącej sesji...\n\
@@ -766,7 +800,7 @@ signin-submit-btn = Zaloguj się\n\
 signin-have-account = Masz już konto? Zaloguj się\n\
 signin-need-account = Nie masz konta? Utwórz je\n\
 signin-auth-failed = Uwierzytelnianie nie powiodło się.\n\
-footer-operator = ExoNovel · Operator: Exosystems (exosystems.net)\n\
+footer-brand-prefix = ExoNovel, od\n\
 privacy-page-title = Polityka prywatności — ExoNovel\n\
 privacy-effective = Data wejścia w życie i ostatnia aktualizacja: 24 listopada 2026\n\
 privacy-heading = Polityka prywatności ExoNovel\n\
@@ -786,7 +820,7 @@ privacy-s1-sec-body = Znaczniki czasu logowania, adres IP, nagłówek User-Agent
 privacy-s2-title = 2. Pliki cookie i pamięć przeglądarki\n\
 privacy-s2-body = ExoNovel używa wyłącznie niezbędnych plików cookie sesji uwierzytelniania (HttpOnly) oraz tymczasowej pamięci sesji przeglądarki do zachowania oczekujących kodów zaproszeń podczas przekierowań logowania. Nie stosujemy zewnętrznych plików cookie reklamowych ani śledzących.\n\
 privacy-s3-title = 3. Sposób wykorzystania danych\n\
-privacy-s3-li1 = Uwierzytelnianie sesji i rozwiązywanie tożsamości did:peer w trybach Web, Desktop i Mobile.\n\
+privacy-s3-li1 = Uwierzytelnianie sesji i rozwiązywanie tożsamości did:peer w przeglądarce, na komputerach i urządzeniach mobilnych.\n\
 privacy-s3-li2 = Wyświetlanie wybranej persony, pseudonimu, awatara i preferencji językowych (w tym układu RTL).\n\
 privacy-s3-li3 = Obsługa wspólnych grup literackich, atrybucji współautorów i zaproszeń inicjowanych przez użytkownika.\n\
 privacy-s3-li4 = Wykonywanie inicjowanych przez użytkownika kopii zapasowych na połączonym Dysku Google.\n\
@@ -829,14 +863,14 @@ terms-s3-li2-label = Materiały nielegalne i naruszenia: \n\
 terms-s3-li2-body = CSAM, treści bez zgody, nękanie, mowa nienawiści oraz naruszenia praw autorskich są surowo zabronione i skutkują natychmiastowym zablokowaniem konta.\n\
 terms-s4-title = 4. Połączone aplikacje zewnętrzne\n\
 terms-s4-body = Opcjonalne integracje, takie jak Dysk Google, uruchamiane są wyłącznie po wyraźnej zgodzie użytkownika i mogą zostać cofnięte w dowolnej chwili w Preferencjach -> Połączone aplikacje.\n\
-terms-s5-title = 5. Tryby usługi, dostępność i kontakt\n\
-terms-s5-body = ExoNovel oferuje współpracę webową, lokalne przechowywanie na urządzeniu oraz opcjonalne plany synchronizacji. W sprawach prawnych i wsparcia napisz na support@exosystems.net lub exonomyapp@gmail.com.\n\
-preferences-subtitle = Preferencje konta, języki, tryby pracy i kanały powiadomień (wszystkie zakupy i subskrypcje pozostają w Profilu).\n\
+terms-s5-title = 5. Dostępność usługi, plany synchronizacji i kontakt\n\
+terms-s5-body = ExoNovel oferuje współpracę webową, lokalne przechowywanie na urządzeniu oraz opcjonalne plany synchronizacji osobistej. W sprawach prawnych i wsparcia napisz na support@exosystems.net lub exonomyapp@gmail.com.\n\
+preferences-subtitle = Preferencje konta, języków, przeglądu synchronizacji i dostarczania powiadomień (zakupy, paywalle i plany znajdują się w Profilu).\n\
 preferences-nav-aria = Sekcje preferencji\n\
-sec-account = Konto i bezpieczeństwo\n\
+sec-account = Konto i suwerenna tożsamość\n\
 sec-connected-apps = Połączone aplikacje i Dokumenty Google\n\
-sec-appearance-langs = Wygląd i języki (29)\n\
-sec-sync-storage = Synchronizacja i pamięć (3 tryby)\n\
+sec-appearance-langs = Języki (29)\n\
+sec-sync-storage = Sieć, urządzenie i synchronizacja współpracy\n\
 sec-notifications = Kanały powiadomień\n\
 sec-admin-allowlist = Lista dostępu i konta\n\
 account-title = Konto i suwerenna tożsamość\n\
@@ -855,30 +889,24 @@ format-opt-article = Artykuły i literatura faktu\n\
 format-opt-short = Opowiadania\n\
 format-opt-screenplay = Scenariusze\n\
 format-opt-poetry = Poezja\n\
-appearance-title = Motyw i architektura dwóch języków\n\
-appearance-desc = Język interfejsu steruje menu i kierunkiem układu (automatyczne RTL dla arabskiego i hebrajskiego). Domyślny język pisania steruje edytorami niezależnie i zapisuje się bezpośrednio na koncie.\n\
-theme-label = Wygląd motywu\n\
-theme-opt-system = Systemowy\n\
-theme-opt-light = Jasny\n\
-theme-opt-dark = Ciemny\n\
+appearance-title = Architektura dwóch języków (29 języków)\n\
+appearance-desc = Język aplikacji steruje menu, nawigacją i kierunkiem układu (automatyczne RTL dla arabskiego i hebrajskiego). Język pisania steruje edytorami niezależnie i zapisuje się bezpośrednio na koncie.\n\
 offline-packs-title = Zdecentralizowane pakiety językowe offline\n\
-offline-packs-desc = Instalacje trybu lokalnego 2 pobierają wybrane pakiety językowe bezpośrednio z publicznej przestrzeni nazw Willow tylko do odczytu:\n\
-save-theme-lang-btn = Zapisz domyślny motyw i języki\n\
-sync-title = Trzy tryby działania i kryptograficzna ślepota\n\
-sync-sub = Wybierz sposób przechowywania i synchronizacji tekstów między przeglądarką a aplikacjami na urządzeniach.\n\
-sync-m1-title = Tryb 1 · ExoNovel w sieci (Darmowy)\n\
-sync-m1-desc = Obszar roboczy w chmurze oparty na zarządzanej bazie PostgreSQL z natychmiastowymi aktualizacjami między kartami.\n\
-sync-m2-title = Tryb 2 · Suwerenne urządzenie (Darmowy)\n\
-sync-m2-desc = W 100% lokalny magazyn Willow na Windows, macOS, Linux, Android i iOS. Zawiera darmowe odkrywanie iroh i ślepy przekaźnik ExoNovel.\n\
-sync-m3-title = Tryb 3 · Zarządzana synchronizacja Web + Urządzenie\n\
-sync-m3-desc = Płatny (9 $/mies. lub 90 $/rok w Profilu). Ślepa kopia zapasowa autoryzowana przez Meadowcap i dwukierunkowa synchronizacja Willow.\n\
-sync-zk-title = Kryptograficzna ślepota zero-knowledge\n\
-sync-zk-desc = W trybach 2 i 3 szkice i wpisy Willow są szyfrowane end-to-end przez nadawcę przed dotarciem do przekaźnika. Widoczne są wyłącznie ramki routingu i tokeny Meadowcap.\n\
-sync-enable-m3 = Włącz zarządzaną synchronizację Willow (Tryb 3) na tym koncie\n\
-sync-current-tier = Aktualny poziom:\n\
-sync-requires-sub = Zarządzana synchronizacja Trybu 3 wymaga aktywnej subskrypcji zarządzanej w Profilu.\n\
-sync-manage-in-profile = Zarządzaj subskrypcją w Profilu →\n\
-sync-save-toggle = Zapisz przełącznik synchronizacji\n\
+offline-packs-desc = Aplikacje ExoNovel na urządzeniach pobierają wybrane pakiety językowe bezpośrednio z publicznej przestrzeni nazw Willow tylko do odczytu:\n\
+save-theme-lang-btn = Zapisz preferencje językowe\n\
+sync-title = Pisanie w sieci, na urządzeniu i synchronizacja współpracy\n\
+sync-sub = Korzystaj z ExoNovel za darmo w przeglądarce i za darmo offline na urządzeniach. Synchronizacja współpracy między pisarzami jest darmowa w obu środowiskach.\n\
+sync-m1-title = W przeglądarce (Darmowe)\n\
+sync-m1-desc = Obszar roboczy w chmurze dostępny z dowolnej przeglądarki z natychmiastową współpracą między autorami i grupami.\n\
+sync-m2-title = Na urządzeniu (Darmowe)\n\
+sync-m2-desc = Przechowywanie offline-first na Windows, macOS, Linux, Android i iOS — pisz wszędzie i zachowaj pełną lokalną kontrolę nad biblioteką.\n\
+sync-m3-title = Synchronizacja własnych urządzeń ($9/mies. · $90/rok)\n\
+sync-m3-desc = Szyfrowana end-to-end synchronizacja utrzymująca Twoje własne szkice offline w stałej zgodności z Twoim profilem w przeglądarce.\n\
+sync-collab-title = Współpraca z innymi pisarzami jest darmowa wszędzie\n\
+sync-collab-desc = Za każdym razem, gdy dodajesz współpracowników, synchronizacja między nimi działa automatycznie i za darmo — niezależnie od tego, czy jedna osoba pisze w przeglądarce, a druga w aplikacji na komputerze lub telefonie. Opłata dotyczy wyłącznie synchronizacji Twojej własnej biblioteki między urządzeniem a profilem w sieci.\n\
+sync-zk-title = Kryptograficzna prywatność zero-knowledge\n\
+sync-zk-desc = Szkice synchronizowane z urządzeń oraz wspólne pakiety danych są szyfrowane end-to-end przez nadawcę przed przejściem przez infrastrukturę przekaźnika ExoNovel.\n\
+sync-manage-in-profile = Zobacz plany synchronizacji w Profilu →\n\
 notif-channels-title = Wieloplatformowe kanały dostarczania\n\
 notif-email-prefix = Transakcyjna usługa e-mail (notes@exosystems.net)\n\
 notif-email-active = · Dostarczanie e-mail aktywne\n\
@@ -890,7 +918,7 @@ notif-web-push-title = Powiadomienia przeglądarki WWW\n\
 notif-web-push-desc = Natywne banery systemowe przez Notification API przeglądarki.\n\
 notif-native-push-title = Natywne powiadomienia urządzeń (Android UnifiedPush + FCM, iOS/macOS APNs, Windows WNS, Linux)\n\
 notif-email-title = Transakcyjny e-mail (Notatki z ExoNovel)\n\
-notif-digest-label = Tryb podsumowań e-mail\n\
+notif-digest-label = Częstotliwość podsumowań e-mail\n\
 notif-digest-instant = Natychmiastowy e-mail\n\
 notif-digest-daily = Dzienny raport\n\
 notif-digest-off = E-mail wyłączony\n\
@@ -1040,14 +1068,16 @@ conn-msg-action-err = Operacja nie powiodła się.\n\
 tab-overview = Przegląd\n\
 tab-works = Dzieła\n\
 tab-groups = Grupy i zaproszenia\n\
-tab-wallet = Portfel, paywalle i zakupy\n\
+tab-wallet = Portfel\n\
+tab-paywalls = Paywalle\n\
+tab-plans = Plany\n\
 tab-personas = Persony\n\
 tab-langs-alerts = Języki i powiadomienia\n\
 profile-tabs-aria = Sekcje profilu\n\
 profile-overview-title = Przegląd tożsamości twórcy\n\
 profile-overview-desc = Twoja suwerenna tożsamość spaja dzieła, persony, grupy, wypłaty oraz zakupy czytelników.\n\
 active-persona-label = Aktywna persona\n\
-sync-tier-label = Poziom synchronizacji:\n\
+profile-sync-plan-label = Plan synchronizacji osobistej:\n\
 personas-label = Persony\n\
 groups-label = Grupy\n\
 referrals-label = Polecenia\n\
@@ -1058,7 +1088,7 @@ profile-referrals-unit = dołączonych pisarzy\n\
 works-title = Utworzone i rozwidlone dzieła\n\
 works-desc = Każdy manuskrypt przechowuje wspólne edycje Loro CRDT oraz ścieżki uprawnień Willow Meadowcap powiązane z aktywną personą.\n\
 works-novels-title = Powieści i serie\n\
-works-novels-desc = Rozdziały LoroText oraz płatne lub bezpłatne poziomy dostępu konfigurowane w sekcji Portfel, paywalle i zakupy.\n\
+works-novels-desc = Rozdziały i sceny zapisywane z darmowymi lub płatnymi progami dostępu konfigurowanymi w zakładce Paywalle.\n\
 works-scripts-title = Scenariusze i poezja\n\
 works-scripts-desc = Wielojęzyczny edytor tekstu (29 języków + RTL) z kursorami współpracy na żywo.\n\
 groups-title = Grupy i menedżerowie\n\
@@ -1079,11 +1109,35 @@ invites-th-link = Link zaproszenia\n\
 invites-th-uses = Użycia\n\
 invites-th-created = Utworzono\n\
 invites-scope-general = Ogólne zaproszenie ExoNovel\n\
-wallet-title = Subskrypcja zarządzanej synchronizacji Willow (Tryb 3)\n\
-wallet-sub = Tryb 1 (Web) i Tryb 2 (Lokalny Willow na urządzeniu + darmowe odkrywanie przekaźników ExoNovel) są całkowicie bezpłatne. Zasubskrybuj tutaj, aby zarejestrować swoje ID did:peer do ślepej szyfrowanej synchronizacji Trybu 3 (9 $/mies. lub 90 $/rok).\n\
+wallet-tab-title = Połączone portfele i metody płatności\n\
+wallet-tab-sub = Wybierz sposób odbierania płatności od czytelników i opłacania planów synchronizacji osobistej w lokalnych walutach, kartami oraz kryptowalutami.\n\
+wallet-selected-rail-title = Aktywna ścieżka rozliczeń\n\
+wallet-selected-rail-desc = Używana przy aktywacji planów synchronizacji osobistej oraz wypłatach dla autorów.\n\
+wallet-card-desc = Karty, Apple Pay, Google Pay oraz lokalne bramki walutowe.\n\
+wallet-solana-desc = Natychmiastowe wypłaty w stablecoinach i odblokowania czytelników.\n\
+wallet-btc-desc = Tanie faktury Lightning dla globalnych mikroodblokowań i subskrypcji.\n\
+ledger-wallet-title = Transakcje portfela i paragony\n\
+ledger-wallet-sub = Pełny rejestr przychodów autora, paragonów czytelników i opłat za plan synchronizacji.\n\
+paywalls-title = Paywalle autorów i dostęp czytelników\n\
+paywalls-sub = Zdecyduj, które historie, rozdziały i elementy świata pozostają darmowe dla wszystkich, a które odblokowują się za opłatą — z automatycznym podziałem przychodów dla współautorów.\n\
+paywalls-free-tier-title = Darmowe rozdziały publiczne\n\
+paywalls-free-tier-desc = Udostępniaj pierwsze rozdziały lub całe książki bezpłatnie, aby nowi czytelnicy mogli poznać Twoją twórczość.\n\
+paywalls-unlock-title = Paywalle dla opowieści i rozdziałów\n\
+paywalls-unlock-desc = Ustalaj ceny odblokowania w preferowanej walucie dla kart, płatności mobilnych i portfeli krypto.\n\
+paywalls-splits-title = Podział przychodów współautorów\n\
+paywalls-splits-desc = Gdy piszecie wspólnie w grupie, przychody z paywalli trafiają przejrzyście do każdego przypisanego twórcy.\n\
+paywalls-ledger-title = Odblokowania czytelników i aktywność paywalli\n\
+paywalls-ledger-sub = Dzieła odblokowane przez Ciebie jako czytelnika oraz płatne odblokowania w Twoich historiach.\n\
+paywalls-empty = Brak jeszcze zarejestrowanych sprzedaży paywalli ani odblokowań czytelników.\n\
+plans-title = Dostęp do pisania i plany synchronizacji własnych urządzeń\n\
+plans-sub = Pisanie w przeglądarce jest darmowe, pisanie na własnych urządzeniach jest darmowe, a synchronizacja współpracy między pisarzami jest zawsze darmowa — nawet gdy jedna osoba jest w sieci, a druga offline na urządzeniu. Płatny plan służy wyłącznie do synchronizacji Twoich własnych szkiców między urządzeniem a profilem w sieci.\n\
+plans-payment-rail-note = Wybrana metoda płatności\n\
+plans-change-wallet-btn = Konfiguruj w Portfelu →\n\
+plans-free-title = Sieć, urządzenie i współpraca (Darmowe)\n\
+plans-free-desc = Darmowe pisanie w przeglądarce, darmowe pisanie lokalne na urządzeniach oraz darmowa synchronizacja współpracy z zespołem.\n\
 wallet-peer-prefix = Docelowy węzeł usługi ExoNovel:\n\
 wallet-currency-label = Lokalna waluta\n\
-wallet-rail-label = Metoda płatności (AOTA)\n\
+wallet-rail-label = Domyślna metoda płatności (AOTA)\n\
 wallet-cur-usd = USD (9 $/mies. · 90 $/rok)\n\
 wallet-cur-eur = EUR (9 €/mies. · 90 €/rok)\n\
 wallet-cur-gbp = GBP (7 £/mies. · 70 £/rok)\n\
@@ -1097,20 +1151,16 @@ wallet-rail-solana = Solana Pay / USDC\n\
 wallet-rail-btc = Bitcoin Lightning (L402)\n\
 wallet-rail-eth = Base / Arbitrum / Ethereum\n\
 wallet-rail-mobile = Płatność mobilna / PIX / UPI\n\
-wallet-free-title = Darmowe tryby (1 i 2)\n\
-wallet-free-desc = Aplikacja webowa w chmurze lub lokalny magazyn Willow na urządzeniu + darmowy przekaźnik odkrywania\n\
 wallet-free-current = Obecny plan (Darmowy)\n\
 wallet-free-switch = Przełącz na darmowy\n\
-wallet-mo-title = Synchronizacja miesięczna (ekw. 9 $/mies.)\n\
-wallet-mo-desc = Odblokowuje przełącznik Trybu 3 w Preferencjach i ślepą replikację Meadowcap.\n\
+wallet-mo-title = Synchronizacja osobista miesięczna (ekw. 9 $/mies.)\n\
+wallet-mo-desc = Szyfrowana synchronizacja łącząca Twoje własne szkice offline z Twoim profilem w przeglądarce.\n\
 wallet-mo-active = Aktywny plan miesięczny\n\
 wallet-mo-activate = Aktywuj 9 $/miesiąc\n\
-wallet-yr-title = Synchronizacja roczna (ekw. 90 $/rok)\n\
-wallet-yr-desc = 2 miesiące gratis · pełna ślepa synchronizacja Willow serwer-urządzenie.\n\
+wallet-yr-title = Synchronizacja osobista roczna (ekw. 90 $/rok)\n\
+wallet-yr-desc = 2 miesiące gratis · pełna szyfrowana synchronizacja między Twoimi urządzeniami a profilem w sieci.\n\
 wallet-yr-active = Aktywny plan roczny\n\
 wallet-yr-activate = Aktywuj 90 $/rok\n\
-ledger-title = Paywalle autorów, zakupy czytelników i rejestr synchronizacji\n\
-ledger-sub = Wszystkie zapisy handlowe — połączone portfele, przychody z paywalli, zakupy dzieł i faktury synchronizacji — znajdują się wyłącznie tutaj w Profilu.\n\
 ledger-th-type = Typ\n\
 ledger-th-amount = Kwota\n\
 ledger-th-cycle = Cykl\n\
@@ -1286,7 +1336,14 @@ cms-msg-generating-proposal = Uruchamianie analizy propozycji aktywnego wnioskow
 cms-toast-proposal-generated = Wygenerowano notatkę propozycji dojrzałości\n\
 cms-toast-proposal-updated = Zaktualizowano status propozycji\n\
 cms-toast-tool-added = Dodano narzędzie do katalogu dojrzałości\n\
-cms-toast-copied = Skopiowano tekst do schowka\n",
+cms-toast-copied = Skopiowano tekst do schowka\n\
+nav-group-account = Konto\n\
+nav-group-workspace = Przestrzeń robocza i powiadomienia\n\
+nav-group-admin = Administracja\n\
+nav-group-writing = Pisanie i współpraca\n\
+nav-group-commerce = Rozliczenia i dostęp czytelników\n\
+nav-group-personalization = Personalizacja\n\
+settings-resize-aria = Zmień szerokość paska nawigacji ustawień\n",
         "de" => "\
 nav-sign-in = Anmelden\n\
 nav-toggle-menu = Navigationsmenü umschalten\n\
@@ -1309,15 +1366,49 @@ dismiss-label = Schließen\n\
 save-changes-short = Speichern\n\
 confirm-label = Bestätigen\n\
 copy-text-label = Text kopieren\n\
-back-to-workspace = ← Zurück zum Arbeitsbereich\n\
-plan-label = Tarif:\n\
 pen-name-label = Künstlername:\n\
 pending-did-label = Ausstehende did:peer\n\
-workspace-desc = Dein kollaborativer Schreibbereich, verankert an deiner souveränen did:peer-Identität über Web-Modus 1, Gerätemodus 2 und verwaltete Synchronisierung 3.\n\
+workspace-desc = Dein Schreibtisch hält alles, woran du gerade arbeitest, griffbereit — ob du deine erste Geschichte für die Schule gliederst, mit Freunden Figuren entwickelst oder allein Gedichte schreibst. Jede Figur, Zeitleiste, Szene und Notiz bleibt mit deinem Künstlernamen verknüpft, damit du Ideen frei teilen, gemeinsam lernen und deine Werke immer als deine eigenen behalten kannst.\n\
 btn-profile-billing = Profil, Personas & Abrechnung\n\
 btn-connected-apps = Verbundene Apps & Google Docs\n\
 btn-open-cms = MADR Docs CMS öffnen\n\
 workspace-key-label = Aktiver Persona-Schlüssel (did:peer)\n\
+choose-image-btn = Profilbild wählen\n\
+persona-choose-avatar-btn = Persona-Bild wählen\n\
+desk-start-eyebrow = Neues Projekt starten\n\
+desk-start-title = Was möchtest du heute schreiben?\n\
+desk-starter-novel-hint = Bereit auf deinem Regal: Handlungsübersicht · Figurenkarten · Kapitel-1-Entwurf · Welt-Zeitleiste.\n\
+desk-starter-article-hint = Bereit auf deinem Regal: Einstiegsthese · Abschnittsgliederung · Quellennotizen · Aufsatz-Entwurf.\n\
+desk-starter-short-hint = Bereit auf deinem Regal: Einstiegshaken · Wendepunkt · Figuren-Moment · Szenenentwurf.\n\
+desk-starter-script-hint = Bereit auf deinem Regal: Szenenkopf · Besetzung & Stimmen · Beat Sheet · Drehbuchseiten.\n\
+desk-starter-poetry-hint = Bereit auf deinem Regal: Strophenentwurf · Rhythmusnotizen · Band-Reihenfolge · Widmung.\n\
+desk-blocks-eyebrow = Geschichten-Bausteine\n\
+desk-blocks-title = Dein Regal voller Bausteine\n\
+desk-block-chars-title = Figuren\n\
+desk-block-chars-desc = Behalte Heldinnen, Gegenspieler und Vorgeschichten im Blick — oder hole eine Figur von Freunden mit klarer Urhebernennung in deine Szene.\n\
+desk-block-plots-title = Handlungen\n\
+desk-block-plots-desc = Skizziere Wendepunkte, Kapitel und Überraschungen, damit deine Geschichte rund vom Anfang bis zum Schluss fließt.\n\
+desk-block-timelines-title = Zeitleisten\n\
+desk-block-timelines-desc = Ordne, was zuerst, danach oder vor Jahren geschah — ideal für Krimis, Trilogien oder gemeinsame Schulprojekte.\n\
+desk-block-themes-title = Themen & Motive\n\
+desk-block-themes-desc = Halte die großen Fragen, Stimmungen und Leitmotive fest, damit alle Co-Autorinnen auf derselben Wellenlänge bleiben.\n\
+desk-scratchpad-eyebrow = Notizblock\n\
+desk-scratchpad-label = Schneller Ideenblock\n\
+desk-scratchpad-title = Halte eine schnelle Idee fest\n\
+desk-note-title-label = Arbeitstitel oder Impuls\n\
+desk-note-title-ph = z. B. Regen auf den Stufen der Bibliothek...\n\
+desk-note-body-label = Erste Zeilen oder Szenenskizze\n\
+desk-note-body-ph = Schreibe ein paar Sätze, teste einen Dialog oder wechsle oben deine Schreibsprache...\n\
+desk-note-keep-btn = Idee auf dem Schreibtisch anheften\n\
+desk-note-clear-btn = Leeren\n\
+desk-note-pinned-msg = Idee für diese Sitzung auf deinem Schreibtisch angeheftet\n\
+guides-eyebrow = Dear World · Benutzerhandbücher\n\
+guides-sidebar-title = Erste Schritte\n\
+guides-sidebar-sub = Schritt-für-Schritt-Anleitungen für Schülerinnen und Studierende, die gemeinsames Schreiben auf ExoNovel entdecken.\n\
+guides-open-desk-btn = Zum Schreibtisch\n\
+guides-signin-btn = Anmelden und loslegen\n\
+guides-loading = Dear World Guide wird geöffnet...\n\
+guides-empty = Wähle links ein Kapitel aus, um zu beginnen.\n\
 toast-did-copied = did:peer-ID kopiert\n\
 toast-switched-persona = Persona gewechselt\n\
 oauth-connected-google = Google Drive & Google Docs erfolgreich verbunden.\n\
@@ -1358,17 +1449,17 @@ slide-4-tab = Verbinde auf deine Art\n\
 slide-4-title = Verknüpfe deine Tools, behalte volle Freiheit\n\
 slide-4-p1 = Deine Texte sollten niemals in einer einzigen Plattform eingesperrt sein. Melde dich so an, wie es dir am besten passt, schreibe in den Formaten, die zu deinem Projekt gehören, und verknüpfe externe Cloud-Speicher, Schreibtools und Workflows für Backups, schnelle Exporte, Veröffentlichungen, plattformübergreifende Projekte oder was immer dein kreativer Prozess verlangt.\n\
 slide-4-p2 = Alles in ExoNovel greift ineinander, ohne dich festzunageln. Füge Verbindungen hinzu, wann immer sie helfen, kombiniere Werkzeuge, wenn deine Projekte wachsen, und trenne jeden Dienst jederzeit wieder — bei vollem Zugriff auf dein Konto, deine Personas und deine Werke.\n\
-landing-modes-title = Wähle, wie du schreibst und synchronisierst\n\
-landing-modes-sub = Starte komplett kostenlos im Browser und auf deinen eigenen Geräten — oder schalte monatlich bzw. jährlich die automatische verschlüsselte Synchronisation ein, um alle Bildschirme nahtlos zu verbinden.\n\
+landing-modes-title = Im Web, auf deinem Gerät und gemeinsam synchronisiert\n\
+landing-modes-sub = Schreibe kostenlos im Webbrowser und in unseren nativen Geräte-Apps. Zusammenarbeit zwischen Schreibenden synchronisiert automatisch und kostenlos zwischen Web und Gerät — nur für die automatische Synchronisierung deiner eigenen persönlichen Entwürfe zwischen Web und Geräten fällt ein kleiner Monats- oder Jahresbetrag an.\n\
 mode-free-badge = Dauerhaft kostenlos\n\
-mode-free-title = Web & Offline-Geräte-Apps\n\
-mode-free-desc = Schreibe, arbeite live im Team zusammen und veröffentliche kostenlos direkt im Browser — plus kostenlose Apps für Linux, macOS, Windows, Android und iOS zum Offline-Schreiben und manuellen Synchronisieren auf Abruf.\n\
-mode-monthly-badge = Monatliche Sync\n\
-mode-monthly-title = Automatische Synchronisation — 9 $ / Monat\n\
-mode-monthly-desc = Halte deinen Browser-Arbeitsbereich und alle Offline-Geräte für eine kleine monatliche Gebühr (Gegenwert in Landeswährung) dauerhaft verbunden — inklusive Ende-zu-Ende-verschlüsseltem Abgleich aller Online- und lokalen Entwürfe.\n\
-mode-annual-badge = Jährliche Sync\n\
-mode-annual-title = Automatische Synchronisation — 90 $ / Jahr\n\
-mode-annual-desc = Die volle automatische Web- und Geräte-Synchronisation zum noch kleineren Monatspreis im Jahresplan (effektiv 7,50 $ / Monat in Landeswährung — zwei Monate gratis gegenüber der monatlichen Zahlung).\n\
+mode-free-title = Im Web & auf deinem Gerät\n\
+mode-free-desc = Schreibe, lade Co-Autorinnen ein und arbeite zusammen im Browser sowie in unseren kostenlosen Linux-, macOS-, Windows-, Android- und iOS-Apps — inklusive kostenloser automatischer Team-Synchronisation zwischen Web und Geräten.\n\
+mode-monthly-badge = Persönliche Sync\n\
+mode-monthly-title = Persönliche Sync — 9 $ / Monat\n\
+mode-monthly-desc = Halte deine eigenen Entwürfe im Web und auf deinen Offline-Geräten mit Ende-zu-Ende-Verschlüsselung automatisch synchron (9 $/Monat oder Gegenwert in Landeswährung).\n\
+mode-annual-badge = Jährliche persönliche Sync\n\
+mode-annual-title = Persönliche Sync — 90 $ / Jahr\n\
+mode-annual-desc = Volle automatische Synchronisierung zwischen deinem eigenen Web-Profil und deinen persönlichen Geräten (effektiv 7,50 $/Monat in Landeswährung — zwei Monate gratis gegenüber dem Monatsplan).\n\
 landing-formats-title = Format wählen und direkt losschreiben\n\
 landing-formats-sub = Ob eigener Roman, Schulaufsatz oder Drehbuch für einen Kurzfilm — starte mit einem klaren Layout, das zu deiner Art zu schreiben passt.\n\
 format-novel-title = Romane\n\
@@ -1381,7 +1472,7 @@ format-screenplay-title = Drehbücher & Skripte\n\
 format-screenplay-desc = Schreibe Szenen und Dialoge wie in echten Film- oder Videoskripten — sauber formatiert, während du tippst.\n\
 format-poetry-title = Lyrik\n\
 format-poetry-desc = Gestalte Rhythmus, Strophen und Zeilenumbrüche genau so, wie du sie setzt — vom einzelnen Gedicht bis zum eigenen Band.\n\
-signin-back-home = ← Zurück zur ExoNovel-Übersicht\n\
+signin-back-home = ← Zurück\n\
 signin-title = Bei ExoNovel anmelden\n\
 signin-subtitle = Authentifiziere dich, um deine maßgebliche did:peer-Identität aufzulösen und deinen Arbeitsbereich zu öffnen.\n\
 signin-checking-session = Bestehende Sitzung wird geprüft...\n\
@@ -1400,7 +1491,7 @@ signin-submit-btn = Anmelden\n\
 signin-have-account = Bereits ein Konto? Anmelden\n\
 signin-need-account = Noch kein Konto? Konto erstellen\n\
 signin-auth-failed = Authentifizierung fehlgeschlagen.\n\
-footer-operator = ExoNovel · Betrieben von Exosystems (exosystems.net)\n\
+footer-brand-prefix = ExoNovel, von\n\
 privacy-page-title = Datenschutzerklärung — ExoNovel\n\
 privacy-effective = Inkrafttreten & letzte Aktualisierung: 24. November 2026\n\
 privacy-heading = ExoNovel Datenschutzerklärung\n\
@@ -1420,7 +1511,7 @@ privacy-s1-sec-body = Anmeldezeitpunkte, IP-Adresse, Browser-User-Agent und Fehl
 privacy-s2-title = 2. Cookies & Browser-Speicher\n\
 privacy-s2-body = ExoNovel nutzt ausschließlich technisch notwendige HttpOnly-Authentifizierungs-Cookies sowie temporären Sitzungsspeicher des Browsers zur Erhaltung ausstehender Einladungscodes bei Anmelde-Weiterleitungen. Es werden keine Werbe- oder Tracking-Cookies verwendet.\n\
 privacy-s3-title = 3. Wie wir Ihre Daten verwenden\n\
-privacy-s3-li1 = Authentifizierung Ihrer Sitzung und Auflösung Ihrer did:peer-Identität über Web, Desktop und Mobil.\n\
+privacy-s3-li1 = Authentifizierung deiner Sitzung und Auflösung deiner did:peer-Identität im Web, auf dem Desktop und mobil.\n\
 privacy-s3-li2 = Anzeige Ihrer gewählten Persona, des Künstlernamens, des Avatars und der Sprachpräferenzen (inkl. RTL).\n\
 privacy-s3-li3 = Betrieb gemeinsamer Schreibgruppen, Autorenzuordnung und Einladungen.\n\
 privacy-s3-li4 = Ausführung benutzergesteuerter Sicherungen und Exporte in Ihr verbundenes Google Drive.\n\
@@ -1463,14 +1554,14 @@ terms-s3-li2-label = Rechtswidrige & missbräuchliche Inhalte: \n\
 terms-s3-li2-body = CSAM, nicht einvernehmliche intime Darstellungen, Belästigung, Hassrede und Urheberrechtsverletzungen führen zur sofortigen Kontokündigung.\n\
 terms-s4-title = 4. Verbundene externe Apps\n\
 terms-s4-body = Optionale Integrationen wie Google Drive werden nur nach Ihrer ausdrücklichen Zustimmung aktiviert und können jederzeit unter Präferenzen -> Verbundene Apps widerrufen werden.\n\
-terms-s5-title = 5. Betriebsmodi, Verfügbarkeit & Kontakt\n\
-terms-s5-body = ExoNovel bietet Web-Kollaboration, lokale Gerätespeicherung und optionale Sync-Tarife ohne Gewährleistung unterbrechungsfreier Verfügbarkeit. Kontakt: support@exosystems.net oder exonomyapp@gmail.com.\n\
-preferences-subtitle = Konto-, Sprach-, Betriebsmodus- und Benachrichtigungspräferenzen (Käufe und Abonnements bleiben im Profil).\n\
+terms-s5-title = 5. Verfügbarkeit, Sync-Tarife & Kontakt\n\
+terms-s5-body = ExoNovel bietet Web-Kollaboration, lokale Gerätespeicherung und optionale Tarife für die Synchronisierung persönlicher Geräte. Kontakt: support@exosystems.net oder exonomyapp@gmail.com.\n\
+preferences-subtitle = Konto-, Sprach-, Sync-Übersichts- und Benachrichtigungspräferenzen (Käufe, Paywalls und Tarife bleiben im Profil).\n\
 preferences-nav-aria = Präferenzen-Bereiche\n\
-sec-account = Konto & Sicherheit\n\
+sec-account = Konto & Souveräne Identität\n\
 sec-connected-apps = Verbundene Apps & Google Docs\n\
-sec-appearance-langs = Design & Sprachen (29)\n\
-sec-sync-storage = Synchronisierung & Speicher (3 Modi)\n\
+sec-appearance-langs = Sprachen (29)\n\
+sec-sync-storage = Web, Gerät & Team-Sync\n\
 sec-notifications = Benachrichtigungskanäle\n\
 sec-admin-allowlist = Docs-Zugriffsliste & Konten\n\
 account-title = Konto & Souveräne Identität\n\
@@ -1489,30 +1580,24 @@ format-opt-article = Artikel & Sachbücher\n\
 format-opt-short = Kurzgeschichten\n\
 format-opt-screenplay = Drehbücher\n\
 format-opt-poetry = Lyrik\n\
-appearance-title = Design & Zweisprachige Architektur\n\
-appearance-desc = Die App-Ausgabesprache steuert Menüs und Layout-Richtung (auto RTL für Arabisch und Hebräisch). Die Eingabesprache steuert Editoren unabhängig und wird direkt im Konto gespeichert.\n\
-theme-label = Erscheinungsbild\n\
-theme-opt-system = System\n\
-theme-opt-light = Hell\n\
-theme-opt-dark = Dunkel\n\
+appearance-title = Zweisprachige Architektur (29 Sprachen)\n\
+appearance-desc = Die App-Sprache steuert Menüs, Navigation und Layout-Richtung (automatisches RTL für Arabisch und Hebräisch). Die Schreibsprache steuert Editoren unabhängig und wird direkt im Konto gespeichert.\n\
 offline-packs-title = Dezentrale Offline-Sprachpakete\n\
-offline-packs-desc = Dezentrale Modus-2-Installationen laden jedes gewählte Sprachpaket direkt aus dem öffentlichen schreibgeschützten Willow-Namespace von ExoNovel:\n\
-save-theme-lang-btn = Design & Sprachstandards speichern\n\
-sync-title = Drei Betriebsmodi & Kryptografische Blindheit\n\
-sync-sub = Wähle, wie ExoNovel deine Texte zwischen Web und lokalen Geräten speichert und synchronisiert.\n\
-sync-m1-title = Modus 1 · ExoNovel im Web (Kostenlos)\n\
-sync-m1-desc = Cloud-Arbeitsbereich mit verwaltetem PostgreSQL und Echtzeit-Updates über Tabs hinweg.\n\
-sync-m2-title = Modus 2 · Souveränes Gerät (Kostenlos)\n\
-sync-m2-desc = 100 % lokaler Willow-Speicher unter Windows, macOS, Linux, Android und iOS inklusive kostenloser iroh-Erkennung und blindem Relay.\n\
-sync-m3-title = Modus 3 · Verwaltete Web- + Gerätesynchronisierung\n\
-sync-m3-desc = Kostenpflichtig (9 $/Monat oder 90 $/Jahr im Profil). Meadowcap-autorisiertes blindes Backup und bidirektionale Willow-Synchronisierung.\n\
-sync-zk-title = Zero-Knowledge Kryptografische Blindheit\n\
-sync-zk-desc = In Modus 2 und 3 werden Entwürfe und private Willow-Einträge vor Verlassen des Geräts Ende-zu-Ende verschlüsselt. Sichtbar bleiben nur Routing-Frames und Meadowcap-Tokens.\n\
-sync-enable-m3 = Verwaltete Modus-3-Willow-Synchronisierung für dieses Konto aktivieren\n\
-sync-current-tier = Aktuelle Stufe:\n\
-sync-requires-sub = Modus-3-Synchronisierung erfordert ein aktives Abonnement im Profil.\n\
-sync-manage-in-profile = Abonnement im Profil verwalten →\n\
-sync-save-toggle = Sync-Schalter speichern\n\
+offline-packs-desc = ExoNovel-Geräteinstallationen laden jedes gewählte Sprachpaket direkt aus dem öffentlichen schreibgeschützten Willow-Namespace von ExoNovel:\n\
+save-theme-lang-btn = Sprachpräferenzen speichern\n\
+sync-title = Schreiben im Web, auf dem Gerät & Team-Sync\n\
+sync-sub = Nutze ExoNovel kostenlos im Browser und kostenlos offline auf deinen Geräten. Die Zusammenarbeit zwischen Schreibenden synchronisiert in beiden Umgebungen kostenlos.\n\
+sync-m1-title = Im Web (Kostenlos)\n\
+sync-m1-desc = Cloud-Arbeitsbereich in jedem Browser mit Live-Zusammenarbeit zwischen Autorinnen und Gruppen.\n\
+sync-m2-title = Auf deinem Gerät (Kostenlos)\n\
+sync-m2-desc = Offline-First-Speicher auf Windows, macOS, Linux, Android und iOS — schreibe überall bei voller lokaler Kontrolle über deine Bibliothek.\n\
+sync-m3-title = Eigene Geräte synchronisieren (9 $/Monat · 90 $/Jahr)\n\
+sync-m3-desc = Ende-zu-Ende-verschlüsselte Synchronisierung, die deine eigenen Offline-Geräteentwürfe dauerhaft mit deinem eigenen Web-Profil abgleicht.\n\
+sync-collab-title = Zusammenarbeit mit anderen Schreibenden ist überall kostenlos\n\
+sync-collab-desc = Sobald du Mitwirkende hinzufügst, erfolgt die Synchronisation zwischen euch automatisch, um Texte zu teilen und gemeinsam zu bearbeiten — unabhängig davon, ob jemand im Browser oder auf dem Smartphone bzw. Laptop arbeitet. Nur das Synchronisieren deiner eigenen Geräteinhalte mit deinem eigenen Web-Profil ist kostenpflichtig.\n\
+sync-zk-title = Zero-Knowledge Kryptografische Privatsphäre\n\
+sync-zk-desc = Geräte-synchronisierte Entwürfe und geteilte Datenpakete werden vom Absender Ende-zu-Ende verschlüsselt, bevor sie die Relay-Infrastruktur von ExoNovel berühren.\n\
+sync-manage-in-profile = Sync-Tarife im Profil ansehen →\n\
 notif-channels-title = Plattformübergreifende Zustellungskanäle\n\
 notif-email-prefix = Transaktionaler E-Mail-Dienst (notes@exosystems.net)\n\
 notif-email-active = · E-Mail-Versand aktiv\n\
@@ -1524,7 +1609,7 @@ notif-web-push-title = Browser-Benachrichtigungen\n\
 notif-web-push-desc = Native Systembanner über die Browser Notification API.\n\
 notif-native-push-title = Native Push-Geräte (Android UnifiedPush + FCM, iOS/macOS APNs, Windows WNS, Linux)\n\
 notif-email-title = Transaktionale E-Mail (Hinweise von ExoNovel)\n\
-notif-digest-label = E-Mail-Zusammenfassungsmodus\n\
+notif-digest-label = E-Mail-Zusammenfassungshäufigkeit\n\
 notif-digest-instant = Sofortige E-Mail\n\
 notif-digest-daily = Tägliche Zusammenfassung\n\
 notif-digest-off = E-Mail deaktiviert\n\
@@ -1674,14 +1759,16 @@ conn-msg-action-err = Aktion fehlgeschlagen.\n\
 tab-overview = Übersicht\n\
 tab-works = Werke\n\
 tab-groups = Gruppen & Einladungen\n\
-tab-wallet = Wallet, Paywalls & Käufe\n\
+tab-wallet = Wallet\n\
+tab-paywalls = Paywalls\n\
+tab-plans = Tarife\n\
 tab-personas = Personas\n\
 tab-langs-alerts = Sprachen & Benachrichtigungen\n\
 profile-tabs-aria = Profilbereiche\n\
 profile-overview-title = Öffentliche Autorenübersicht\n\
 profile-overview-desc = Deine souveräne Stammidentität verankert Werke, Personas, Gruppeneinladungen, Paywalls und Leserkäufe.\n\
 active-persona-label = Aktive Persona\n\
-sync-tier-label = Sync-Stufe:\n\
+profile-sync-plan-label = Persönlicher Sync-Tarif:\n\
 personas-label = Personas\n\
 groups-label = Gruppen\n\
 referrals-label = Empfehlungen\n\
@@ -1692,7 +1779,7 @@ profile-referrals-unit = beigetretene Autoren\n\
 works-title = Verfasste & geforkte Werke\n\
 works-desc = Jedes Manuskript speichert kollaborative Loro-CRDT-Änderungen neben Willow-Meadowcap-Pfaden deiner aktiven Persona.\n\
 works-novels-title = Romane & Fortsetzungen\n\
-works-novels-desc = LoroText-Kapitel sowie kostenpflichtige oder freie Leserzugänge unter Wallet, Paywalls & Käufe.\n\
+works-novels-desc = Kapitel und Szenen mit kostenlosen oder kostenpflichtigen Leserzugängen unter Paywalls konfiguriert.\n\
 works-scripts-title = Drehbücher & Lyrik\n\
 works-scripts-desc = Mehrsprachiger Texteditor (29 Sprachen + RTL) mit Live-Kollaborationscursorn.\n\
 groups-title = Gruppen & Manager\n\
@@ -1713,11 +1800,35 @@ invites-th-link = Einladungslink\n\
 invites-th-uses = Nutzungen\n\
 invites-th-created = Erstellt\n\
 invites-scope-general = Allgemeine ExoNovel-Einladung\n\
-wallet-title = Verwaltetes Modus-3-Willow-Sync-Abonnement\n\
-wallet-sub = Modus 1 (Web) und Modus 2 (Lokaler Gerät-Willow + kostenloses ExoNovel-Relay-Discovery) sind vollständig kostenlos. Abonniere hier für blinde verschlüsselte Modus-3-Meadowcap-Synchronisierung (9 $/Monat oder 90 $/Jahr).\n\
+wallet-tab-title = Verbundene Wallets & Zahlungswege\n\
+wallet-tab-sub = Wähle, wie du Leserzahlungen empfängst und persönliche Geräte-Sync-Tarife über unterstützte Lokalwährungs-, Karten- und Krypto-Wege bezahlst.\n\
+wallet-selected-rail-title = Aktiver Abwicklungsweg\n\
+wallet-selected-rail-desc = Wird bei der Aktivierung persönlicher Sync-Tarife und für Autoren-Auszahlungen genutzt.\n\
+wallet-card-desc = Karten, Apple Pay, Google Pay und lokale Währungsabwicklungen.\n\
+wallet-solana-desc = Sekundenschnelle Stablecoin-Auszahlungen und direkte Leser-Freischaltungen.\n\
+wallet-btc-desc = Günstige Lightning-Rechnungen für globale Mikro-Freischaltungen und Abos.\n\
+ledger-wallet-title = Wallet-Transaktionen & Belege\n\
+ledger-wallet-sub = Vollständiges Protokoll aus Autoreneinnahmen, Leser-Quittungen und Sync-Tarifgebühren.\n\
+paywalls-title = Autoren-Paywalls & Leserzugang\n\
+paywalls-sub = Lege fest, welche Geschichten, Kapitel oder Weltbau-Elemente für alle kostenlos bleiben und welche gegen Zahlung freigeschaltet werden — mit automatischer Aufteilung an Mitwirkende.\n\
+paywalls-free-tier-title = Kostenlose öffentliche Kapitel\n\
+paywalls-free-tier-desc = Halte Eröffnungskapitel oder ganze Bücher offen, damit neue Lesende dein Werk entdecken können.\n\
+paywalls-unlock-title = Paywalls pro Geschichte & Kapitel\n\
+paywalls-unlock-desc = Setze direkte Freischaltpreise in deiner bevorzugten Währung für Karten, Mobile Money und Krypto-Wallets.\n\
+paywalls-splits-title = Automatische Anteile für Mitwirkende\n\
+paywalls-splits-desc = Wenn ihr in einer Gruppe gemeinsam schreibt, werden Paywall-Erlöse sauber auf jede genannte Person aufgeteilt.\n\
+paywalls-ledger-title = Leser-Freischaltungen & Paywall-Aktivität\n\
+paywalls-ledger-sub = Von dir freigeschaltete Werke sowie bezahlte Freischaltungen deiner eigenen Geschichten.\n\
+paywalls-empty = Noch keine Paywall-Verkäufe oder Leser-Freischaltungen verzeichnet.\n\
+plans-title = Schreibzugang & Persönliche Geräte-Sync-Tarife\n\
+plans-sub = Schreiben im Web ist kostenlos, Schreiben auf deinen eigenen Geräten ist kostenlos, und die Team-Synchronisierung zwischen Schreibenden ist immer kostenlos — selbst wenn eine Person im Web und eine andere offline auf dem Gerät arbeitet. Ein bezahlter Tarif gilt nur für den Abgleich deiner eigenen Geräte-Entwürfe mit deinem eigenen Web-Profil.\n\
+plans-payment-rail-note = Gewählter Zahlungsweg\n\
+plans-change-wallet-btn = Im Wallet konfigurieren →\n\
+plans-free-title = Web, Gerät & Zusammenarbeit (Kostenlos)\n\
+plans-free-desc = Kostenloses Schreiben im Web, kostenloses lokales Schreiben auf Geräten und kostenlose Team-Synchronisation.\n\
 wallet-peer-prefix = ExoNovel-Dienst-Empfänger-Peer:\n\
 wallet-currency-label = Lokale Währung\n\
-wallet-rail-label = Zahlungsweg (AOTA)\n\
+wallet-rail-label = Standard-Zahlungsweg (AOTA)\n\
 wallet-cur-usd = USD (9 $/Monat · 90 $/Jahr)\n\
 wallet-cur-eur = EUR (9 €/Monat · 90 €/Jahr)\n\
 wallet-cur-gbp = GBP (7 £/Monat · 70 £/Jahr)\n\
@@ -1731,20 +1842,16 @@ wallet-rail-solana = Solana Pay / USDC\n\
 wallet-rail-btc = Bitcoin Lightning (L402)\n\
 wallet-rail-eth = Base / Arbitrum / Ethereum\n\
 wallet-rail-mobile = Mobile Money / PIX / UPI\n\
-wallet-free-title = Kostenlose Modi (1 & 2)\n\
-wallet-free-desc = Cloud-Web-App oder lokaler Geräte-Willow-Speicher + kostenloses Discovery-Relay\n\
 wallet-free-current = Aktueller Tarif (Kostenlos)\n\
 wallet-free-switch = Zu Kostenlos wechseln\n\
-wallet-mo-title = Monatssynchronisierung (9 $/Monat Äquiv.)\n\
-wallet-mo-desc = Aktiviert den Modus-3-Schalter in den Präferenzen & blinde Meadowcap-Replikation.\n\
+wallet-mo-title = Persönliche Sync Monatlich (9 $/Monat Äquiv.)\n\
+wallet-mo-desc = Verschlüsselte Synchronisierung deiner eigenen Offline-Geräteentwürfe mit deinem eigenen Web-Profil.\n\
 wallet-mo-active = Aktiv (Monatlich)\n\
 wallet-mo-activate = 9 $/Monat aktivieren\n\
-wallet-yr-title = Jahressynchronisierung (90 $/Jahr Äquiv.)\n\
-wallet-yr-desc = 2 Monate gratis · vollständige blinde Willow Server-zu-Gerät-Synchronisierung.\n\
+wallet-yr-title = Persönliche Sync Jährlich (90 $/Jahr Äquiv.)\n\
+wallet-yr-desc = 2 Monate gratis · vollständige verschlüsselte Sync zwischen deinen eigenen Geräten und deinem Web-Profil.\n\
 wallet-yr-active = Aktiv (Jährlich)\n\
 wallet-yr-activate = 90 $/Jahr aktivieren\n\
-ledger-title = Autoren-Paywalls, Leserkäufe & Sync-Journal\n\
-ledger-sub = Alle kommerziellen Belege — verbundene Wallets, Paywall-Einnahmen, Werkkäufe und Sync-Quittungen — befinden sich ausschließlich hier im Profil.\n\
 ledger-th-type = Typ\n\
 ledger-th-amount = Betrag\n\
 ledger-th-cycle = Zyklus\n\
@@ -1920,7 +2027,14 @@ cms-msg-generating-proposal = Aktive Inferenz-Analyse für Vorschlag läuft...\n
 cms-toast-proposal-generated = Reifegrad-Vorschlag erstellt\n\
 cms-toast-proposal-updated = Vorschlagsstatus aktualisiert\n\
 cms-toast-tool-added = Tool zum Reifegrad-Katalog hinzugefügt\n\
-cms-toast-copied = Text in Zwischenablage kopiert\n",
+cms-toast-copied = Text in Zwischenablage kopiert\n\
+nav-group-account = Konto\n\
+nav-group-workspace = Arbeitsbereich & Zustellung\n\
+nav-group-admin = Verwaltung\n\
+nav-group-writing = Schreiben & Zusammenarbeit\n\
+nav-group-commerce = Abrechnung & Lesezugang\n\
+nav-group-personalization = Personalisierung\n\
+settings-resize-aria = Navigationsleiste in der Breite anpassen\n",
         _ => "\
 nav-sign-in = Sign in\n\
 nav-toggle-menu = Toggle navigation menu\n\
@@ -1943,15 +2057,49 @@ dismiss-label = Dismiss\n\
 save-changes-short = Save\n\
 confirm-label = Confirm\n\
 copy-text-label = Copy Text\n\
-back-to-workspace = ← Back to Workspace\n\
-plan-label = Plan:\n\
 pen-name-label = Pen name:\n\
 pending-did-label = Pending did:peer\n\
-workspace-desc = Your collaborative creative writing space anchored to your sovereign did:peer identity across Web Mode 1, Free Device Mode 2, and Managed Blind Sync Mode 3.\n\
+workspace-desc = Your writing desk keeps everything you're working on close at hand—whether you're outlining your very first story for class, shaping characters with friends, or drafting poems on your own. Every character, timeline, scene, and comment you add stays credited to your pen name, so you can share ideas freely, learn together, and know your work always remains yours.\n\
 btn-profile-billing = Profile, Personas & Billing\n\
 btn-connected-apps = Connected Apps & Google Docs\n\
 btn-open-cms = Open MADR Docs CMS\n\
 workspace-key-label = Active Persona Workspace Key (did:peer)\n\
+choose-image-btn = Choose Profile Photo\n\
+persona-choose-avatar-btn = Choose Persona Photo\n\
+desk-start-eyebrow = Start a New Project\n\
+desk-start-title = What would you like to write today?\n\
+desk-starter-novel-hint = Ready on your shelf: Story Outline · Character Cards · Chapter 1 Draft · World Timeline.\n\
+desk-starter-article-hint = Ready on your shelf: Thesis Hook · Section Outline · Source Notes · Final Essay Draft.\n\
+desk-starter-short-hint = Ready on your shelf: Opening Hook · Turning Point · Character Beat · Scene Draft.\n\
+desk-starter-script-hint = Ready on your shelf: Scene Heading · Cast & Voices · Beat Sheet · Script Pages.\n\
+desk-starter-poetry-hint = Ready on your shelf: Stanza Draft · Line Rhythm Notes · Collection Order · Author Dedication.\n\
+desk-blocks-eyebrow = Story Building Blocks\n\
+desk-blocks-title = Your Shelf of Story Pieces\n\
+desk-block-chars-title = Characters\n\
+desk-block-chars-desc = Keep track of heroes, rivals, sidekicks, and their backstories—even bring a friend's character into a scene with clear credit.\n\
+desk-block-plots-title = Plots\n\
+desk-block-plots-desc = Sketch turning points, chapter beats, and surprises so your story moves smoothly from beginning to ending.\n\
+desk-block-timelines-title = Timelines\n\
+desk-block-timelines-desc = Line up what happened first, next, and years before—helpful when writing mysteries, trilogies, or class projects together.\n\
+desk-block-themes-title = Themes\n\
+desk-block-themes-desc = Pin the big questions, moods, and motifs at the heart of your writing so every co-writer stays on the same page.\n\
+desk-scratchpad-eyebrow = Scratchpad\n\
+desk-scratchpad-label = Quick Idea Scratchpad\n\
+desk-scratchpad-title = Jot Down a Quick Idea\n\
+desk-note-title-label = Working title or prompt\n\
+desk-note-title-ph = e.g. Rain over the library steps...\n\
+desk-note-body-label = Opening lines or scene sketch\n\
+desk-note-body-ph = Write a few sentences, test dialogue, or switch your writing language above...\n\
+desk-note-keep-btn = Pin Idea on Desk\n\
+desk-note-clear-btn = Clear\n\
+desk-note-pinned-msg = Idea pinned on your desk for this session\n\
+guides-eyebrow = Dear World · User Guides\n\
+guides-sidebar-title = Getting Started\n\
+guides-sidebar-sub = Step-by-step guides written for High School and University writers exploring collaborative storytelling on ExoNovel.\n\
+guides-open-desk-btn = Go to Your Desk\n\
+guides-signin-btn = Sign in to Start Writing\n\
+guides-loading = Opening your Dear World guide...\n\
+guides-empty = Select a guide chapter from the list to begin.\n\
 toast-did-copied = did:peer ID copied\n\
 toast-switched-persona = Switched persona\n\
 oauth-connected-google = Google Drive & Docs connected successfully.\n\
@@ -1992,17 +2140,17 @@ slide-4-tab = Connect Your Way\n\
 slide-4-title = Connect Your Tools, Keep Total Freedom\n\
 slide-4-p1 = Your writing shouldn't be trapped inside a single platform. Sign in the way you prefer, write in the formats that fit your project, and link external cloud storage, tools, and workflows for backups, quick exports, publishing, cross-platform projects, or whatever else your creative process needs.\n\
 slide-4-p2 = Everything in ExoNovel works together without locking you in. Add connections whenever they help, combine tools as your projects grow, and disconnect any service anytime while enjoying full access to your account, personas, and creations.\n\
-landing-modes-title = Choose How You Write and Sync\n\
-landing-modes-sub = Start completely free in your browser and on your own devices—or turn on automatic encrypted sync monthly or annually to keep every screen united in one virtual writing home.\n\
+landing-modes-title = On the Web, On Your Device, and Synced Together\n\
+landing-modes-sub = Write for free in your web browser and in our native device apps. Collaborating with other writers syncs automatically across web and device for free—while keeping your own personal web and device shelves synced automatically is a small monthly or annual fee.\n\
 mode-free-badge = Free Forever\n\
-mode-free-title = Web & Offline Device Apps\n\
-mode-free-desc = Create, collaborate live, and publish right in your browser for free—plus download our free Linux, macOS, Windows, Android, and iOS apps to write offline and manually sync your drafts with the web on demand.\n\
-mode-monthly-badge = Monthly Sync\n\
-mode-monthly-title = Automatic Sync — $9 / month\n\
-mode-monthly-desc = Keep your browser workspace and all offline devices continuously connected for a small monthly fee (local currency equivalent), uniting online and local creations automatically with end-to-end encryption.\n\
-mode-annual-badge = Annual Sync\n\
-mode-annual-title = Automatic Sync — $90 / year\n\
-mode-annual-desc = Enjoy full automatic Web + Device sync at an even smaller monthly cost on the annual plan ($7.50/month effective rate in local currency equivalent—two months free compared to monthly).\n\
+mode-free-title = On the Web & On Your Device\n\
+mode-free-desc = Create, invite co-writers, and collaborate across web browsers and our free Linux, macOS, Windows, Android, and iOS apps—with free automatic collaboration sync between co-writers on web and device.\n\
+mode-monthly-badge = Personal Sync\n\
+mode-monthly-title = Personal Sync — $9 / month\n\
+mode-monthly-desc = Keep your own personal drafts on the web and on your offline devices automatically synced with end-to-end encryption ($9/month local currency equivalent).\n\
+mode-annual-badge = Annual Personal Sync\n\
+mode-annual-title = Personal Sync — $90 / year\n\
+mode-annual-desc = Full automatic sync between your own web profile and your personal devices ($7.50/month effective rate in local currency equivalent—two months free compared to monthly).\n\
 landing-formats-title = Pick Your Format. Start Creating.\n\
 landing-formats-sub = Whether you're writing a novel for fun, drafting a class essay, or scripting a short film, start with a clean layout built for the way you create.\n\
 format-novel-title = Novels\n\
@@ -2015,7 +2163,7 @@ format-screenplay-title = Screenplays & Scripts\n\
 format-screenplay-desc = Write scenes and dialogue that look like real movie or video scripts, formatted cleanly as you type.\n\
 format-poetry-title = Poetry\n\
 format-poetry-desc = Shape rhythm, stanzas, and line breaks that stay right where you put them—from a single poem to a full book.\n\
-signin-back-home = ← Back to ExoNovel overview\n\
+signin-back-home = ← Back\n\
 signin-title = Sign in to ExoNovel\n\
 signin-subtitle = Authenticate to resolve your authoritative did:peer identity and open your workspace.\n\
 signin-checking-session = Checking existing session...\n\
@@ -2034,7 +2182,7 @@ signin-submit-btn = Sign in\n\
 signin-have-account = Already have an account? Sign in\n\
 signin-need-account = Need an account? Create one\n\
 signin-auth-failed = Authentication failed.\n\
-footer-operator = ExoNovel · Operated by Exosystems (exosystems.net)\n\
+footer-brand-prefix = ExoNovel, from\n\
 privacy-page-title = Privacy Policy — ExoNovel\n\
 privacy-effective = Effective Date & Last Updated: November 24, 2026\n\
 privacy-heading = ExoNovel Privacy Policy\n\
@@ -2054,7 +2202,7 @@ privacy-s1-sec-body = Sign-in timestamps, IP address, browser User-Agent string,
 privacy-s2-title = 2. Cookies & Browser Storage\n\
 privacy-s2-body = ExoNovel uses strictly necessary HttpOnly authentication session cookies to maintain your signed-in session, and temporary browser session storage strictly to preserve pending collaboration invite codes across sign-in redirects. ExoNovel does not use third-party advertising cookies, behavioral tracking pixels, or cross-site ad networks.\n\
 privacy-s3-title = 3. How We Use Your Information\n\
-privacy-s3-li1 = Authenticate your session and resolve your authoritative did:peer identity across Web, Desktop, and Mobile modes.\n\
+privacy-s3-li1 = Authenticate your session and resolve your authoritative did:peer identity across web, desktop, and mobile.\n\
 privacy-s3-li2 = Display your chosen author persona, pen name, avatar, and language preferences (including right-to-left layout preferences).\n\
 privacy-s3-li3 = Operate collaborative story groups, contributor attribution, and group/referral invitations you initiate.\n\
 privacy-s3-li4 = Execute user-initiated backups or exports to your connected Google Drive workspace when you explicitly trigger them.\n\
@@ -2097,14 +2245,14 @@ terms-s3-li2-label = Unlawful & Abusive Material: \n\
 terms-s3-li2-body = Child sexual abuse material (CSAM), non-consensual intimate imagery, harassment, hate incitement, and copyright infringement are strictly prohibited and result in immediate account suspension and termination.\n\
 terms-s4-title = 4. Connected External Apps (Google Drive & Third-Party Services)\n\
 terms-s4-body = Optional integrations such as Google Drive backup are activated only upon your explicit authorization and may be disconnected or revoked at any time in ExoNovel Preferences -> Connected Apps or via your third-party provider's account security page. Your use of third-party services remains subject to their respective terms.\n\
-terms-s5-title = 5. Service Modes, Availability & Contact\n\
-terms-s5-body = ExoNovel provides hosted web collaboration, local-first device storage, and optional cloud-relay sync plans. Features are provided on an 'as available' basis as the platform evolves. For legal, safety, billing, or support inquiries, contact support@exosystems.net or exonomyapp@gmail.com.\n\
-preferences-subtitle = Account, language, operating mode, and notification delivery preferences (commercial purchases & subscriptions stay in Profile).\n\
+terms-s5-title = 5. Service Availability, Sync Plans & Contact\n\
+terms-s5-body = ExoNovel provides hosted web collaboration, local-first device storage, and optional personal device sync plans. Features are provided on an 'as available' basis as the platform evolves. For legal, safety, billing, or support inquiries, contact support@exosystems.net or exonomyapp@gmail.com.\n\
+preferences-subtitle = Account, language, sync overview, and notification delivery preferences (purchases, paywalls, and plans live in Profile).\n\
 preferences-nav-aria = Preferences sections\n\
-sec-account = Account & Security\n\
+sec-account = Account & Sovereign Identity\n\
 sec-connected-apps = Connected Apps & Google Docs\n\
-sec-appearance-langs = Appearance & Languages (29)\n\
-sec-sync-storage = Sync & Storage (3 Modes)\n\
+sec-appearance-langs = Languages (29)\n\
+sec-sync-storage = Web, Device & Collaboration Sync\n\
 sec-notifications = Notification Channels\n\
 sec-admin-allowlist = Docs Allowlist & Accounts\n\
 account-title = Account & Sovereign Identity\n\
@@ -2123,30 +2271,24 @@ format-opt-article = Articles & Nonfiction\n\
 format-opt-short = Short Stories\n\
 format-opt-screenplay = Screenplays\n\
 format-opt-poetry = Poetry\n\
-appearance-title = Theme & Dual Language Architecture\n\
-appearance-desc = Output UI Language controls menus and layout direction (auto RTL for Arabic and Hebrew). Default Input Language controls composers independently and saves directly to your account.\n\
-theme-label = Theme Appearance\n\
-theme-opt-system = System\n\
-theme-opt-light = Light\n\
-theme-opt-dark = Dark\n\
+appearance-title = Dual Language Architecture (29 Languages)\n\
+appearance-desc = App Language controls menus, navigation, and layout direction (automatic right-to-left for Arabic and Hebrew). Writing Input controls composers independently and saves directly to your account.\n\
 offline-packs-title = Decentralized Offline Language Packs\n\
-offline-packs-desc = Decentralized Mode 2 installs download any selected language pack directly from ExoNovel's public read-only Willow namespace:\n\
-save-theme-lang-btn = Save Theme & Language Defaults\n\
-sync-title = Three Operating Modes & Cryptographic Blindness\n\
-sync-sub = Choose how ExoNovel stores and synchronizes your writing across Web and Device installs.\n\
-sync-m1-title = Mode 1 · ExoNovel on Web (Free)\n\
-sync-m1-desc = Cloud workspace backed by managed PostgreSQL with instant real-time updates across tabs.\n\
-sync-m2-title = Mode 2 · Sovereign Device (Free)\n\
-sync-m2-desc = 100% local Willow store on Windows, macOS, Linux, Android, and iOS. Includes free ExoNovel iroh discovery & blind relay transit.\n\
-sync-m3-title = Mode 3 · Web + Device Managed Sync\n\
-sync-m3-desc = Paid ($9/mo or $90/yr in Profile). Meadowcap-authorized blind backup and bidirectional Web-to-Device Willow sync.\n\
-sync-zk-title = Zero-Knowledge Cryptographic Blindness\n\
-sync-zk-desc = In Modes 2 and 3, drafts and private synced Willow entries are end-to-end encrypted by the sender before touching ExoNovel's relay or storage. Only routing frames and Meadowcap capability tokens are visible.\n\
-sync-enable-m3 = Enable Mode 3 Managed Willow Sync on this account\n\
-sync-current-tier = Current tier:\n\
-sync-requires-sub = Mode 3 Managed Sync requires an active subscription managed in Profile.\n\
-sync-manage-in-profile = Manage Subscription in Profile →\n\
-sync-save-toggle = Save Sync Toggle\n\
+offline-packs-desc = ExoNovel device installs download any selected language pack directly from ExoNovel's public read-only Willow namespace:\n\
+save-theme-lang-btn = Save Language Preferences\n\
+sync-title = Writing on Web, on Device & Collaboration Sync\n\
+sync-sub = Use ExoNovel for free in your browser and free offline on your devices. Team collaboration sync between writers is free across both.\n\
+sync-m1-title = On the Web (Free)\n\
+sync-m1-desc = Cloud workspace accessible from any browser with live collaboration across writers and groups.\n\
+sync-m2-title = On Your Device (Free)\n\
+sync-m2-desc = Offline-first storage on Windows, macOS, Linux, Android, and iOS—write anywhere and keep full local control of your library.\n\
+sync-m3-title = Sync Your Own Devices ($9/mo · $90/yr)\n\
+sync-m3-desc = End-to-end encrypted sync keeping your own offline device drafts continuously aligned with your own web profile.\n\
+sync-collab-title = Collaborating With Other Writers Is Free Everywhere\n\
+sync-collab-desc = Whenever you add collaborators, sync between collaborators happens automatically so you can share your work and collaborate—no matter whether one writer is in a browser and another is on a desktop or phone app. Only syncing your own device content with your own web profile carries a fee.\n\
+sync-zk-title = Zero-Knowledge Cryptographic Privacy\n\
+sync-zk-desc = Device-synced drafts and shared payloads are end-to-end encrypted by the sender before passing through ExoNovel's relay infrastructure.\n\
+sync-manage-in-profile = View Sync Plans in Profile →\n\
 notif-channels-title = Multi-Platform Delivery Channels\n\
 notif-email-prefix = Transactional Email Service (notes@exosystems.net)\n\
 notif-email-active = · Email Delivery Active\n\
@@ -2158,7 +2300,7 @@ notif-web-push-title = Web Browser Notifications\n\
 notif-web-push-desc = Native OS banner via browser Notification API.\n\
 notif-native-push-title = Native Push Devices (Android UnifiedPush + FCM, iOS/macOS APNs, Windows WNS, Linux)\n\
 notif-email-title = Transactional Email (Notes from ExoNovel)\n\
-notif-digest-label = Email Digest Mode\n\
+notif-digest-label = Email Digest Frequency\n\
 notif-digest-instant = Instant Email\n\
 notif-digest-daily = Daily Digest\n\
 notif-digest-off = Email Disabled\n\
@@ -2308,14 +2450,16 @@ conn-msg-action-err = Action failed.\n\
 tab-overview = Overview\n\
 tab-works = Works\n\
 tab-groups = Groups & Invites\n\
-tab-wallet = Wallet, Paywalls & Purchases\n\
+tab-wallet = Wallet\n\
+tab-paywalls = Paywalls\n\
+tab-plans = Plans\n\
 tab-personas = Personas\n\
 tab-langs-alerts = Languages & Notifications\n\
 profile-tabs-aria = Profile sections\n\
 profile-overview-title = Public Creator Identity Overview\n\
 profile-overview-desc = Your sovereign root identity anchors your works, personas, group invitations, paywall payouts, and reader purchases.\n\
 active-persona-label = Active persona\n\
-sync-tier-label = Sync tier:\n\
+profile-sync-plan-label = Personal sync plan:\n\
 personas-label = Personas\n\
 groups-label = Groups\n\
 referrals-label = Referrals\n\
@@ -2326,7 +2470,7 @@ profile-referrals-unit = joined writers\n\
 works-title = Authored & Forked Works\n\
 works-desc = Every manuscript stores collaborative Loro CRDT edits alongside Willow Meadowcap capability paths anchored to your active persona.\n\
 works-novels-title = Novels & Serials\n\
-works-novels-desc = LoroText chapters + paywalled or free public reader tiers configured in Wallet, Paywalls & Purchases.\n\
+works-novels-desc = Chapters and scenes saved with free public or paid reader tiers configured in Paywalls.\n\
 works-scripts-title = Screenplays & Poetry\n\
 works-scripts-desc = Multi-language input composer (29 languages + RTL) with live collaborative cursors.\n\
 groups-title = Groups & Managers\n\
@@ -2347,11 +2491,35 @@ invites-th-link = Invite Link\n\
 invites-th-uses = Uses\n\
 invites-th-created = Created\n\
 invites-scope-general = General ExoNovel Invite\n\
-wallet-title = Mode 3 Managed Willow Sync Subscription\n\
-wallet-sub = Mode 1 (Web) and Mode 2 (Local Device Willow + Free ExoNovel Relay Discovery) are completely free. Subscribe here to register your did:peer IDs for blind encrypted Mode 3 server-to-device Meadowcap sync ($9/month or $90/year local currency equivalent).\n\
+wallet-tab-title = Connected Wallets & Payment Rails\n\
+wallet-tab-sub = Choose how you receive reader payments and pay for personal device sync plans across all supported local currency, card, and crypto rails.\n\
+wallet-selected-rail-title = Active Settlement Rail\n\
+wallet-selected-rail-desc = Used when activating personal sync plans or receiving writer payouts.\n\
+wallet-card-desc = Cards, Apple Pay, Google Pay, and local regional currency settlements.\n\
+wallet-solana-desc = Sub-second stablecoin creator payouts and instant reader unlocks.\n\
+wallet-btc-desc = Low-fee Lightning invoices for global micro-unlocks and subscriptions.\n\
+ledger-wallet-title = Wallet Transactions & Receipts\n\
+ledger-wallet-sub = Complete record of writer earnings, reader unlock receipts, and sync plan charges.\n\
+paywalls-title = Author Paywalls & Reader Access\n\
+paywalls-sub = Decide which stories, chapters, or reusable worldbuilding blocks stay free for everyone and which unlock for paying readers—with automatic attribution splits for collaborators.\n\
+paywalls-free-tier-title = Free Public Chapters\n\
+paywalls-free-tier-desc = Keep opening chapters or whole books open to all readers so newcomers can discover your writing.\n\
+paywalls-unlock-title = Per-Story & Chapter Paywalls\n\
+paywalls-unlock-desc = Set direct reader unlock prices in your preferred currency across cards, mobile money, and crypto wallets.\n\
+paywalls-splits-title = Collaborator Attribution Splits\n\
+paywalls-splits-desc = When you co-write in a group, paywall revenue traces cleanly to each credited creator.\n\
+paywalls-ledger-title = Reader Unlocks & Paywall Activity\n\
+paywalls-ledger-sub = Works you unlocked as a reader and paid reader unlocks across your own paywalled stories.\n\
+paywalls-empty = No paywall sales or reader unlock receipts recorded yet.\n\
+plans-title = Writing Access & Personal Device Sync Plans\n\
+plans-sub = Writing on the web is free, writing on your own devices is free, and team collaboration sync between writers is always free—even when one writer is on the web and another works offline on a device. A paid plan is only for keeping your own offline device drafts synced with your own web profile.\n\
+plans-payment-rail-note = Selected Payment Rail\n\
+plans-change-wallet-btn = Configure in Wallet →\n\
+plans-free-title = Web, Device & Collaboration (Free)\n\
+plans-free-desc = Free writing on the web, free local writing on your devices, and free collaboration sync between you and your writing team.\n\
 wallet-peer-prefix = ExoNovel Service Recipient Peer:\n\
 wallet-currency-label = Local Currency\n\
-wallet-rail-label = Payment Rail (AOTA)\n\
+wallet-rail-label = Default Payment Rail (AOTA)\n\
 wallet-cur-usd = USD ($9/mo · $90/yr)\n\
 wallet-cur-eur = EUR (€9/mo · €90/yr)\n\
 wallet-cur-gbp = GBP (£7/mo · £70/yr)\n\
@@ -2365,20 +2533,16 @@ wallet-rail-solana = Solana Pay / USDC\n\
 wallet-rail-btc = Bitcoin Lightning (L402)\n\
 wallet-rail-eth = Base / Arbitrum / Ethereum\n\
 wallet-rail-mobile = Mobile Money / PIX / UPI\n\
-wallet-free-title = Free Modes (1 & 2)\n\
-wallet-free-desc = Cloud Web App or Device Local Willow Store + Free Discovery Relay\n\
 wallet-free-current = Current Plan (Free)\n\
 wallet-free-switch = Switch to Free\n\
-wallet-mo-title = Sync Monthly ($9/mo eq.)\n\
-wallet-mo-desc = Authorizes Mode 3 Preferences toggle & blind Meadowcap replication.\n\
+wallet-mo-title = Personal Sync Monthly ($9/mo eq.)\n\
+wallet-mo-desc = Encrypted sync connecting your own offline device drafts with your own web profile.\n\
 wallet-mo-active = Active Monthly\n\
 wallet-mo-activate = Activate $9/month\n\
-wallet-yr-title = Sync Annual ($90/yr eq.)\n\
-wallet-yr-desc = 2 months free · full blind Willow server-to-device sync.\n\
+wallet-yr-title = Personal Sync Annual ($90/yr eq.)\n\
+wallet-yr-desc = 2 months free · full encrypted sync between your own devices and your own web profile.\n\
 wallet-yr-active = Active Annual\n\
 wallet-yr-activate = Activate $90/year\n\
-ledger-title = Author Paywalls, Reader Purchases & Sync Ledger\n\
-ledger-sub = All commercial records—connected wallets, paywall earnings, reader purchases of works you buy, and Sync receipts—live exclusively here in Profile.\n\
 ledger-th-type = Type\n\
 ledger-th-amount = Amount\n\
 ledger-th-cycle = Cycle\n\
@@ -2554,7 +2718,14 @@ cms-msg-generating-proposal = Running active inference proposal analysis...\n\
 cms-toast-proposal-generated = Maturity proposal note generated\n\
 cms-toast-proposal-updated = Proposal status updated\n\
 cms-toast-tool-added = Tool added to Maturity Catalog\n\
-cms-toast-copied = Copied text to clipboard\n",
+cms-toast-copied = Copied text to clipboard\n\
+nav-group-account = Account\n\
+nav-group-workspace = Workspace & Delivery\n\
+nav-group-admin = Administration\n\
+nav-group-writing = Writing & Collaboration\n\
+nav-group-commerce = Billing & Reader Access\n\
+nav-group-personalization = Personalization\n\
+settings-resize-aria = Resize settings navigation sidebar\n",
     }
 }
 
@@ -2565,8 +2736,8 @@ pub fn render_ftl_pack(code: &str) -> Option<String> {
     Some(format!(
         "# ExoNovel Fluent Locale Pack ({code})\n\
          # Direction: {dir} | Willow Read-Only Blob: /public/i18n/{code}.ftl\n\n\
-         nav-home = {nav_home}\n\
-         nav-workspace = {nav_workspace}\n\
+         nav-desk = {nav_desk}\n\
+         nav-dear-world = {nav_dear_world}\n\
          nav-docs = {nav_docs}\n\
          nav-profile = {nav_profile}\n\
          nav-preferences = {nav_preferences}\n\
@@ -2578,13 +2749,12 @@ pub fn render_ftl_pack(code: &str) -> Option<String> {
          preferences-title = {preferences_title}\n\
          notifications-title = {notifications_title}\n\
          save-label = {save_label}\n\
-         back-to-home = {nav_home}\n\
-         back-to-docs = {nav_docs}\n\
+         back-to-desk = ← {nav_desk}\n\
          {extra}",
         code = seed.code,
         dir = seed.dir,
-        nav_home = seed.nav_home,
-        nav_workspace = seed.nav_workspace,
+        nav_desk = seed.nav_desk,
+        nav_dear_world = seed.nav_dear_world,
         nav_docs = seed.nav_docs,
         nav_profile = seed.nav_profile,
         nav_preferences = seed.nav_preferences,

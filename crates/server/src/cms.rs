@@ -764,10 +764,10 @@ pub async fn seed_cms_from_disk(pool: &PgPool, root_dir: &Path) {
         ),
         (
             "payment-gateways-kyc",
-            "Mode 3 Payments",
+            "Personal Sync Payments",
             "Owner",
             "Complete payment gateway KYC/webhooks & set crypto wallet receive addresses",
-            "Complete merchant verification and configure webhook signing secrets in production server configuration for your active AOTA payment processors before turning on live $9/mo ($90/yr) Mode 3 sync plans.",
+            "Complete merchant verification and configure webhook signing secrets in production server configuration for your active AOTA payment processors before turning on live $9/mo ($90/yr) Personal Web-to-Device Sync plans.",
             "",
             80_i32,
             false,

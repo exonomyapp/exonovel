@@ -10,6 +10,7 @@ use crate::{
         CopyIcon, DriveContentResponse, DriveFileItem, DriveFilesResponse, DriveSaveResponse,
         GoogleLogoIcon,
     },
+    ui::{select_opt, ExoSelect},
 };
 
 fn friendly_mime_key(mime: &str) -> (&'static str, &'static str) {
@@ -485,9 +486,9 @@ pub fn ConnectedAppsPreferencesPanel(
     view! {
         <div>
             <div class="exo-card">
-                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                <div class="exo-gh-section-head-row">
                     <div>
-                        <h2 class="exo-h2" style="margin: 0;">{move || i18n.tr("connected_apps_title", "Connected Apps & Google Docs")}</h2>
+                        <h2 class="exo-h2">{move || i18n.tr("connected_apps_title", "Connected Apps & Google Docs")}</h2>
                         <p class="exo-sub" style="margin: 6px 0 0;">
                             {move || i18n.tr("connected_apps_desc", "Primary sign-in uses minimal identity scopes only (openid, email, profile). Connect Google Drive & Google Docs separately here to create, preview, and back up your Markdown manuscripts and ADRs into Google Docs or .md files.")}
                         </p>
@@ -546,12 +547,12 @@ pub fn ConnectedAppsPreferencesPanel(
             </div>
 
             <div class="exo-card">
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
+                <div class="exo-gh-section-head-row">
                     <div style="display: flex; align-items: center; gap: 12px;">
                         <GoogleLogoIcon />
                         <div>
                             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                <h2 class="exo-h2" style="margin: 0;">{move || i18n.tr("google_drive_docs_title", "Google Drive & Google Docs")}</h2>
+                                <h2 class="exo-h2">{move || i18n.tr("google_drive_docs_title", "Google Drive & Google Docs")}</h2>
                                 {move || match google_app() {
                                     Some(app) if app.status == "connected" => view! {
                                         <span class="exo-tag exo-tag-ok">{move || i18n.tr("status_connected", "Connected")}</span>
@@ -659,9 +660,9 @@ pub fn ConnectedAppsPreferencesPanel(
 
             <Show when=is_google_connected>
                 <div class="exo-card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <div class="exo-gh-section-head-row">
                         <div>
-                            <h2 class="exo-h2" style="margin: 0;">{move || i18n.tr("drive_ws_title", "Google Docs & Drive Workspace")}</h2>
+                            <h2 class="exo-h2">{move || i18n.tr("drive_ws_title", "Google Docs & Drive Workspace")}</h2>
                             <p class="exo-sub" style="margin: 4px 0 0;">
                                 {move || i18n.tr("drive_ws_sub", "Create native editable Google Docs from Markdown, browse ExoNovel folders, preview docs as Markdown, or manage Trash.")}
                             </p>
@@ -748,14 +749,15 @@ pub fn ConnectedAppsPreferencesPanel(
                                 </div>
                                 <div class="exo-field">
                                     <label class="exo-label">{move || i18n.tr("drive_target_fmt_label", "Target Format")}</label>
-                                    <select
-                                        class="exo-input"
-                                        prop:value=move || new_doc_format.get()
-                                        on:change=move |ev| set_new_doc_format.set(event_target_value(&ev))
-                                    >
-                                        <option value="google-doc">{move || i18n.tr("drive_fmt_gdoc", "Google Doc (Native Editable)")}</option>
-                                        <option value="markdown">{move || i18n.tr("drive_fmt_md", "Markdown (.md)")}</option>
-                                    </select>
+                                    <ExoSelect
+                                        value=Signal::derive(move || new_doc_format.get())
+                                        options=Signal::derive(move || vec![
+                                            select_opt("google-doc", i18n.tr("drive_fmt_gdoc", "Google Doc (Native Editable)")),
+                                            select_opt("markdown", i18n.tr("drive_fmt_md", "Markdown (.md)")),
+                                        ])
+                                        aria_label=Signal::derive(move || i18n.tr("drive_target_fmt_label", "Target Format"))
+                                        on_change=Callback::new(move |val| set_new_doc_format.set(val))
+                                    />
                                 </div>
                             </div>
                             <div class="exo-field">

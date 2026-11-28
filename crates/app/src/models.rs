@@ -35,6 +35,8 @@ pub struct UserProfile {
     pub preferred_input_locales: Vec<String>,
     pub sync_plan_tier: String,
     pub willow_sync_enabled: bool,
+    pub profile_nav_width: i32,
+    pub preferences_nav_width: i32,
     pub last_active_tab: String,
     pub last_doc_path: String,
     pub provider_given_name: String,
@@ -501,9 +503,56 @@ pub struct IdentitiesResponse {
     pub identities: Vec<IdentityRecord>,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GuideChapterSummary {
+    pub slug: String,
+    pub chapter_order: i32,
+    pub locale: String,
+    pub title: String,
+    pub summary: String,
+    pub audience: String,
+    pub reading_minutes: usize,
+    pub word_count: usize,
+    pub translation_status: String,
+    pub willow_namespace: String,
+    pub willow_subspace: String,
+    pub willow_path: String,
+    pub willow_timestamp_us: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GuideChapterDetail {
+    pub slug: String,
+    pub chapter_order: i32,
+    pub locale: String,
+    pub title: String,
+    pub summary: String,
+    pub audience: String,
+    pub raw_markdown: String,
+    pub html: String,
+    pub headings: Vec<DocHeading>,
+    pub reading_minutes: usize,
+    pub word_count: usize,
+    pub translation_status: String,
+    pub willow_namespace: String,
+    pub willow_subspace: String,
+    pub willow_path: String,
+    pub willow_timestamp_us: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GuidesListResponse {
+    pub guides: Vec<GuideChapterSummary>,
+    pub willow_namespace: String,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ActiveTab {
     Workspace,
+    Guides,
     Docs,
     Profile,
     Preferences,
@@ -515,6 +564,8 @@ pub enum ProfileTab {
     Works,
     Groups,
     Wallet,
+    Paywalls,
+    Plans,
     Personas,
     LanguagesAndAlerts,
 }
@@ -988,6 +1039,17 @@ pub fn invite_url_for_code(code: &str) -> String {
         .and_then(|w| w.location().origin().ok())
         .unwrap_or_else(|| "https://exonovel.exosystems.net".to_string());
     format!("{origin}/?invite={code}")
+}
+
+pub fn short_did_preview(did: &str) -> String {
+    let trimmed = did.trim();
+    let count = trimmed.chars().count();
+    if count <= 18 {
+        trimmed.to_string()
+    } else {
+        let prefix: String = trimmed.chars().take(16).collect();
+        format!("{prefix}…")
+    }
 }
 
 pub fn format_allowlist_status(status: &str) -> &'static str {

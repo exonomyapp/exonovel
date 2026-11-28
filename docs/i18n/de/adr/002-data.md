@@ -17,13 +17,15 @@ ExoNovel läuft als Webanwendung sowie nativ auf **Linux, macOS, Windows, Androi
    - **Willow-Protokoll-Koordinaten**: Zentrale Tabellen führen deterministische Willow-Koordinaten (`willow_namespace`, `willow_subspace`, `willow_path`, `willow_timestamp_us` sowie SHA-256 `payload_digest` und `byte_length`), sodass Nutzende ihren Bestand verlustfrei in einen lokalen Rust-Willow-Store überführen können.
    - **Mehrgrößen-Medienassets**: Bild-Uploads bis 2 MB werden serverseitig in passende Größen (`thumb` 64×64, `medium` 256×256, `large` <= 1024px WebP/JPEG) mit Inhalts-Digests umgerechnet.
    - **Neon Better Auth**: Verwaltete Auth-Tabellen im Schema `neon_auth`.
-2. **Drei Betriebsmodi, ExoNovels `did:peer`-Relay/Sync-Knoten & Bidirektionale Portabilität**:
-   - **Modus 1 — ExoNovel im Web (`Kostenlos`)**: Cloud-gestützte Web-Nutzung über **Neon PostgreSQL**.
-   - **Modus 2 — ExoNovel auf dem Gerät (`Kostenlos`)**: Native Builds für **Linux, macOS, Windows, Android und iOS** starten lokal **ohne Neon-Zwang** mittels **`willow25`** (`0.7.11`) und **ExoNovels kostenloser `iroh`-Discovery-&-Relay-Zone** (`v1.4.x`). **Blind-Relay-Gebot**: Alle über Modus-2-Relays gepufferten Nutzdaten werden vor Versand auf dem Gerät Ende-zu-Ende verschlüsselt.
-   - **Modus 3 — Web + Gerät mit verwaltetem Sync (`Kostenpflichtig: Gegenwert von 9 USD/Monat oder 90 USD/Jahr in Landeswährung`)**:
-     - Aktivierung und Abrechnung erfolgen im Bereich **Profil** (ExoNovel agiert dabei selbst als Peer mit eigener `did:peer` und AOTA-Wallets).
-     - Nach Aktivierung entsperren sich die **Sync-Regler in den Präferenzen** und registrieren die `did:peer`-IDs mittels **Meadowcap-Fähigkeitsdelegation** in `willow25` auf ExoNovels verwaltetem Sync-Knoten—mit clientseitiger AEAD-Verschlüsselung, sodass der Backup-Knoten **kryptografisch blind** bleibt.
-     - Verlustfreier Export (`Neon -> willow25`) und Re-Import (`willow25 -> Neon`) über `willow_*`-Koordinaten und kausale **`loro` (`1.18.0`)**-CRDT-Frontiers.
+2. **Web, Gerät, Team-Sync vs. Persönliche Geräte-Sync (`did:peer`-Portabilität)**:
+   - **Im Web (`Kostenlos`)**: Cloud-gestützter Arbeitsbereich über PostgreSQL, in jedem Browser verfügbar.
+   - **Auf deinem Gerät (`Kostenlos`)**: Native Builds für **Linux, macOS, Windows, Android und iOS** starten lokal **ohne Cloud-Datenbank-Zwang** mittels **`willow25`** (`0.7.11`) und **ExoNovels kostenloser `iroh`-Discovery-&-Relay-Zone** (`v1.4.x`). **Blind-Relay-Gebot**: Alle über ExoNovels Relays geleiteten Nutzdaten werden vor Versand auf dem Gerät Ende-zu-Ende verschlüsselt.
+   - **Kostenlose automatische Team-Synchronisation über Web & Gerät**: Sobald Mitwirkende hinzugefügt werden, synchronisiert ExoNovel die gemeinsame Arbeit automatisch zwischen allen Co-Autorinnen — unabhängig davon, ob eine Person im Browser und eine andere lokal auf ihrem Gerät schreibt.
+   - **Persönliche Geräte-Synchronisation (`Kostenpflichtig: Gegenwert von 9 USD/Monat oder 90 USD/Jahr in Landeswährung`)**:
+     - Deckt **ausschließlich** das fortlaufende Synchronisieren der eigenen Offline-Geräte-Entwürfe mit dem eigenen Web-Profil ab.
+     - Aktivierung und Abrechnung erfolgen über **Profil → Tarife** (mit Zahlungswegen in **Profil → Wallet**, wobei ExoNovel als Peer mit eigener `did:peer` und AOTA-Wallets agiert).
+     - Registriert die `did:peer`-IDs mittels **Meadowcap-Fähigkeitsdelegation** in `willow25` auf ExoNovels verwaltetem Sync-Dienst — mit clientseitiger AEAD-Verschlüsselung, sodass ExoNovel **kryptografisch blind** bleibt.
+     - Verlustfreier Export (`PostgreSQL -> willow25`) und Re-Import (`willow25 -> PostgreSQL`) über `willow_*`-Koordinaten und kausale **`loro` (`1.18.0`)**-CRDT-Frontiers.
 
 ## Unter-ADRs
 
