@@ -5,6 +5,7 @@ import path from 'node:path';
 import {
   getSyncBaseSnapshot,
   loadSyncBaseIndex,
+  removeSyncBaseSnapshot,
   runThreeWayMergeText,
   saveSyncBaseSnapshot,
 } from './syncMerge.ts';
@@ -25,9 +26,12 @@ const ignoreFactory = require('ignore') as (options?: {
 
 const ROOT_DIR = process.cwd();
 const GITIGNORE_PATH = path.join(ROOT_DIR, '.gitignore');
-const GITHUB_OWNER = 'exonomyapp';
-const GITHUB_REPO = 'exonovel';
-const GITHUB_BASE_BRANCH = 'main';
+const PENDING_COMMIT_PATH = path.join(ROOT_DIR, '.local', 'pending-commit.json');
+const PRODUCTION_SITE_URL = 'https://exonovel.exosystems.net';
+
+export const GITHUB_OWNER = 'exonomyapp';
+export const GITHUB_REPO = 'exonovel';
+export const GITHUB_BASE_BRANCH = 'main';
 const GITHUB_API_BASE = 'https://api.github.com';
 const GITHUB_API_VERSION = '2022-11-28';
 
@@ -41,11 +45,16 @@ const HARD_PROTECTED_DIRS = new Set([
   'target',
   '.aistudio',
   '.agents',
+  '.local',
   '.neon',
   '.vite',
 ]);
 
 const HARD_PROTECTED_BASENAMES = new Set(['.env', '.env.local', '.DS_Store']);
+
+// Files generated/maintained strictly outside AI Studio (e.g. Rust CI / Dependabot)
+// that must never be deleted or pushed from this workspace.
+const REMOTE_MANAGED_HIDDEN_FILES = new Set(['Cargo.lock']);
 
 // Core .gitignore safety patterns that cannot be removed through the UI.
 const LOCKED_GITIGNORE_PATTERNS = new Set([
@@ -60,10 +69,12 @@ const LOCKED_GITIGNORE_PATTERNS = new Set([
   '.env*',
   '!.env.example',
   '.neon',
+  '.local/',
 ]);
 
-const CONSOLE_FILES = new Set([
+const CONSOLE_ROOT_FILES = new Set([
   '.env.example',
+  '.gitignore',
   'AGENTS.md',
   'bun.lock',
   'index.html',
@@ -80,21 +91,6 @@ const SUPERSEDED_EXACT_PATHS = new Set([
   'firebase-applet-config.json',
   'neon.ts',
   'public/assets/exonovel-google-logo.png',
-  'server/auth.ts',
-  'server/db.ts',
-  'server/docs.ts',
-  'server/storage.ts',
-  'src/components/AdminSettings.tsx',
-  'src/components/AuthGate.tsx',
-  'src/components/DocsSidebar.tsx',
-  'src/components/DriveWorkspace.tsx',
-  'src/components/GoogleSignInButton.tsx',
-  'src/components/MarkdownReader.tsx',
-  'src/components/TableOfContents.tsx',
-  'src/lib/authClient.ts',
-  'src/lib/driveApi.ts',
-  'src/lib/driveAuth.ts',
-  'src/types/docs.ts',
 ]);
 
 const BINARY_EXTENSIONS = new Set([
@@ -120,7 +116,7 @@ export type SyncFileCategory = 'app' | 'console' | 'superseded';
 
 export interface WorkspaceDiffEntry {
   path: string;
-  status: 'modified' | 'added_local' | 'remote_only';
+  status: 'modified' | 'added_local' | 'remote_only' | 'deleted_remote';
   category: SyncFileCategory;
   sizeBytes: number;
   remoteSizeBytes?: number;
@@ -148,6 +144,14 @@ export interface IgnoredFileEntry {
   remoteSha?: string;
 }
 
+export interface PreparedCommitSuggestion {
+  commitMessage: string;
+  branchName: string;
+  prTitle: string;
+  prBody: string;
+  source: 'authored' | 'fallback' | 'none';
+}
+
 export interface WorkspaceDiffResult {
   headSha: string;
   files: WorkspaceDiffEntry[];
@@ -155,6 +159,14 @@ export interface WorkspaceDiffResult {
     rules: GitignoreRuleEntry[];
     ignoredFiles: IgnoredFileEntry[];
   };
+  commitSuggestion: PreparedCommitSuggestion;
+}
+
+export interface DiffHunkLine {
+  type: 'ctx' | 'add' | 'del';
+  oldLine: number | null;
+  newLine: number | null;
+  text: string;
 }
 
 export interface WorkspaceFileDiffDetail {
@@ -171,13 +183,15 @@ export interface WorkspaceFileDiffDetail {
   localContent: string | null;
   remoteContent: string | null;
   baseContent: string | null;
+  diffHunks: DiffHunkLine[];
+  diffTruncated: boolean;
   truncated: boolean;
 }
 
 export interface MergeConflictEntry {
   path: string;
   direction: 'pull' | 'push';
-  reason: 'overlap' | 'remote_ahead_clean' | 'no_base' | 'binary';
+  reason: 'overlap' | 'remote_ahead_clean' | 'no_base' | 'binary' | 'deleted_remote';
   remoteSha: string;
   baseSha: string | null;
   isBinary: boolean;
@@ -185,6 +199,21 @@ export interface MergeConflictEntry {
   localContent: string | null;
   remoteContent: string | null;
   suggestedContent: string | null;
+}
+
+export interface ProductionProbeItem {
+  path: string;
+  status: number;
+  ok: boolean;
+  note: string;
+  latencyMs: number;
+}
+
+export interface ProductionProbeResult {
+  siteUrl: string;
+  checkedAt: string;
+  allHealthy: boolean;
+  results: ProductionProbeItem[];
 }
 
 export class GitHubSyncConflictError extends Error {
@@ -223,6 +252,10 @@ function isHardProtectedPath(relPath: string): boolean {
   return false;
 }
 
+function isHiddenManagedPath(relPath: string): boolean {
+  return REMOTE_MANAGED_HIDDEN_FILES.has(normalizeRelativePath(relPath));
+}
+
 function isLocalUploadSkipped(relPath: string): boolean {
   const normalized = normalizeRelativePath(relPath);
   return normalized.startsWith('public/assets/aistudio/');
@@ -232,24 +265,32 @@ function classifyPath(relPath: string): SyncFileCategory {
   const normalized = normalizeRelativePath(relPath);
   if (
     SUPERSEDED_EXACT_PATHS.has(normalized) ||
-    normalized.startsWith('public/')
+    normalized.startsWith('public/') ||
+    normalized.startsWith('server/') ||
+    normalized.startsWith('src/')
   ) {
     return 'superseded';
   }
   if (
-    CONSOLE_FILES.has(normalized) ||
-    normalized.startsWith('server/') ||
-    normalized.startsWith('src/')
+    CONSOLE_ROOT_FILES.has(normalized) ||
+    normalized.startsWith('sync-console/')
   ) {
     return 'console';
   }
   return 'app';
 }
 
-function resolveSafeSyncPath(relPath: string): { relPath: string; absPath: string } | null {
+function resolveSafeSyncPath(
+  relPath: string
+): { relPath: string; absPath: string } | null {
   if (typeof relPath !== 'string') return null;
   const trimmed = relPath.trim().replace(/\\/g, '/');
-  if (!trimmed || trimmed.startsWith('/') || isHardProtectedPath(trimmed)) {
+  if (
+    !trimmed ||
+    trimmed.startsWith('/') ||
+    isHardProtectedPath(trimmed) ||
+    isHiddenManagedPath(trimmed)
+  ) {
     return null;
   }
   const normalized = normalizeRelativePath(trimmed);
@@ -373,11 +414,12 @@ export function unignoreFileInGitignore(rawPath: string): {
     );
   }
 
-  const exactCandidates = new Set([
-    resolved.relPath,
-    `/${resolved.relPath}`,
-  ]);
-  if (matchedRule && exactCandidates.has(matchedRule) && rulePatterns.includes(matchedRule)) {
+  const exactCandidates = new Set([resolved.relPath, `/${resolved.relPath}`]);
+  if (
+    matchedRule &&
+    exactCandidates.has(matchedRule) &&
+    rulePatterns.includes(matchedRule)
+  ) {
     removeGitignorePattern(matchedRule);
     return { action: 'removed_rule', pattern: matchedRule };
   }
@@ -387,7 +429,7 @@ export function unignoreFileInGitignore(rawPath: string): {
   return { action: 'added_negation', pattern: negation };
 }
 
-function getGitHubToken(): string {
+export function getGitHubToken(): string {
   return (process.env.GITHUB_PAT || '').trim();
 }
 
@@ -448,7 +490,11 @@ function collectWorkspaceFiles(dir: string, prefix = ''): string[] {
   for (const entry of entries) {
     if (entry.isSymbolicLink()) continue;
     const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
-    if (isHardProtectedPath(rel) || isLocalUploadSkipped(rel)) {
+    if (
+      isHardProtectedPath(rel) ||
+      isHiddenManagedPath(rel) ||
+      isLocalUploadSkipped(rel)
+    ) {
       continue;
     }
     const fullPath = path.join(dir, entry.name);
@@ -481,6 +527,158 @@ async function runWithConcurrency<T, R>(
   return results;
 }
 
+function loadPendingCommitMeta(): {
+  commitMessage?: string;
+  branchName?: string;
+  prTitle?: string;
+  prBody?: string;
+} | null {
+  try {
+    if (!fs.existsSync(PENDING_COMMIT_PATH)) return null;
+    const raw = JSON.parse(fs.readFileSync(PENDING_COMMIT_PATH, 'utf8')) as {
+      commitMessage?: unknown;
+      branchName?: unknown;
+      prTitle?: unknown;
+      prBody?: unknown;
+    };
+    if (typeof raw?.commitMessage === 'string' && raw.commitMessage.trim()) {
+      return {
+        commitMessage: raw.commitMessage.trim(),
+        branchName:
+          typeof raw.branchName === 'string' ? raw.branchName.trim() : undefined,
+        prTitle: typeof raw.prTitle === 'string' ? raw.prTitle.trim() : undefined,
+        prBody: typeof raw.prBody === 'string' ? raw.prBody.trim() : undefined,
+      };
+    }
+  } catch {
+    // Ignore malformed pending commit file
+  }
+  return null;
+}
+
+function clearPendingCommitMeta(): void {
+  try {
+    if (fs.existsSync(PENDING_COMMIT_PATH)) {
+      fs.unlinkSync(PENDING_COMMIT_PATH);
+    }
+  } catch {
+    // Ignore cleanup errors
+  }
+}
+
+function buildPreparedCommitSuggestion(
+  files: WorkspaceDiffEntry[]
+): PreparedCommitSuggestion {
+  const authored = loadPendingCommitMeta();
+  if (authored?.commitMessage) {
+    return {
+      commitMessage: authored.commitMessage,
+      branchName:
+        authored.branchName ||
+        `sync/exonovel-${new Date().toISOString().slice(0, 10)}`,
+      prTitle: authored.prTitle || authored.commitMessage.split('\n')[0],
+      prBody: authored.prBody || '',
+      source: 'authored',
+    };
+  }
+
+  const pushables = files.filter((f) => f.canPush);
+  if (pushables.length === 0) {
+    return {
+      commitMessage: '',
+      branchName: '',
+      prTitle: '',
+      prBody: '',
+      source: 'none',
+    };
+  }
+
+  const scopes = new Set<string>();
+  for (const f of pushables) {
+    if (f.path.startsWith('sync-console/')) scopes.add('sync-console');
+    else if (f.path.startsWith('.github/')) scopes.add('ci');
+    else if (f.path.startsWith('crates/')) scopes.add('app');
+    else if (f.path.startsWith('style/')) scopes.add('style');
+    else if (f.path.startsWith('docs/')) scopes.add('docs');
+    else scopes.add('workspace');
+  }
+
+  const scopeLabel = Array.from(scopes).slice(0, 2).join(',');
+  const shortNames = pushables
+    .slice(0, 3)
+    .map((f) => path.posix.basename(f.path))
+    .join(', ');
+  const more = pushables.length > 3 ? ` (+${pushables.length - 3} more)` : '';
+  const verb = pushables.every((f) => f.path.startsWith('docs/')) ? 'docs' : 'chore';
+
+  return {
+    commitMessage: `${verb}(${scopeLabel}): update ${shortNames}${more}`,
+    branchName: `sync/${Array.from(scopes)[0] || 'update'}`,
+    prTitle: '',
+    prBody: '',
+    source: 'fallback',
+  };
+}
+
+export async function probeProductionSite(): Promise<ProductionProbeResult> {
+  const paths = ['/', '/api/health'];
+  const results: ProductionProbeItem[] = [];
+
+  for (const p of paths) {
+    const start = Date.now();
+    try {
+      const probe = await fetch(`${PRODUCTION_SITE_URL}${p}`, {
+        signal: AbortSignal.timeout(6000),
+      });
+      const latencyMs = Date.now() - start;
+      let note = `${probe.status} OK`;
+      let ok = probe.ok;
+
+      if (p === '/api/health') {
+        if (probe.ok) {
+          const body = (await probe.json().catch(() => null)) as {
+            runtime?: string;
+          } | null;
+          note = body?.runtime ? `${probe.status} (${body.runtime})` : `${probe.status}`;
+        } else {
+          note = `${probe.status} Error`;
+        }
+      } else if (p === '/') {
+        const html = probe.ok ? await probe.text().catch(() => '') : '';
+        if (probe.status === 502) {
+          note = '502 Bad Gateway';
+          ok = false;
+        } else if (!probe.ok) {
+          note = `HTTP ${probe.status}`;
+          ok = false;
+        } else if (!html.includes('ExoNovel')) {
+          note = `${probe.status} (Unexpected body)`;
+          ok = false;
+        } else {
+          note = `${probe.status} (ExoNovel HTML)`;
+        }
+      }
+
+      results.push({ path: p, status: probe.status, ok, note, latencyMs });
+    } catch (err) {
+      results.push({
+        path: p,
+        status: 0,
+        ok: false,
+        note: err instanceof Error ? err.message : 'Network error',
+        latencyMs: Date.now() - start,
+      });
+    }
+  }
+
+  return {
+    siteUrl: PRODUCTION_SITE_URL,
+    checkedAt: new Date().toISOString(),
+    allHealthy: results.every((r) => r.ok),
+    results,
+  };
+}
+
 export interface GitHubOpenPull {
   number: number;
   title: string;
@@ -501,6 +699,9 @@ export interface GitHubCheckRunSummary {
   htmlUrl: string;
   startedAt: string | null;
   completedAt: string | null;
+  outputTitle: string | null;
+  outputSummary: string | null;
+  outputText: string | null;
 }
 
 export interface GitHubSyncStatus {
@@ -561,7 +762,9 @@ export async function getGitHubSyncStatus(): Promise<GitHubSyncStatus> {
       githubRequest<{
         protected: boolean;
         commit: { sha: string; commit?: { message?: string } };
-      }>(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/branches/${GITHUB_BASE_BRANCH}`, { token }),
+      }>(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/branches/${GITHUB_BASE_BRANCH}`, {
+        token,
+      }),
       githubRequest<
         Array<{
           number: number;
@@ -573,7 +776,9 @@ export async function getGitHubSyncStatus(): Promise<GitHubSyncStatus> {
           user?: { login?: string } | null;
           created_at: string;
         }>
-      >(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/pulls?state=open&per_page=20`, { token }),
+      >(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/pulls?state=open&per_page=20`, {
+        token,
+      }),
       githubRequest<{
         check_runs?: Array<{
           id: number;
@@ -583,6 +788,11 @@ export async function getGitHubSyncStatus(): Promise<GitHubSyncStatus> {
           html_url: string;
           started_at: string | null;
           completed_at: string | null;
+          output?: {
+            title?: string | null;
+            summary?: string | null;
+            text?: string | null;
+          } | null;
         }>;
       }>(
         `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/commits/${GITHUB_BASE_BRANCH}/check-runs?per_page=20`,
@@ -633,6 +843,9 @@ export async function getGitHubSyncStatus(): Promise<GitHubSyncStatus> {
       htmlUrl: run.html_url,
       startedAt: run.started_at,
       completedAt: run.completed_at,
+      outputTitle: run.output?.title || null,
+      outputSummary: run.output?.summary || null,
+      outputText: run.output?.text || null,
     }));
   } catch (err) {
     baseStatus.error =
@@ -649,7 +862,9 @@ async function fetchMainTreeSnapshot(token: string): Promise<{
 }> {
   const branchRes = await githubRequest<{
     commit: { sha: string; commit: { tree: { sha: string } } };
-  }>(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/branches/${GITHUB_BASE_BRANCH}`, { token });
+  }>(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/branches/${GITHUB_BASE_BRANCH}`, {
+    token,
+  });
 
   const headSha = branchRes.data.commit.sha;
   const baseTreeSha = branchRes.data.commit.commit.tree.sha;
@@ -721,15 +936,16 @@ export async function computeWorkspaceDiff(): Promise<WorkspaceDiffResult> {
     const category = classifyPath(relPath);
 
     if (!remote) {
+      const wasOnRemoteBefore = Boolean(baseRecord);
       changed.push({
         path: relPath,
-        status: 'added_local',
+        status: wasOnRemoteBefore ? 'deleted_remote' : 'added_local',
         category,
         sizeBytes: content.length,
-        hasBase: Boolean(baseRecord),
-        remoteUpdatedSinceBase: false,
-        canPush: true,
-        canPull: false,
+        hasBase: wasOnRemoteBefore,
+        remoteUpdatedSinceBase: wasOnRemoteBefore,
+        canPush: category !== 'superseded',
+        canPull: wasOnRemoteBefore,
         canDeleteRemote: false,
       });
     } else if (remote.sha !== localSha) {
@@ -747,7 +963,6 @@ export async function computeWorkspaceDiff(): Promise<WorkspaceDiffResult> {
         canDeleteRemote: false,
       });
     } else {
-      // Identical local and remote copy establishes a verified baseline snapshot.
       if (!baseRecord || baseRecord.blobSha !== remote.sha) {
         saveSyncBaseSnapshot(relPath, remote.sha, content, 'seed');
       }
@@ -755,7 +970,7 @@ export async function computeWorkspaceDiff(): Promise<WorkspaceDiffResult> {
   }
 
   for (const [remotePath, remote] of remoteBlobs.entries()) {
-    if (isHardProtectedPath(remotePath)) continue;
+    if (isHardProtectedPath(remotePath) || isHiddenManagedPath(remotePath)) continue;
     if (localPathSet.has(remotePath)) continue;
     const baseRecord = baseIndex[remotePath];
 
@@ -823,6 +1038,7 @@ export async function computeWorkspaceDiff(): Promise<WorkspaceDiffResult> {
       rules,
       ignoredFiles,
     },
+    commitSuggestion: buildPreparedCommitSuggestion(changed),
   };
 }
 
@@ -831,6 +1047,73 @@ function isBufferBinary(buf: Buffer, relPath: string): boolean {
   if (BINARY_EXTENSIONS.has(ext)) return true;
   const sample = buf.subarray(0, 8192);
   return sample.includes(0);
+}
+
+function buildUnifiedLineHunks(
+  remoteText: string,
+  localText: string
+): { diffHunks: DiffHunkLine[]; diffTruncated: boolean } {
+  const a = remoteText ? remoteText.split(/\r?\n/) : [];
+  const b = localText ? localText.split(/\r?\n/) : [];
+  const maxLines = 600;
+  const diffHunks: DiffHunkLine[] = [];
+
+  let i = 0;
+  let j = 0;
+  while ((i < a.length || j < b.length) && diffHunks.length < maxLines) {
+    if (i < a.length && j < b.length && a[i] === b[j]) {
+      diffHunks.push({ type: 'ctx', oldLine: i + 1, newLine: j + 1, text: a[i] });
+      i += 1;
+      j += 1;
+      continue;
+    }
+
+    let foundMatch = false;
+    for (let look = 1; look <= 16; look += 1) {
+      if (i + look < a.length && j < b.length && a[i + look] === b[j]) {
+        for (let k = 0; k < look && diffHunks.length < maxLines; k += 1) {
+          diffHunks.push({
+            type: 'del',
+            oldLine: i + k + 1,
+            newLine: null,
+            text: a[i + k],
+          });
+        }
+        i += look;
+        foundMatch = true;
+        break;
+      }
+      if (j + look < b.length && i < a.length && a[i] === b[j + look]) {
+        for (let k = 0; k < look && diffHunks.length < maxLines; k += 1) {
+          diffHunks.push({
+            type: 'add',
+            oldLine: null,
+            newLine: j + k + 1,
+            text: b[j + k],
+          });
+        }
+        j += look;
+        foundMatch = true;
+        break;
+      }
+    }
+
+    if (!foundMatch) {
+      if (i < a.length) {
+        diffHunks.push({ type: 'del', oldLine: i + 1, newLine: null, text: a[i] });
+        i += 1;
+      }
+      if (j < b.length && diffHunks.length < maxLines) {
+        diffHunks.push({ type: 'add', oldLine: null, newLine: j + 1, text: b[j] });
+        j += 1;
+      }
+    }
+  }
+
+  return {
+    diffHunks,
+    diffTruncated: i < a.length || j < b.length,
+  };
 }
 
 export async function getWorkspaceFileDiff(
@@ -911,6 +1194,10 @@ export async function getWorkspaceFileDiff(
     }
   }
 
+  const linePreview = isBinary
+    ? { diffHunks: [], diffTruncated: false }
+    : buildUnifiedLineHunks(remoteContent ?? '', localContent ?? '');
+
   return {
     path: relPath,
     existsLocal,
@@ -927,6 +1214,8 @@ export async function getWorkspaceFileDiff(
     localContent,
     remoteContent,
     baseContent,
+    diffHunks: linePreview.diffHunks,
+    diffTruncated: linePreview.diffTruncated,
     truncated,
   };
 }
@@ -943,6 +1232,7 @@ export interface PullFilesResult {
   paths: string[];
   autoMergedPaths: string[];
   keptLocalPaths: string[];
+  deletedLocalPaths: string[];
   conflicts: MergeConflictEntry[];
 }
 
@@ -975,6 +1265,7 @@ export async function pullFilesFromGitHub(
     )
   );
   const targets: Array<{ relPath: string; absPath: string; sha: string }> = [];
+  const deletedTargets: Array<{ relPath: string; absPath: string; baseSha: string; baseBuf: Buffer }> = [];
   const seen = new Set<string>();
 
   for (const rawPath of params.paths) {
@@ -985,6 +1276,17 @@ export async function pullFilesFromGitHub(
     if (seen.has(resolved.relPath)) continue;
     const remote = remoteBlobs.get(resolved.relPath);
     if (!remote) {
+      const baseSnapshot = getSyncBaseSnapshot(resolved.relPath);
+      if (baseSnapshot) {
+        seen.add(resolved.relPath);
+        deletedTargets.push({
+          relPath: resolved.relPath,
+          absPath: resolved.absPath,
+          baseSha: baseSnapshot.blobSha,
+          baseBuf: baseSnapshot.buffer,
+        });
+        continue;
+      }
       throw new Error(`File does not exist on main: ${resolved.relPath}`);
     }
     seen.add(resolved.relPath);
@@ -1006,7 +1308,42 @@ export async function pullFilesFromGitHub(
   const pulledPaths: string[] = [];
   const autoMergedPaths: string[] = [];
   const keptLocalPaths: string[] = [];
+  const deletedLocalPaths: string[] = [];
   const conflicts: MergeConflictEntry[] = [];
+
+  for (const delTarget of deletedTargets) {
+    const existsLocal =
+      fs.existsSync(delTarget.absPath) && fs.statSync(delTarget.absPath).isFile();
+    if (!existsLocal) {
+      removeSyncBaseSnapshot(delTarget.relPath);
+      continue;
+    }
+
+    const localBuf = fs.readFileSync(delTarget.absPath);
+    const localSha = computeGitBlobSha(localBuf);
+    if (overwriteSet.has(delTarget.relPath) || localSha === delTarget.baseSha) {
+      fs.unlinkSync(delTarget.absPath);
+      removeSyncBaseSnapshot(delTarget.relPath);
+      deletedLocalPaths.push(delTarget.relPath);
+      continue;
+    }
+
+    const isBinary =
+      isBufferBinary(localBuf, delTarget.relPath) ||
+      isBufferBinary(delTarget.baseBuf, delTarget.relPath);
+    conflicts.push({
+      path: delTarget.relPath,
+      direction: 'pull',
+      reason: 'deleted_remote',
+      remoteSha: '',
+      baseSha: delTarget.baseSha,
+      isBinary,
+      baseContent: isBinary ? null : delTarget.baseBuf.toString('utf8'),
+      localContent: isBinary ? null : localBuf.toString('utf8'),
+      remoteContent: null,
+      suggestedContent: null,
+    });
+  }
 
   for (const file of fetched) {
     const parentDir = path.dirname(file.absPath);
@@ -1037,7 +1374,6 @@ export async function pullFilesFromGitHub(
 
     if (baseSnapshot && !isBinary) {
       if (baseSnapshot.blobSha === file.sha) {
-        // GitHub copy has not changed since the baseline; keep unpushed local edits intact.
         keptLocalPaths.push(file.relPath);
         continue;
       }
@@ -1090,19 +1426,21 @@ export async function pullFilesFromGitHub(
     paths: pulledPaths,
     autoMergedPaths,
     keptLocalPaths,
+    deletedLocalPaths,
     conflicts,
   };
 }
 
 export interface ResolveMergeParams {
   path: string;
-  resolvedContent: string;
-  remoteSha: string;
+  resolvedContent?: string;
+  remoteSha?: string;
+  action?: 'save' | 'delete_local' | 'keep_local';
 }
 
 export async function resolveWorkspaceMerge(
   params: ResolveMergeParams
-): Promise<{ path: string; baseSha: string }> {
+): Promise<{ path: string; baseSha: string | null }> {
   const token = getGitHubToken();
   if (!token) {
     throw new Error('GITHUB_PAT is not configured on the server.');
@@ -1111,6 +1449,25 @@ export async function resolveWorkspaceMerge(
   if (!resolved || isLocalUploadSkipped(resolved.relPath)) {
     throw new Error(`Invalid or blocked merge file path: ${String(params.path)}`);
   }
+
+  const action = params.action || 'save';
+  if (action === 'delete_local') {
+    if (fs.existsSync(resolved.absPath) && fs.statSync(resolved.absPath).isFile()) {
+      fs.unlinkSync(resolved.absPath);
+    }
+    removeSyncBaseSnapshot(resolved.relPath);
+    return { path: resolved.relPath, baseSha: null };
+  }
+
+  if (action === 'keep_local') {
+    if (typeof params.resolvedContent === 'string') {
+      fs.mkdirSync(path.dirname(resolved.absPath), { recursive: true });
+      fs.writeFileSync(resolved.absPath, Buffer.from(params.resolvedContent, 'utf8'));
+    }
+    removeSyncBaseSnapshot(resolved.relPath);
+    return { path: resolved.relPath, baseSha: null };
+  }
+
   if (typeof params.resolvedContent !== 'string') {
     throw new Error('Resolved file content is required.');
   }
@@ -1188,7 +1545,7 @@ export async function syncWorkspaceToGitHub(
     throw new Error('Sync mode must be "pr" or "direct".');
   }
 
-  const commitMessage = (params.commitMessage || '').trim().slice(0, 240);
+  const commitMessage = (params.commitMessage || '').trim().slice(0, 4000);
   if (!commitMessage) {
     throw new Error('Commit message is required.');
   }
@@ -1199,8 +1556,8 @@ export async function syncWorkspaceToGitHub(
   if (uploadInputs.length === 0 && deleteInputs.length === 0) {
     throw new Error('Select at least one file to push or remove.');
   }
-  if (uploadInputs.length + deleteInputs.length > 200) {
-    throw new Error('Too many files selected in a single sync batch (max 200).');
+  if (uploadInputs.length + deleteInputs.length > 250) {
+    throw new Error('Too many files selected in a single sync batch (max 250).');
   }
 
   const resolvedFiles: Array<{ relPath: string; content: Buffer }> = [];
@@ -1242,10 +1599,20 @@ export async function syncWorkspaceToGitHub(
     reasonHint: 'remote_ahead' | 'no_base_changed';
   }> = [];
 
+  const remoteDeletedFiles: Array<{
+    file: { relPath: string; content: Buffer };
+    baseSnapshot: NonNullable<ReturnType<typeof getSyncBaseSnapshot>>;
+  }> = [];
+
   for (const file of resolvedFiles) {
     const remote = remoteBlobs.get(file.relPath);
-    if (!remote) continue;
     const baseSnapshot = getSyncBaseSnapshot(file.relPath);
+    if (!remote) {
+      if (baseSnapshot) {
+        remoteDeletedFiles.push({ file, baseSnapshot });
+      }
+      continue;
+    }
     if (baseSnapshot && baseSnapshot.blobSha !== remote.sha) {
       remoteAheadFiles.push({
         file,
@@ -1267,8 +1634,8 @@ export async function syncWorkspaceToGitHub(
     }
   }
 
-  if (remoteAheadFiles.length > 0) {
-    const conflicts = await runWithConcurrency(remoteAheadFiles, 6, async (item) => {
+  if (remoteAheadFiles.length > 0 || remoteDeletedFiles.length > 0) {
+    const aheadConflicts = await runWithConcurrency(remoteAheadFiles, 6, async (item) => {
       const blobRes = await githubRequest<{ content: string; encoding: string }>(
         `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/git/blobs/${item.remoteSha}`,
         { token }
@@ -1290,7 +1657,9 @@ export async function syncWorkspaceToGitHub(
         return {
           path: item.file.relPath,
           direction: 'push' as const,
-          reason: merged.hasConflict ? ('overlap' as const) : ('remote_ahead_clean' as const),
+          reason: merged.hasConflict
+            ? ('overlap' as const)
+            : ('remote_ahead_clean' as const),
           remoteSha: item.remoteSha,
           baseSha: item.baseSnapshot.blobSha,
           isBinary: false,
@@ -1318,8 +1687,27 @@ export async function syncWorkspaceToGitHub(
       };
     });
 
+    const deletedConflicts: MergeConflictEntry[] = remoteDeletedFiles.map((item) => {
+      const isBinary =
+        isBufferBinary(item.file.content, item.file.relPath) ||
+        isBufferBinary(item.baseSnapshot.buffer, item.file.relPath);
+      return {
+        path: item.file.relPath,
+        direction: 'push',
+        reason: 'deleted_remote',
+        remoteSha: '',
+        baseSha: item.baseSnapshot.blobSha,
+        isBinary,
+        baseContent: isBinary ? null : item.baseSnapshot.buffer.toString('utf8'),
+        localContent: isBinary ? null : item.file.content.toString('utf8'),
+        remoteContent: null,
+        suggestedContent: null,
+      };
+    });
+
+    const conflicts = [...aheadConflicts, ...deletedConflicts];
     throw new GitHubSyncConflictError(
-      `${conflicts.length} checked file(s) changed on GitHub main since their last synced baseline. Merge those remote edits below before pushing.`,
+      `${conflicts.length} checked file(s) changed or were deleted on GitHub main since their last synced baseline. Review and resolve below before pushing.`,
       { conflicts, headSha }
     );
   }
@@ -1435,6 +1823,10 @@ export async function syncWorkspaceToGitHub(
     for (const item of uploadedTreeEntries) {
       saveSyncBaseSnapshot(item.path, item.uploadedSha, item.rawContent, 'push');
     }
+    for (const delPath of resolvedDeletePaths) {
+      removeSyncBaseSnapshot(delPath);
+    }
+    clearPendingCommitMeta();
 
     return {
       mode: 'direct',
@@ -1455,14 +1847,17 @@ export async function syncWorkspaceToGitHub(
     },
   });
 
-  const prTitle = (params.prTitle || commitMessage).trim().slice(0, 240);
+  const firstCommitLine = commitMessage.split('\n')[0];
+  const commitExtraLines = commitMessage.split('\n').slice(1).join('\n').trim();
+  const prTitle = (params.prTitle || firstCommitLine).trim().slice(0, 240);
   const summaryLines = [
     ...resolvedFiles.map((f) => `- Updated/added \`${f.relPath}\``),
     ...resolvedDeletePaths.map((p) => `- Removed superseded \`${p}\``),
   ];
-  const prBody =
-    (params.prBody || '').trim().slice(0, 4000) ||
-    `Synced ${resolvedFiles.length} updated/added file(s) and removed ${resolvedDeletePaths.length} file(s) from ExoNovel workspace:\n\n${summaryLines.join('\n')}`;
+  const defaultBody = commitExtraLines
+    ? `${commitExtraLines}\n\n---\nSynced ${resolvedFiles.length} updated/added file(s) and removed ${resolvedDeletePaths.length} file(s):\n\n${summaryLines.join('\n')}`
+    : `Synced ${resolvedFiles.length} updated/added file(s) and removed ${resolvedDeletePaths.length} file(s) from ExoNovel workspace:\n\n${summaryLines.join('\n')}`;
+  const prBody = ((params.prBody || '').trim() || defaultBody).slice(0, 6000);
 
   const prRes = await githubRequest<{ number: number; html_url: string }>(
     `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/pulls`,
@@ -1478,6 +1873,8 @@ export async function syncWorkspaceToGitHub(
     }
   );
 
+  clearPendingCommitMeta();
+
   return {
     mode: 'pr',
     commitSha,
@@ -1492,7 +1889,7 @@ export async function syncWorkspaceToGitHub(
 
 export async function mergeGitHubPullRequest(params: {
   pullNumber: number;
-  mergeMethod?: 'merge' | 'squash' | 'rebase';
+  mergeMethod?: 'merge';
 }): Promise<{ merged: boolean; sha: string | null; message: string }> {
   const token = getGitHubToken();
   if (!token) {
@@ -1504,11 +1901,6 @@ export async function mergeGitHubPullRequest(params: {
     throw new Error('Valid pull request number is required.');
   }
 
-  const mergeMethod =
-    params.mergeMethod === 'squash' || params.mergeMethod === 'rebase'
-      ? params.mergeMethod
-      : 'merge';
-
   const res = await githubRequest<{
     merged?: boolean;
     sha?: string;
@@ -1516,7 +1908,7 @@ export async function mergeGitHubPullRequest(params: {
   }>(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/pulls/${pullNumber}/merge`, {
     method: 'PUT',
     token,
-    body: { merge_method: mergeMethod },
+    body: { merge_method: 'merge' },
   });
 
   return {

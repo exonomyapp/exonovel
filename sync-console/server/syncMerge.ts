@@ -127,6 +127,24 @@ export function saveSyncBaseSnapshot(
   writeSyncBaseIndex(index);
 }
 
+export function removeSyncBaseSnapshot(relPath: string): void {
+  const normalized = normalizeRelPath(relPath);
+  if (!normalized) return;
+  const index = loadSyncBaseIndex();
+  if (normalized in index) {
+    delete index[normalized];
+    writeSyncBaseIndex(index);
+  }
+  try {
+    const blobPath = getBlobStoragePath(normalized);
+    if (fs.existsSync(blobPath)) {
+      fs.unlinkSync(blobPath);
+    }
+  } catch {
+    // Ignore cleanup errors
+  }
+}
+
 function normalizeLineEndings(text: string): string {
   return text.replace(/\r\n/g, '\n');
 }

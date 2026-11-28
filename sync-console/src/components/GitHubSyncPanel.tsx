@@ -1,18 +1,34 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react';
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Download,
+  ExternalLink,
   Eye,
   EyeOff,
-  ExternalLink,
   GitBranch,
   GitMerge,
   GitPullRequest,
+  Globe,
   Plus,
   Search,
   Trash2,
   Upload,
   X,
+  XCircle,
 } from 'lucide-react';
+import {
+  LineDiffViewer,
+  type WorkspaceFileDiffDetail,
+} from './LineDiffViewer';
 
 interface GitHubOpenPull {
   number: number;
@@ -33,6 +49,9 @@ interface GitHubCheckRunSummary {
   htmlUrl: string;
   startedAt: string | null;
   completedAt: string | null;
+  outputTitle: string | null;
+  outputSummary: string | null;
+  outputText: string | null;
 }
 
 interface GitHubSyncStatus {
@@ -56,11 +75,26 @@ interface GitHubSyncStatus {
   error: string | null;
 }
 
+interface ProductionProbeItem {
+  path: string;
+  status: number;
+  ok: boolean;
+  note: string;
+  latencyMs: number;
+}
+
+interface ProductionProbeResult {
+  siteUrl: string;
+  checkedAt: string;
+  allHealthy: boolean;
+  results: ProductionProbeItem[];
+}
+
 type SyncFileCategory = 'app' | 'console' | 'superseded';
 
 interface WorkspaceDiffEntry {
   path: string;
-  status: 'modified' | 'added_local' | 'remote_only';
+  status: 'modified' | 'added_local' | 'remote_only' | 'deleted_remote';
   category: SyncFileCategory;
   sizeBytes: number;
   remoteSizeBytes?: number;
@@ -88,27 +122,18 @@ interface IgnoredFileEntry {
   remoteSha?: string;
 }
 
-interface WorkspaceFileDiffDetail {
-  path: string;
-  existsLocal: boolean;
-  existsRemote: boolean;
-  remoteSha: string | null;
-  hasBase: boolean;
-  baseSha: string | null;
-  remoteUpdatedSinceBase: boolean;
-  isBinary: boolean;
-  localSize: number;
-  remoteSize: number;
-  localContent: string | null;
-  remoteContent: string | null;
-  baseContent: string | null;
-  truncated: boolean;
+interface PreparedCommitSuggestion {
+  commitMessage: string;
+  branchName: string;
+  prTitle: string;
+  prBody: string;
+  source: 'authored' | 'fallback' | 'none';
 }
 
 interface MergeConflictEntry {
   path: string;
   direction: 'pull' | 'push';
-  reason: 'overlap' | 'remote_ahead_clean' | 'no_base' | 'binary';
+  reason: 'overlap' | 'remote_ahead_clean' | 'no_base' | 'binary' | 'deleted_remote';
   remoteSha: string;
   baseSha: string | null;
   isBinary: boolean;
@@ -127,7 +152,7 @@ interface GitHubSyncPanelProps {
 
 type CategoryFilter = 'all' | 'app' | 'console' | 'superseded' | 'ignored';
 
-function buildSuggestedCommit(
+function buildFallbackSelectionCommit(
   pushFiles: WorkspaceDiffEntry[],
   deletePaths: string[]
 ): string {
@@ -148,17 +173,32 @@ function buildSuggestedCommit(
   return `chore: sync ${pushFiles.length} file(s) to exonomyapp/exonovel`;
 }
 
-function statusDisplayLabel(status: WorkspaceDiffEntry['status']): string {
-  if (status === 'added_local') return 'new locally';
-  if (status === 'remote_only') return 'on main only';
-  return 'modified';
+function statusDisplayLabel(file: WorkspaceDiffEntry): string {
+  if (file.status === 'deleted_remote') return 'Deleted on GitHub';
+  if (file.category === 'superseded') {
+    if (file.status === 'remote_only') return 'Removed here';
+    if (file.status === 'added_local') return 'Unused local';
+    return 'Obsolete · review';
+  }
+  if (file.status === 'added_local') return 'Add to GitHub';
+  if (file.status === 'remote_only') return 'New on GitHub';
+  return file.remoteUpdatedSinceBase ? 'Both changed · merge' : 'Edited here';
 }
 
-function statusColorClass(status: WorkspaceDiffEntry['status']): string {
-  if (status === 'added_local') {
+function statusColorClass(file: WorkspaceDiffEntry): string {
+  if (file.status === 'deleted_remote') {
+    return 'text-red-700 dark:text-red-400';
+  }
+  if (file.category === 'superseded') {
+    if (file.status === 'added_local') {
+      return 'text-[#57534E] dark:text-[#9CA3AF]';
+    }
+    return 'text-amber-700 dark:text-amber-400';
+  }
+  if (file.status === 'added_local') {
     return 'text-emerald-700 dark:text-emerald-400';
   }
-  if (status === 'remote_only') {
+  if (file.status === 'remote_only') {
     return 'text-[#1D4ED8] dark:text-[#60A5FA]';
   }
   return 'text-amber-700 dark:text-amber-400';
@@ -177,10 +217,14 @@ export function GitHubSyncPanel({
   onUnauthorized,
 }: GitHubSyncPanelProps) {
   const [githubStatus, setGithubStatus] = useState<GitHubSyncStatus | null>(null);
+  const [prodProbe, setProdProbe] = useState<ProductionProbeResult | null>(null);
   const [diffHeadSha, setDiffHeadSha] = useState<string | null>(null);
   const [githubDiff, setGithubDiff] = useState<WorkspaceDiffEntry[]>([]);
   const [gitignoreRules, setGitignoreRules] = useState<GitignoreRuleEntry[]>([]);
   const [ignoredFiles, setIgnoredFiles] = useState<IgnoredFileEntry[]>([]);
+  const [commitSuggestion, setCommitSuggestion] =
+    useState<PreparedCommitSuggestion | null>(null);
+
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [selectedUntrackPaths, setSelectedUntrackPaths] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
@@ -201,6 +245,9 @@ export function GitHubSyncPanel({
   const [mergingPr, setMergingPr] = useState<number | null>(null);
   const [confirmDirectPush, setConfirmDirectPush] = useState(false);
 
+  const [expandedCheckId, setExpandedCheckId] = useState<number | null>(null);
+  const [liveConnected, setLiveConnected] = useState(false);
+
   const [mergeQueue, setMergeQueue] = useState<MergeConflictEntry[]>([]);
   const [mergeDrafts, setMergeDrafts] = useState<Record<string, string>>({});
   const [resolvingMergePath, setResolvingMergePath] = useState<string | null>(null);
@@ -214,6 +261,13 @@ export function GitHubSyncPanel({
     () => `sync/exonovel-${new Date().toISOString().slice(0, 10)}`
   );
   const [prTitle, setPrTitle] = useState('');
+  const [prBody, setPrBody] = useState('');
+
+  const commitEditedRef = useRef(false);
+  const branchEditedRef = useRef(false);
+  const prTitleEditedRef = useRef(false);
+  const prBodyEditedRef = useRef(false);
+
   const [githubNotice, setGithubNotice] = useState<{
     message: string;
     url?: string;
@@ -225,6 +279,7 @@ export function GitHubSyncPanel({
   const onLoadingChangeRef = useRef(onLoadingChange);
   const onUnauthorizedRef = useRef(onUnauthorized);
   const fetchInFlightRef = useRef(false);
+  const diffViewerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     getTokenRef.current = getToken;
@@ -245,7 +300,7 @@ export function GitHubSyncPanel({
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
+        'X-Requested-With': 'exonovel-sync',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init?.headers || {}),
       },
@@ -263,17 +318,31 @@ export function GitHubSyncPanel({
     setError(null);
     setConfirmDirectPush(false);
     try {
-      const [statusRes, diffRes] = await Promise.all([
+      const [statusRes, diffRes, probeRes] = await Promise.all([
         authFetch('/api/admin/github/status'),
         authFetch('/api/admin/github/diff'),
+        authFetch('/api/admin/github/prod-probe').catch(() => null),
       ]);
 
       if (statusRes.ok) {
         const statusData = (await statusRes.json()) as GitHubSyncStatus;
         setGithubStatus(statusData);
+        const failedRun = statusData.checkRuns.find(
+          (r) =>
+            (r.conclusion === 'failure' || r.conclusion === 'cancelled') &&
+            (r.outputText || r.outputSummary)
+        );
+        if (failedRun) {
+          setExpandedCheckId((cur) => cur ?? failedRun.id);
+        }
       } else {
         const errData = await statusRes.json().catch(() => ({}));
         setError(errData.error || 'Unable to check GitHub status.');
+      }
+
+      if (probeRes && probeRes.ok) {
+        const probeData = (await probeRes.json()) as ProductionProbeResult;
+        setProdProbe(probeData);
       }
 
       if (diffRes.ok) {
@@ -284,17 +353,38 @@ export function GitHubSyncPanel({
             rules: GitignoreRuleEntry[];
             ignoredFiles: IgnoredFileEntry[];
           };
+          commitSuggestion?: PreparedCommitSuggestion;
         };
         setDiffHeadSha(diffData.headSha || null);
         setGithubDiff(diffData.files);
         setGitignoreRules(diffData.gitignore?.rules || []);
         setIgnoredFiles(diffData.gitignore?.ignoredFiles || []);
 
+        const suggestion = diffData.commitSuggestion || null;
+        setCommitSuggestion(suggestion);
+        if (suggestion && suggestion.source === 'authored') {
+          if (!commitEditedRef.current && suggestion.commitMessage) {
+            setCommitMessage(suggestion.commitMessage);
+          }
+          if (!branchEditedRef.current && suggestion.branchName) {
+            setBranchName(suggestion.branchName);
+          }
+          if (!prTitleEditedRef.current && suggestion.prTitle) {
+            setPrTitle(suggestion.prTitle);
+          }
+          if (!prBodyEditedRef.current && suggestion.prBody) {
+            setPrBody(suggestion.prBody);
+          }
+        }
+
         const validDiffPaths = new Set(diffData.files.map((f) => f.path));
         setSelectedPaths((prev) => {
           const preserved = prev.filter((p) => validDiffPaths.has(p));
           if (preserved.length > 0) return preserved;
-          return diffData.files.filter((f) => f.category === 'app').map((f) => f.path);
+          return diffData.files
+            .filter((f) => f.category === 'app' || f.category === 'console')
+            .filter((f) => f.canPush && f.status !== 'deleted_remote')
+            .map((f) => f.path);
         });
 
         const validRemoteIgnored = new Set(
@@ -333,6 +423,85 @@ export function GitHubSyncPanel({
   useEffect(() => {
     loadGitHubSync();
   }, [loadGitHubSync, refreshTrigger]);
+
+  // Automatic live updates via SSE (zero-cost ETag watcher on the server).
+  useEffect(() => {
+    let active = true;
+    let controller = new AbortController();
+    let reconnectTimer: number | null = null;
+
+    const connect = async () => {
+      if (!active) return;
+      controller = new AbortController();
+      try {
+        const token = await getTokenRef.current();
+        const res = await fetch('/api/admin/github/events', {
+          method: 'GET',
+          credentials: 'include',
+          cache: 'no-store',
+          signal: controller.signal,
+          headers: {
+            Accept: 'text/event-stream',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+
+        if (res.status === 401) {
+          setLiveConnected(false);
+          onUnauthorizedRef.current?.();
+          return;
+        }
+        if (!res.ok || !res.body) {
+          throw new Error('SSE stream unavailable');
+        }
+
+        setLiveConnected(true);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let currentEvent = 'message';
+
+        while (active) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          let lineEnd = buffer.indexOf('\n');
+          while (lineEnd !== -1) {
+            const line = buffer.slice(0, lineEnd).replace(/\r$/, '');
+            buffer = buffer.slice(lineEnd + 1);
+            if (line === '') {
+              if (currentEvent === 'update') {
+                void loadGitHubSync();
+              }
+              currentEvent = 'message';
+            } else if (line.startsWith('event:')) {
+              currentEvent = line.slice(6).trim();
+            }
+            lineEnd = buffer.indexOf('\n');
+          }
+        }
+      } catch {
+        // Ignore abort / transient drop and retry
+      } finally {
+        setLiveConnected(false);
+        if (active) {
+          reconnectTimer = window.setTimeout(connect, 5000);
+        }
+      }
+    };
+
+    void connect();
+
+    return () => {
+      active = false;
+      setLiveConnected(false);
+      controller.abort();
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+      }
+    };
+  }, [loadGitHubSync]);
 
   const countsByCategory = useMemo(() => {
     let app = 0;
@@ -432,7 +601,10 @@ export function GitHubSyncPanel({
   }, [includeRemoteDeletions, selectedRemoteDeleteCandidates, selectedUntrackPaths]);
 
   const effectivePushCount = selectedPushFiles.length + allDeletePaths.length;
-  const suggestedCommit = buildSuggestedCommit(selectedPushFiles, allDeletePaths);
+  const suggestedCommitPlaceholder =
+    (commitSuggestion?.source === 'authored' && commitSuggestion.commitMessage) ||
+    commitSuggestion?.commitMessage ||
+    buildFallbackSelectionCommit(selectedPushFiles, allDeletePaths);
 
   const togglePathSelection = (filePath: string) => {
     setConfirmDirectPush(false);
@@ -533,6 +705,9 @@ export function GitHubSyncPanel({
         throw new Error(data.error || 'Unable to inspect file diff.');
       }
       setPreviewData(data as WorkspaceFileDiffDetail);
+      window.setTimeout(() => {
+        diffViewerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 40);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to inspect file diff.');
       setPreviewPath(null);
@@ -562,7 +737,7 @@ export function GitHubSyncPanel({
         : selectedPullFiles.map((f) => f.path);
 
     if (targetPaths.length === 0) {
-      setError('Select at least one "modified" or "on main only" file to pull.');
+      setError('Select at least one edited or GitHub-only file to pull.');
       return;
     }
 
@@ -580,7 +755,11 @@ export function GitHubSyncPanel({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (res.status === 409 && Array.isArray(data.conflicts) && data.conflicts.length > 0) {
+        if (
+          res.status === 409 &&
+          Array.isArray(data.conflicts) &&
+          data.conflicts.length > 0
+        ) {
           openConflictsInResolver(data.conflicts as MergeConflictEntry[]);
         }
         throw new Error(data.error || 'Pull from main failed.');
@@ -595,6 +774,9 @@ export function GitHubSyncPanel({
       const keptCount = Array.isArray(data.keptLocalPaths)
         ? data.keptLocalPaths.length
         : 0;
+      const deletedLocalCount = Array.isArray(data.deletedLocalPaths)
+        ? data.deletedLocalPaths.length
+        : 0;
 
       if (conflicts.length > 0) {
         openConflictsInResolver(conflicts);
@@ -605,9 +787,16 @@ export function GitHubSyncPanel({
       const parts: string[] = [];
       if (data.filesPulled > 0) {
         const mergeNote =
-          autoMergedCount > 0 ? ` (${autoMergedCount} 3-way merged with local edits)` : '';
+          autoMergedCount > 0
+            ? ` (${autoMergedCount} 3-way merged with local edits)`
+            : '';
         parts.push(
           `Synced ${data.filesPulled} file(s) from exonomyapp/exonovel@main (${String(data.headSha || '').slice(0, 8)})${mergeNote}`
+        );
+      }
+      if (deletedLocalCount > 0) {
+        parts.push(
+          `Removed ${deletedLocalCount} local file(s) that were deleted on GitHub main`
         );
       }
       if (keptCount > 0) {
@@ -633,11 +822,12 @@ export function GitHubSyncPanel({
 
   const handleResolveMerge = async (
     conflict: MergeConflictEntry,
-    contentOverride?: string
+    contentOverride?: string,
+    action: 'save' | 'delete_local' | 'keep_local' = 'save'
   ) => {
     const resolvedContent =
       contentOverride !== undefined ? contentOverride : mergeDrafts[conflict.path];
-    if (typeof resolvedContent !== 'string') {
+    if (action === 'save' && typeof resolvedContent !== 'string') {
       setError('Merged content is required before applying.');
       return;
     }
@@ -651,22 +841,28 @@ export function GitHubSyncPanel({
           path: conflict.path,
           resolvedContent,
           remoteSha: conflict.remoteSha,
+          action,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Unable to save merged file.');
+        throw new Error(data.error || 'Unable to resolve file conflict.');
       }
 
       setMergeQueue((prev) => prev.filter((item) => item.path !== conflict.path));
       setGithubNotice({
-        message: `Saved merged ${conflict.path} against GitHub main baseline (${conflict.remoteSha.slice(0, 8)}).`,
+        message:
+          action === 'delete_local'
+            ? `Removed local ${conflict.path} to match deletion on GitHub main.`
+            : action === 'keep_local'
+              ? `Kept local ${conflict.path} as an unpushed local file.`
+              : `Saved merged ${conflict.path} against GitHub main baseline (${conflict.remoteSha.slice(0, 8)}).`,
       });
       setPreviewPath(null);
       setPreviewData(null);
       await loadGitHubSync();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to save merged file.');
+      setError(err instanceof Error ? err.message : 'Unable to resolve file conflict.');
     } finally {
       setResolvingMergePath(null);
     }
@@ -677,7 +873,7 @@ export function GitHubSyncPanel({
       setError('Select at least one local file to push or remove.');
       return;
     }
-    const effectiveCommit = commitMessage.trim() || suggestedCommit;
+    const effectiveCommit = commitMessage.trim() || suggestedCommitPlaceholder;
     const knownRemoteShas: Record<string, string> = {};
     for (const file of selectedPushFiles) {
       if (file.remoteSha) {
@@ -698,14 +894,22 @@ export function GitHubSyncPanel({
           deletePaths: allDeletePaths,
           commitMessage: effectiveCommit,
           branchName: mode === 'pr' ? branchName : undefined,
-          prTitle: mode === 'pr' ? prTitle.trim() || effectiveCommit : undefined,
+          prTitle:
+            mode === 'pr'
+              ? prTitle.trim() || effectiveCommit.split('\n')[0]
+              : undefined,
+          prBody: mode === 'pr' && prBody.trim() ? prBody.trim() : undefined,
           expectedHeadSha: diffHeadSha || undefined,
           knownRemoteShas,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (res.status === 409 && Array.isArray(data.conflicts) && data.conflicts.length > 0) {
+        if (
+          res.status === 409 &&
+          Array.isArray(data.conflicts) &&
+          data.conflicts.length > 0
+        ) {
           openConflictsInResolver(data.conflicts as MergeConflictEntry[]);
         }
         throw new Error(data.error || 'GitHub sync failed.');
@@ -725,8 +929,13 @@ export function GitHubSyncPanel({
           label: 'View Commit',
         });
       }
+      commitEditedRef.current = false;
+      branchEditedRef.current = false;
+      prTitleEditedRef.current = false;
+      prBodyEditedRef.current = false;
       setCommitMessage('');
       setPrTitle('');
+      setPrBody('');
       setIncludeRemoteDeletions(false);
       setSelectedUntrackPaths([]);
       setMergeQueue([]);
@@ -758,7 +967,9 @@ export function GitHubSyncPanel({
       });
       await loadGitHubSync();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to merge pull request.');
+      setError(
+        err instanceof Error ? err.message : 'Failed to merge pull request.'
+      );
     } finally {
       setMergingPr(null);
     }
@@ -768,21 +979,31 @@ export function GitHubSyncPanel({
     { id: 'all', label: 'All Differences', count: countsByCategory.all },
     { id: 'app', label: 'ExoNovel App & CI', count: countsByCategory.app },
     { id: 'console', label: 'Sync Console', count: countsByCategory.console },
-    { id: 'superseded', label: 'Superseded on main', count: countsByCategory.superseded },
+    {
+      id: 'superseded',
+      label: 'Superseded on main',
+      count: countsByCategory.superseded,
+    },
     { id: 'ignored', label: 'Ignored (.gitignore)', count: countsByCategory.ignored },
   ];
 
   return (
     <div>
-      <div>
-        <h1 className="font-display text-2xl font-semibold tracking-tight">
-          Sync Console
-        </h1>
-        <p className="mt-1 text-sm text-[#57534E] dark:text-[#9CA3AF]">
-          Inspect differences against{' '}
-          <code className="font-mono text-xs">exonomyapp/exonovel@main</code>, manage{' '}
-          <code className="font-mono text-xs">.gitignore</code> rules, selectively pull updates down, or push selected changes.
-        </p>
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">
+            Sync Console
+          </h1>
+          <p className="mt-1 text-sm text-[#57534E] dark:text-[#9CA3AF]">
+            Inspect differences against{' '}
+            <code className="font-mono text-xs">exonomyapp/exonovel@main</code>,
+            manage <code className="font-mono text-xs">.gitignore</code> rules,
+            selectively pull updates down, or push selected changes.
+          </p>
+        </div>
+        <div className="text-xs font-mono text-[#57534E] dark:text-[#9CA3AF]">
+          {liveConnected ? 'Live updates connected' : 'Live updates connecting...'}
+        </div>
       </div>
 
       {error && (
@@ -819,19 +1040,22 @@ export function GitHubSyncPanel({
           </div>
         ) : (
           <>
-            <div className="grid gap-4 sm:grid-cols-3 text-xs">
-              <div className="border-b sm:border-b-0 sm:border-r border-[#E5E0D5] dark:border-[#262B36] pb-3 sm:pb-0 sm:pr-4">
-                <div className="text-[#57534E] dark:text-[#9CA3AF]">Authenticated Account</div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+              <div className="border-b lg:border-b-0 lg:border-r border-[#E5E0D5] dark:border-[#262B36] pb-3 lg:pb-0 lg:pr-4">
+                <div className="text-[#57534E] dark:text-[#9CA3AF]">
+                  Authenticated Account
+                </div>
                 <div className="mt-1 font-medium font-mono">
                   @{githubStatus.tokenUser || 'unknown'}
                 </div>
                 <div className="mt-0.5 text-[#57534E] dark:text-[#9CA3AF]">
-                  Write access: {githubStatus.permissions?.push ? 'enabled' : 'read-only'}
+                  Write access:{' '}
+                  {githubStatus.permissions?.push ? 'enabled' : 'read-only'}
                   {githubStatus.scopes ? ` · ${githubStatus.scopes.join(', ')}` : ''}
                 </div>
               </div>
 
-              <div className="border-b sm:border-b-0 sm:border-r border-[#E5E0D5] dark:border-[#262B36] pb-3 sm:pb-0 sm:pr-4">
+              <div className="border-b lg:border-b-0 lg:border-r border-[#E5E0D5] dark:border-[#262B36] pb-3 lg:pb-0 lg:pr-4">
                 <div className="text-[#57534E] dark:text-[#9CA3AF]">Target Branch</div>
                 <div className="mt-1 font-medium font-mono tabular-nums">
                   {githubStatus.baseBranch} ({githubStatus.headSha?.slice(0, 8) || '—'})
@@ -841,13 +1065,57 @@ export function GitHubSyncPanel({
                 </div>
               </div>
 
-              <div>
-                <div className="text-[#57534E] dark:text-[#9CA3AF]">Branch Protection</div>
+              <div className="border-b sm:border-b-0 lg:border-r border-[#E5E0D5] dark:border-[#262B36] pb-3 sm:pb-0 lg:pr-4">
+                <div className="text-[#57534E] dark:text-[#9CA3AF]">
+                  Branch Protection
+                </div>
                 <div className="mt-1 font-medium">
                   {githubStatus.protectedBranch ? 'Protected' : 'Direct push allowed'}
                 </div>
                 <div className="mt-0.5 text-[#57534E] dark:text-[#9CA3AF] tabular-nums">
                   Open PRs: {githubStatus.openPulls.length}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between gap-2 text-[#57534E] dark:text-[#9CA3AF]">
+                  <span>Live Website</span>
+                  <a
+                    href="https://exonovel.exosystems.net/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-[#1D4ED8] dark:text-[#60A5FA] hover:underline whitespace-nowrap"
+                  >
+                    <Globe className="w-3 h-3" />
+                    <span>Open</span>
+                  </a>
+                </div>
+                <div className="mt-1 space-y-0.5 font-mono tabular-nums">
+                  {!prodProbe ? (
+                    <div className="text-[#57534E] dark:text-[#9CA3AF]">
+                      Checking exonovel.exosystems.net...
+                    </div>
+                  ) : (
+                    prodProbe.results.map((item) => (
+                      <div
+                        key={item.path}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <span className="text-[#57534E] dark:text-[#9CA3AF]">
+                          {item.path}
+                        </span>
+                        <span
+                          className={
+                            item.ok
+                              ? 'text-emerald-700 dark:text-emerald-400 font-medium'
+                              : 'text-red-700 dark:text-red-400 font-medium'
+                          }
+                        >
+                          {item.note}
+                        </span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -859,33 +1127,79 @@ export function GitHubSyncPanel({
                 </div>
                 <div className="divide-y divide-[#E5E0D5] dark:divide-[#262B36] border border-[#E5E0D5] dark:border-[#262B36] rounded-md bg-[#FAF8F4] dark:bg-[#111317]">
                   {githubStatus.checkRuns.map((run) => {
+                    const passed = run.conclusion === 'success';
+                    const failed =
+                      run.conclusion === 'failure' || run.conclusion === 'cancelled';
                     const stateLabel = run.conclusion
                       ? `${run.status} · ${run.conclusion}`
                       : run.status.replace('_', ' ');
-                    const stateColor =
-                      run.conclusion === 'success'
-                        ? 'text-emerald-700 dark:text-emerald-400'
-                        : run.conclusion === 'failure' || run.conclusion === 'cancelled'
-                          ? 'text-red-700 dark:text-red-400'
-                          : 'text-amber-700 dark:text-amber-400';
+                    const stateColor = passed
+                      ? 'text-emerald-700 dark:text-emerald-400'
+                      : failed
+                        ? 'text-red-700 dark:text-red-400'
+                        : 'text-amber-700 dark:text-amber-400';
+                    const hasLog = Boolean(run.outputText || run.outputSummary);
+                    const isExpanded = expandedCheckId === run.id;
+
                     return (
-                      <div
-                        key={run.id}
-                        className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 text-xs"
-                      >
-                        <span className="font-medium">{run.name}</span>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className={`font-mono ${stateColor}`}>{stateLabel}</span>
-                          <a
-                            href={run.htmlUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-[#1D4ED8] dark:text-[#60A5FA] hover:underline whitespace-nowrap"
-                          >
-                            <span>View Run</span>
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
+                      <div key={run.id} className="text-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {passed ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
+                            ) : failed ? (
+                              <XCircle className="w-3.5 h-3.5 text-red-700 dark:text-red-400 shrink-0" />
+                            ) : null}
+                            <span className="font-medium truncate">{run.name}</span>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className={`font-mono ${stateColor}`}>
+                              {stateLabel}
+                            </span>
+                            {hasLog && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedCheckId((cur) =>
+                                    cur === run.id ? null : run.id
+                                  )
+                                }
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[#E5E0D5] dark:border-[#262B36] text-[11px] text-[#57534E] dark:text-[#9CA3AF] hover:text-[#1C1917] dark:hover:text-[#ECEEF2] whitespace-nowrap"
+                              >
+                                <span>{isExpanded ? 'Hide Log' : 'Read Log'}</span>
+                                {isExpanded ? (
+                                  <ChevronUp className="w-3 h-3" />
+                                ) : (
+                                  <ChevronDown className="w-3 h-3" />
+                                )}
+                              </button>
+                            )}
+                            <a
+                              href={run.htmlUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-[#1D4ED8] dark:text-[#60A5FA] hover:underline whitespace-nowrap"
+                            >
+                              <span>View Run</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
                         </div>
+
+                        {isExpanded && hasLog && (
+                          <div className="px-3.5 pb-3 space-y-1.5">
+                            {run.outputSummary && (
+                              <div className="text-[11px] text-[#57534E] dark:text-[#9CA3AF]">
+                                {run.outputSummary}
+                              </div>
+                            )}
+                            {run.outputText && (
+                              <pre className="p-2.5 rounded border border-[#E5E0D5] dark:border-[#262B36] bg-[#FFFFFF] dark:bg-[#171A21] text-[11px] font-mono overflow-x-auto max-h-60 whitespace-pre-wrap break-all text-[#1C1917] dark:text-[#ECEEF2]">
+                                {run.outputText}
+                              </pre>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -932,7 +1246,12 @@ export function GitHubSyncPanel({
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleSelectScope('pushable', (f) => f.canPush)}
+                        onClick={() =>
+                          handleSelectScope(
+                            'pushable',
+                            (f) => f.canPush && f.category !== 'superseded'
+                          )
+                        }
                         className={`text-[#1D4ED8] dark:text-[#60A5FA] hover:underline whitespace-nowrap ${
                           selectionScope === 'pushable' ? 'font-semibold underline' : ''
                         }`}
@@ -956,13 +1275,17 @@ export function GitHubSyncPanel({
                             setSelectionScope('superseded');
                             setSelectedPaths(
                               githubDiff
-                                .filter((f) => f.category === 'superseded')
+                                .filter(
+                                  (f) => f.category === 'superseded' && f.canDeleteRemote
+                                )
                                 .map((f) => f.path)
                             );
                             setIncludeRemoteDeletions(true);
                           }}
                           className={`text-amber-700 dark:text-amber-400 hover:underline whitespace-nowrap ${
-                            selectionScope === 'superseded' ? 'font-semibold underline' : ''
+                            selectionScope === 'superseded'
+                              ? 'font-semibold underline'
+                              : ''
                           }`}
                         >
                           Superseded ({countsByCategory.superseded})
@@ -1037,15 +1360,21 @@ export function GitHubSyncPanel({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <div className="text-xs font-medium">
-                          <code className="font-mono">.gitignore</code> Rules ({gitignoreRules.length})
+                          <code className="font-mono">.gitignore</code> Rules (
+                          {gitignoreRules.length})
                         </div>
                         <div className="text-[11px] text-[#57534E] dark:text-[#9CA3AF]">
-                          Files matching <code className="font-mono">.gitignore</code> stay hidden from active push/pull diffs. Core secret and build cache rules remain protected.
+                          Files matching <code className="font-mono">.gitignore</code> stay
+                          hidden from active push/pull diffs. Core secret and build cache
+                          rules remain protected.
                         </div>
                       </div>
                     </div>
 
-                    <form onSubmit={handleAddPatternSubmit} className="flex flex-wrap items-center gap-2">
+                    <form
+                      onSubmit={handleAddPatternSubmit}
+                      className="flex flex-wrap items-center gap-2"
+                    >
                       <input
                         type="text"
                         value={newIgnorePattern}
@@ -1085,7 +1414,9 @@ export function GitHubSyncPanel({
                             <button
                               type="button"
                               disabled={gitignoreBusy}
-                              onClick={() => handleGitignoreMutation('remove', rule.pattern)}
+                              onClick={() =>
+                                handleGitignoreMutation('remove', rule.pattern)
+                              }
                               className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[#E5E0D5] dark:border-[#262B36] text-[11px] text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50 whitespace-nowrap shrink-0"
                             >
                               <Trash2 className="w-3 h-3" />
@@ -1104,14 +1435,15 @@ export function GitHubSyncPanel({
                     </div>
                     {visibleIgnoredFiles.length === 0 ? (
                       <div className="rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] p-3.5 text-xs text-[#57534E] dark:text-[#9CA3AF]">
-                        {debouncedFileFilter
-                          ? 'No gitignored files match that filter.'
-                          : (
-                            <>
-                              No tracked or workspace files outside build/secret caches are currently matched by{' '}
-                              <code className="font-mono">.gitignore</code>.
-                            </>
-                          )}
+                        {debouncedFileFilter ? (
+                          'No gitignored files match that filter.'
+                        ) : (
+                          <>
+                            No tracked or workspace files outside build/secret caches are
+                            currently matched by{' '}
+                            <code className="font-mono">.gitignore</code>.
+                          </>
+                        )}
                       </div>
                     ) : (
                       <div className="max-h-60 overflow-y-auto rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] divide-y divide-[#E5E0D5] dark:divide-[#262B36]">
@@ -1150,7 +1482,9 @@ export function GitHubSyncPanel({
                                   <button
                                     type="button"
                                     disabled={gitignoreBusy}
-                                    onClick={() => handleGitignoreMutation('unignore', file.path)}
+                                    onClick={() =>
+                                      handleGitignoreMutation('unignore', file.path)
+                                    }
                                     className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[#E5E0D5] dark:border-[#262B36] text-[11px] text-[#1D4ED8] dark:text-[#60A5FA] hover:bg-[#1D4ED8]/10 disabled:opacity-50 whitespace-nowrap"
                                   >
                                     <span>Unignore</span>
@@ -1164,7 +1498,9 @@ export function GitHubSyncPanel({
                     )}
                     {visibleIgnoredFiles.some((f) => f.existsRemote) && (
                       <div className="text-[11px] text-[#57534E] dark:text-[#9CA3AF]">
-                        Check any <span className="font-mono">tracked on main</span> file above to remove its copy from GitHub on your next push while keeping it locally.
+                        Check any <span className="font-mono">tracked on main</span> file
+                        above to remove its copy from GitHub on your next push while
+                        keeping it locally.
                       </div>
                     )}
                   </div>
@@ -1186,31 +1522,41 @@ export function GitHubSyncPanel({
                     return (
                       <div
                         key={file.path}
-                        className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs hover:bg-[#F3F0EA]/60 dark:hover:bg-[#1E232D]/50"
+                        className={`flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs transition-colors ${
+                          isPreviewOpen
+                            ? 'bg-[#1D4ED8]/10 dark:bg-[#1D4ED8]/15'
+                            : 'hover:bg-[#F3F0EA]/60 dark:hover:bg-[#1E232D]/50'
+                        }`}
                       >
-                        <label className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           <input
                             type="checkbox"
                             checked={checked}
                             onChange={() => togglePathSelection(file.path)}
-                            className="rounded border-[#D6D3D1] shrink-0"
+                            aria-label={`Select ${file.path}`}
+                            className="rounded border-[#D6D3D1] shrink-0 cursor-pointer"
                           />
-                          <span className="font-mono truncate">{file.path}</span>
-                        </label>
+                          <button
+                            type="button"
+                            onClick={() => handlePreviewFile(file.path)}
+                            title="Click to view line-by-line changes"
+                            className={`font-mono truncate text-left hover:underline cursor-pointer ${
+                              isPreviewOpen
+                                ? 'text-[#1D4ED8] dark:text-[#60A5FA] font-medium'
+                                : 'text-[#1C1917] dark:text-[#ECEEF2]'
+                            }`}
+                          >
+                            {file.path}
+                          </button>
+                        </div>
                         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                          {file.remoteUpdatedSinceBase && (
-                            <span
-                              className="text-[11px] font-mono text-amber-700 dark:text-amber-400 hidden sm:inline"
-                              title="GitHub main updated this file since its last synced baseline"
-                            >
-                              remote updated
-                            </span>
-                          )}
                           <span className="text-[11px] font-mono text-[#57534E] dark:text-[#9CA3AF] hidden sm:inline">
                             {categoryDisplayLabel(file.category)}
                           </span>
-                          <span className={`text-[11px] font-mono ${statusColorClass(file.status)}`}>
-                            {statusDisplayLabel(file.status)}
+                          <span
+                            className={`text-[11px] font-mono ${statusColorClass(file)}`}
+                          >
+                            {statusDisplayLabel(file)}
                           </span>
                           <span className="text-[11px] font-mono tabular-nums text-[#57534E] dark:text-[#9CA3AF] hidden sm:inline">
                             {file.sizeBytes} B
@@ -1254,7 +1600,9 @@ export function GitHubSyncPanel({
                         Merge Review Required ({mergeQueue.length} file(s))
                       </div>
                       <div className="text-[11px] text-[#57534E] dark:text-[#9CA3AF]">
-                        Both GitHub <code className="font-mono">main</code> and your local workspace edited these files. Apply or save a merged version below so neither side&apos;s changes are overwritten.
+                        Both GitHub <code className="font-mono">main</code> and your local
+                        workspace edited these files. Apply or save a merged version below
+                        so neither side&apos;s changes are overwritten.
                       </div>
                     </div>
                     <button
@@ -1269,13 +1617,15 @@ export function GitHubSyncPanel({
                   {mergeQueue.map((conflict) => {
                     const isBusy = resolvingMergePath === conflict.path;
                     const reasonLabel =
-                      conflict.reason === 'remote_ahead_clean'
-                        ? 'Non-overlapping edits auto-merged (review before applying)'
-                        : conflict.reason === 'overlap'
-                          ? 'Overlapping line conflict'
-                          : conflict.reason === 'binary'
-                            ? 'Binary file conflict'
-                            : 'Two-way comparison (no prior synced baseline)';
+                      conflict.reason === 'deleted_remote'
+                        ? 'Deleted on GitHub by another session'
+                        : conflict.reason === 'remote_ahead_clean'
+                          ? 'Non-overlapping edits auto-merged'
+                          : conflict.reason === 'overlap'
+                            ? 'Overlapping line conflict'
+                            : conflict.reason === 'binary'
+                              ? 'Binary file conflict'
+                              : 'Two-way comparison without prior baseline';
 
                     return (
                       <div
@@ -1291,7 +1641,58 @@ export function GitHubSyncPanel({
                           </span>
                         </div>
 
-                        {conflict.isBinary ? (
+                        {conflict.reason === 'deleted_remote' ? (
+                          <div className="space-y-3">
+                            {!conflict.isBinary && conflict.localContent !== null && (
+                              <div>
+                                <div className="text-[11px] font-mono text-[#57534E] dark:text-[#9CA3AF] mb-1">
+                                  Local Container
+                                </div>
+                                <pre className="max-h-40 overflow-auto rounded border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] p-2 text-[11px] font-mono whitespace-pre-wrap break-all">
+                                  {conflict.localContent}
+                                </pre>
+                              </div>
+                            )}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() =>
+                                  handleResolveMerge(conflict, undefined, 'delete_local')
+                                }
+                                className="px-3 py-1.5 rounded bg-red-700 hover:bg-red-800 text-white text-xs font-medium disabled:opacity-50"
+                              >
+                                {isBusy ? 'Removing...' : 'Delete Local File'}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() =>
+                                  handleResolveMerge(
+                                    conflict,
+                                    mergeDrafts[conflict.path],
+                                    'keep_local'
+                                  )
+                                }
+                                className="px-3 py-1.5 rounded border border-[#1D4ED8] text-[#1D4ED8] dark:text-[#60A5FA] hover:bg-[#1D4ED8]/10 text-xs font-medium disabled:opacity-50"
+                              >
+                                Keep Local File
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() =>
+                                  setMergeQueue((prev) =>
+                                    prev.filter((item) => item.path !== conflict.path)
+                                  )
+                                }
+                                className="px-3 py-1.5 rounded border border-[#E5E0D5] dark:border-[#262B36] text-xs"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : conflict.isBinary ? (
                           <div className="flex flex-wrap items-center gap-2">
                             <button
                               type="button"
@@ -1346,7 +1747,8 @@ export function GitHubSyncPanel({
                                       onClick={() =>
                                         setMergeDrafts((prev) => ({
                                           ...prev,
-                                          [conflict.path]: conflict.suggestedContent || '',
+                                          [conflict.path]:
+                                            conflict.suggestedContent || '',
                                         }))
                                       }
                                       className="text-[#1D4ED8] dark:text-[#60A5FA] hover:underline"
@@ -1429,61 +1831,16 @@ export function GitHubSyncPanel({
               )}
 
               {previewPath && (
-                <div className="rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="font-mono text-xs font-medium truncate">{previewPath}</div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPreviewPath(null);
-                        setPreviewData(null);
-                      }}
-                      className="inline-flex items-center gap-1 text-xs text-[#57534E] dark:text-[#9CA3AF] hover:text-[#1C1917] dark:hover:text-[#ECEEF2]"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                      <span>Close</span>
-                    </button>
-                  </div>
-
-                  {previewLoading ? (
-                    <div className="text-xs text-[#57534E] dark:text-[#9CA3AF]">
-                      Loading file comparison...
-                    </div>
-                  ) : previewData ? (
-                    previewData.isBinary ? (
-                      <div className="text-xs text-[#57534E] dark:text-[#9CA3AF] font-mono">
-                        Binary file · Local: {previewData.existsLocal ? `${previewData.localSize} B` : 'missing'} · Remote main: {previewData.existsRemote ? `${previewData.remoteSize} B` : 'missing'}
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="text-[11px] font-mono text-[#57534E] dark:text-[#9CA3AF]">
-                          {previewData.hasBase
-                            ? previewData.remoteUpdatedSinceBase
-                              ? `Synced baseline: ${previewData.baseSha?.slice(0, 8)} · GitHub main updated (${previewData.remoteSha?.slice(0, 8)})`
-                              : `Synced baseline: ${previewData.baseSha?.slice(0, 8)} (remote unchanged since baseline)`
-                            : 'No prior synced baseline recorded yet'}
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <div>
-                            <div className="text-[11px] font-mono text-[#57534E] dark:text-[#9CA3AF] mb-1">
-                              Remote main ({previewData.existsRemote ? `${previewData.remoteSize} B` : 'not on main'})
-                            </div>
-                            <pre className="max-h-60 overflow-auto rounded border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] p-2.5 text-[11px] font-mono whitespace-pre-wrap break-all">
-                              {previewData.remoteContent ?? '(absent on main)'}
-                            </pre>
-                          </div>
-                          <div>
-                            <div className="text-[11px] font-mono text-[#57534E] dark:text-[#9CA3AF] mb-1">
-                              Local Container ({previewData.existsLocal ? `${previewData.localSize} B` : 'not local'})
-                            </div>
-                            <pre className="max-h-60 overflow-auto rounded border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] p-2.5 text-[11px] font-mono whitespace-pre-wrap break-all">
-                              {previewData.localContent ?? '(absent locally)'}
-                            </pre>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  ) : null}
+                <div ref={diffViewerRef}>
+                  <LineDiffViewer
+                    previewPath={previewPath}
+                    previewLoading={previewLoading}
+                    previewData={previewData}
+                    onClose={() => {
+                      setPreviewPath(null);
+                      setPreviewData(null);
+                    }}
+                  />
                 </div>
               )}
             </div>
@@ -1494,13 +1851,17 @@ export function GitHubSyncPanel({
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] p-3.5 text-xs">
                     <div>
                       <div className="font-medium">
-                        Sync Down: <code className="font-mono">exonomyapp/exonovel@main</code> → Local Container
+                        Sync Down:{' '}
+                        <code className="font-mono">exonomyapp/exonovel@main</code> →
+                        Local Container
                       </div>
                       <div className="mt-0.5 text-[#57534E] dark:text-[#9CA3AF]">
-                        Pulls <span className="font-mono">on main only</span> files and 3-way merges <span className="font-mono">modified</span> files against saved baselines so local edits stay preserved.
+                        Downloads new GitHub files and 3-way merges edited files so local
+                        work stays protected.
                         {selectedPullModifiedCount > 0 && (
                           <span className="text-[#1D4ED8] dark:text-[#60A5FA]">
-                            {' '}({selectedPullModifiedCount} modified file(s) will merge or prompt on conflict)
+                            {' '}
+                            · {selectedPullModifiedCount} will merge or prompt on conflict
                           </span>
                         )}
                       </div>
@@ -1516,7 +1877,7 @@ export function GitHubSyncPanel({
                         <span>
                           {githubPulling
                             ? 'Merging & Pulling...'
-                            : `Pull & Merge from main (${selectedPullFiles.length})`}
+                            : `Pull & Merge (${selectedPullFiles.length})`}
                         </span>
                       </button>
                     </div>
@@ -1534,10 +1895,12 @@ export function GitHubSyncPanel({
                     <span>
                       <span className="font-medium inline-flex items-center gap-1">
                         <Trash2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
-                        Remove {selectedRemoteDeleteCandidates.length} checked &ldquo;on main only&rdquo; file(s) from GitHub on push
+                        Remove {selectedRemoteDeleteCandidates.length} checked GitHub-only
+                        file(s) on push
                       </span>
                       <span className="block mt-0.5 text-[#57534E] dark:text-[#9CA3AF]">
-                        Optional cleanup for superseded files. Leave unchecked to keep remote-only files untouched on <code className="font-mono">main</code>.
+                        Optional cleanup for removed or superseded files. Leave unchecked
+                        to keep them on <code className="font-mono">main</code>.
                       </span>
                     </span>
                   </label>
@@ -1545,23 +1908,39 @@ export function GitHubSyncPanel({
 
                 {selectedUntrackPaths.length > 0 && (
                   <div className="rounded-md border border-amber-300/80 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/20 p-3 text-xs">
-                    {selectedUntrackPaths.length} gitignored file(s) selected to untrack from <code className="font-mono">main</code> on your next push (local copies stay intact).
+                    {selectedUntrackPaths.length} gitignored file(s) selected to untrack
+                    from <code className="font-mono">main</code> on your next push
+                    (local copies stay intact).
                   </div>
                 )}
 
                 <div className="grid gap-3 sm:grid-cols-2 text-xs">
-                  <div>
-                    <label className="block text-[#57534E] dark:text-[#9CA3AF] mb-1">
-                      Commit Message
-                    </label>
-                    <input
-                      type="text"
+                  <div className="sm:col-span-2">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="block text-[#57534E] dark:text-[#9CA3AF]">
+                        Commit Message
+                      </label>
+                      {commitSuggestion?.source === 'authored' && (
+                        <span className="text-[11px] text-[#57534E] dark:text-[#9CA3AF]">
+                          Prepared intent note
+                        </span>
+                      )}
+                    </div>
+                    <textarea
+                      rows={4}
                       value={commitMessage}
-                      onChange={(e) => setCommitMessage(e.target.value)}
-                      placeholder={suggestedCommit || 'chore: update exonomyapp/exonovel'}
-                      className="w-full px-3 py-2 rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] font-mono text-xs"
+                      onChange={(e) => {
+                        commitEditedRef.current = e.target.value.trim().length > 0;
+                        setCommitMessage(e.target.value);
+                      }}
+                      placeholder={
+                        suggestedCommitPlaceholder ||
+                        'Explain what changed and why these edits were made...'
+                      }
+                      className="w-full px-3 py-2 rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] font-mono text-xs focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/40 focus:border-[#1D4ED8]"
                     />
                   </div>
+
                   <div>
                     <label className="block text-[#57534E] dark:text-[#9CA3AF] mb-1">
                       PR Branch Name
@@ -1571,21 +1950,47 @@ export function GitHubSyncPanel({
                       <input
                         type="text"
                         value={branchName}
-                        onChange={(e) => setBranchName(e.target.value)}
-                        className="w-full px-3 py-2 rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] font-mono text-xs"
+                        onChange={(e) => {
+                          branchEditedRef.current = e.target.value.trim().length > 0;
+                          setBranchName(e.target.value);
+                        }}
+                        className="w-full px-3 py-2 rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] font-mono text-xs focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/40 focus:border-[#1D4ED8]"
                       />
                     </div>
                   </div>
-                  <div className="sm:col-span-2">
+
+                  <div>
                     <label className="block text-[#57534E] dark:text-[#9CA3AF] mb-1">
                       Pull Request Title
                     </label>
                     <input
                       type="text"
                       value={prTitle}
-                      onChange={(e) => setPrTitle(e.target.value)}
-                      placeholder={suggestedCommit || 'Summary of changes for exonomyapp/exonovel'}
-                      className="w-full px-3 py-2 rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] text-xs"
+                      onChange={(e) => {
+                        prTitleEditedRef.current = e.target.value.trim().length > 0;
+                        setPrTitle(e.target.value);
+                      }}
+                      placeholder={
+                        suggestedCommitPlaceholder.split('\n')[0] ||
+                        'Summary of changes for exonomyapp/exonovel'
+                      }
+                      className="w-full px-3 py-2 rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] text-xs focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/40 focus:border-[#1D4ED8]"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-[#57534E] dark:text-[#9CA3AF] mb-1">
+                      Pull Request Description (optional)
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={prBody}
+                      onChange={(e) => {
+                        prBodyEditedRef.current = e.target.value.trim().length > 0;
+                        setPrBody(e.target.value);
+                      }}
+                      placeholder="Optional extra context for reviewers; defaults to commit details and file list."
+                      className="w-full px-3 py-2 rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] text-xs focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/40 focus:border-[#1D4ED8]"
                     />
                   </div>
 
@@ -1647,7 +2052,8 @@ export function GitHubSyncPanel({
             {githubStatus.openPulls.length > 0 && (
               <div className="pt-4 border-t border-[#E5E0D5] dark:border-[#262B36]">
                 <div className="text-xs font-medium mb-2">
-                  Open Pull Requests on <code className="font-mono">exonomyapp/exonovel</code>
+                  Open Pull Requests on{' '}
+                  <code className="font-mono">exonomyapp/exonovel</code>
                 </div>
                 <div className="rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] divide-y divide-[#E5E0D5] dark:divide-[#262B36]">
                   {githubStatus.openPulls.map((pr) => (

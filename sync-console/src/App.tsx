@@ -4,13 +4,14 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { Lock, Moon, RefreshCw, Sun } from 'lucide-react';
+import { Lock, Moon, RefreshCw, ShieldAlert, Sun } from 'lucide-react';
 import { GitHubSyncPanel } from './components/GitHubSyncPanel';
 
 interface WorkspaceAuthStatus {
   claimed: boolean;
   source: 'env' | 'claimed' | 'unclaimed';
   unlocked: boolean;
+  aiStudioRestricted?: boolean;
 }
 
 export default function App() {
@@ -52,6 +53,19 @@ export default function App() {
           ? { Authorization: `Bearer ${memoryTokenRef.current}` }
           : undefined,
       });
+      if (res.status === 403) {
+        const body = await res.json().catch(() => ({}));
+        setAuthStatus({
+          claimed: true,
+          source: 'env',
+          unlocked: false,
+          aiStudioRestricted: true,
+        });
+        setError(
+          body.error || 'Sync Console is restricted to AI Studio preview workspaces.'
+        );
+        return;
+      }
       if (!res.ok) {
         throw new Error('Unable to verify workspace session.');
       }
@@ -91,7 +105,7 @@ export default function App() {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
+          'X-Requested-With': 'exonovel-sync',
         },
         body: JSON.stringify({ passcode }),
       });
@@ -118,7 +132,7 @@ export default function App() {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
+          'X-Requested-With': 'exonovel-sync',
           ...(memoryTokenRef.current
             ? { Authorization: `Bearer ${memoryTokenRef.current}` }
             : {}),
@@ -132,9 +146,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF8F4] dark:bg-[#111317] text-[#1C1917] dark:text-[#ECEEF2]">
-      <header className="sticky top-0 z-30 h-14 px-4 sm:px-8 border-b border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4]/95 dark:bg-[#111317]/95 backdrop-blur-sm flex items-center justify-between gap-3 sm:gap-6">
+      <header className="sticky top-0 z-30 h-14 px-4 sm:px-8 border-b border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4]/95 dark:bg-[#111317]/95 backdrop-blur-sm flex items-center justify-between gap-4 sm:gap-8">
         <span className="font-display text-base sm:text-lg font-semibold tracking-tight text-[#1C1917] dark:text-[#ECEEF2] whitespace-nowrap truncate">
-          Update <span className="font-mono text-xs sm:text-sm font-medium">exonomyapp/exonovel</span>
+          Update{' '}
+          <span className="font-mono text-xs sm:text-sm font-medium">
+            exonomyapp/exonovel
+          </span>
         </span>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -146,7 +163,9 @@ export default function App() {
               className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] text-[#1C1917] dark:text-[#ECEEF2] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D] transition-colors whitespace-nowrap shrink-0 min-h-[40px] disabled:opacity-50"
               aria-label="Refresh GitHub diff"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${diffRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${diffRefreshing ? 'animate-spin' : ''}`}
+              />
               <span>
                 {diffRefreshing ? (
                   'Checking...'
@@ -165,7 +184,11 @@ export default function App() {
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#171A21] text-[#1C1917] dark:text-[#ECEEF2] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D] transition-colors whitespace-nowrap shrink-0 min-h-[40px]"
             aria-label={darkMode ? 'Switch to light theme' : 'Switch to dark theme'}
           >
-            {darkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            {darkMode ? (
+              <Sun className="w-3.5 h-3.5" />
+            ) : (
+              <Moon className="w-3.5 h-3.5" />
+            )}
             <span>{darkMode ? 'Light' : 'Dark'}</span>
           </button>
 
@@ -187,6 +210,19 @@ export default function App() {
         {!authStatus ? (
           <div className="py-16 text-sm text-[#57534E] dark:text-[#9CA3AF]">
             Loading workspace session...
+          </div>
+        ) : authStatus.aiStudioRestricted ? (
+          <div className="max-w-md mx-auto mt-10 rounded-lg border border-red-300 dark:border-red-900/60 bg-[#FFFFFF] dark:bg-[#171A21] p-6 sm:p-8">
+            <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+              <ShieldAlert className="w-5 h-5 shrink-0" />
+              <h1 className="font-display text-xl font-semibold tracking-tight">
+                AI Studio Access Only
+              </h1>
+            </div>
+            <p className="mt-2 text-sm text-[#57534E] dark:text-[#9CA3AF]">
+              {error ||
+                'The ExoNovel Sync Console is locked to AI Studio preview workspaces and cannot be accessed from external hosts.'}
+            </p>
           </div>
         ) : authStatus.unlocked ? (
           <GitHubSyncPanel
@@ -229,7 +265,7 @@ export default function App() {
                   value={passcode}
                   onChange={(e) => setPasscode(e.target.value)}
                   placeholder="Enter passcode"
-                  className="w-full px-3.5 py-2.5 text-sm rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] text-[#1C1917] dark:text-[#ECEEF2] focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]"
+                  className="w-full px-3.5 py-2.5 text-sm rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] text-[#1C1917] dark:text-[#ECEEF2] focus:outline-none focus:ring-2 focus:ring-[#1D4ED8] focus:border-[#1D4ED8]"
                 />
               </div>
 

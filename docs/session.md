@@ -2,7 +2,7 @@
 
 > **Shared Multi-Author Coordination Notice (`exonomyapp/exonovel`)**:
 > - Multiple AI Studio accounts and author sessions sync with `exonomyapp/exonovel@main` (`crates/`, `style/`, `assets/`, `.github/`, `docs/`, and the shared `Sync Console`).
-> - **Author Session Attribution**: Because `docs/session.md` is shared across collaborators, every session must track its active changes and notes inside a clearly attributed section identified by the account's email address (e.g., `thalperi@gmail.com`). Collaborators from other accounts should add or update their own `<email>` subsection rather than overwriting another session's work in progress.
+> - **Author Session Attribution**: Because `docs/session.md` is shared across collaborators, every session must track its active changes and notes inside a clearly attributed section identified by the account's email address (e.g., `thalperi@gmail.com`, `tamiroslaw@gmail.com`). Collaborators from other accounts should add or update their own `<email>` subsection rather than overwriting another session's work in progress.
 
 ---
 
@@ -28,6 +28,27 @@
 ---
 
 ## 3. Active Work & Staged Changes by Author Session
+
+### Author Session: `tamiroslaw@gmail.com` (AI Studio Workspace)
+*Scope: Sync Console clean segregation into `sync-console/` and feature/security upgrades prepared in this container.*
+
+1. **Clean Segregation into `sync-console/` (`sync-console/`, `server.ts`, `index.html`, `vite.config.ts`, `workspace.md`)**:
+   - Segregated the Sync Console backend (`sync-console/server/`) and frontend (`sync-console/src/`) out of the repository root so ExoNovel's Rust codebase (`crates/`, `style/`, `assets/`) remains untouched and unmixed, while keeping root `server.ts` as a 1-line launcher into `sync-console/server/index.ts`.
+   - Classified legacy root `server/` and `src/` files as `Superseded on main` so they can be cleanly reviewed and removed when ready.
+2. **AI-Studio-Only Restriction, Passcode Hardening & 7-Day Persistence (`sync-console/server/workspaceAuth.ts`, `sync-console/src/App.tsx`)**:
+   - Restricted Sync Console web and API access strictly to AI Studio preview and loopback hosts (`requireAiStudioEnvironment`), returning HTTP `403` on external public hosts.
+   - Added `scrypt` verification for `ADMIN_PASSCODE`, 5-attempt lockout rate limiting, persistent dual-secret 7-day session signing keys (`HttpOnly; Secure; SameSite=None; Partitioned` cookie + Bearer token), and `X-Requested-With: exonovel-sync` + allowed Origin checks on mutations.
+3. **Live Website Probe, Intent Commit Box, Inline CI Logs, SSE Auto-Refresh, Line Diffs & `Cargo.lock` Safety (`sync-console/server/githubSync.ts`, `sync-console/server/githubMonitor.ts`, `sync-console/src/components/`)**:
+   - Added live website health probing (`https://exonovel.exosystems.net/` and `/api/health`) directly on the Sync Console dashboard.
+   - Added automatic SSE live updates via ETag (`If-None-Match`) GitHub polling (`/api/admin/github/events`) so pushes from any session update the open UI automatically.
+   - Added expandable inline GitHub Actions summary and full failure logs on the dashboard without leaving the page.
+   - Replaced the single-line commit input with a multi-line Commit Message `<textarea>` (4000-char cap) pre-filled from `.local/pending-commit.json` and cleared after push, plus an optional Pull Request Description `<textarea>`, while keeping Standard Merge (`merge_method: 'merge'`).
+   - Added `LineDiffViewer.tsx` defaulting to color-coded line-by-line diffs (opened directly by clicking any file name or its `Diff` button) with `Changes Only` / `Show Full File` and `Side-by-Side` toggles.
+   - Protected `Cargo.lock` from deletion and hid it from the workspace diff list (`REMOTE_MANAGED_HIDDEN_FILES`).
+4. **Communication & Label Clarity (`AGENTS.md`, `sync-console/src/components/GitHubSyncPanel.tsx`)**:
+   - Refined Rule 9 concisely to keep answers balanced at a project-manager level—focused on outcomes and real consequences rather than code mechanics or oversimplified basics.
+   - Replaced location-only diff statuses with concise reconciliation labels (`Add to GitHub`, `Edited here`, `Both changed · merge`, `New on GitHub`, `Removed here`, `Deleted on GitHub`, and `Unused local` for obsolete local-only files) and excluded obsolete local files from push/cleanup selections (`canPush: category !== 'superseded'`).
+   - Added baseline-backed detection for files deleted on GitHub by other sessions (`deleted_remote`): blocks accidental re-upload on push, removes unmodified local copies on pull, and resolves modified/deleted conflicts in Merge Review (`Delete Local File` / `Keep Local File`).
 
 ### Author Session: `thalperi@gmail.com` (AI Studio Workspace)
 *Scope: Both `exonomyapp/exonovel` product changes and shared `Sync Console` tooling authored from this account.*
