@@ -7,6 +7,7 @@ import {
   type FormEvent,
 } from 'react';
 import {
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -29,6 +30,45 @@ import {
   LineDiffViewer,
   type WorkspaceFileDiffDetail,
 } from './LineDiffViewer';
+
+function ThemedCheckbox({
+  checked,
+  onChange,
+  ariaLabel,
+  title,
+  className = '',
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  ariaLabel?: string;
+  title?: string;
+  className?: string;
+}) {
+  return (
+    <span
+      className={`relative inline-flex items-center justify-center w-3.5 h-3.5 shrink-0 ${className}`}
+      title={title}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        aria-label={ariaLabel}
+        className="peer absolute inset-0 h-full w-full opacity-0 cursor-pointer m-0"
+      />
+      <span
+        aria-hidden="true"
+        className={`w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center transition-colors pointer-events-none peer-focus-visible:ring-2 peer-focus-visible:ring-[#1D4ED8]/40 peer-focus-visible:border-[#1D4ED8] ${
+          checked
+            ? 'border-[#1D4ED8] bg-[#1D4ED8] text-white'
+            : 'border-[#D6D3D1] dark:border-[#374151] bg-[#FAF8F4] dark:bg-[#111317] text-transparent peer-hover:border-[#1D4ED8]/60 dark:peer-hover:border-[#60A5FA]/60'
+        }`}
+      >
+        <Check className="w-2.5 h-2.5" strokeWidth={3} />
+      </span>
+    </span>
+  );
+}
 
 interface GitHubOpenPull {
   number: number;
@@ -181,7 +221,9 @@ function statusDisplayLabel(file: WorkspaceDiffEntry): string {
     return 'Obsolete · review';
   }
   if (file.status === 'added_local') return 'Add to GitHub';
-  if (file.status === 'remote_only') return 'New on GitHub';
+  if (file.status === 'remote_only') {
+    return file.hasBase && !file.remoteUpdatedSinceBase ? 'Removed here' : 'New on GitHub';
+  }
   return file.remoteUpdatedSinceBase ? 'Both changed · merge' : 'Edited here';
 }
 
@@ -246,6 +288,8 @@ export function GitHubSyncPanel({
   const [confirmDirectPush, setConfirmDirectPush] = useState(false);
 
   const [expandedCheckId, setExpandedCheckId] = useState<number | null>(null);
+  const [statusPanelExpanded, setStatusPanelExpanded] = useState(false);
+  const prefsLoadedRef = useRef(false);
   const [liveConnected, setLiveConnected] = useState(false);
 
   const [mergeQueue, setMergeQueue] = useState<MergeConflictEntry[]>([]);
@@ -318,11 +362,24 @@ export function GitHubSyncPanel({
     setError(null);
     setConfirmDirectPush(false);
     try {
-      const [statusRes, diffRes, probeRes] = await Promise.all([
+      const [statusRes, diffRes, probeRes, prefsRes] = await Promise.all([
         authFetch('/api/admin/github/status'),
         authFetch('/api/admin/github/diff'),
         authFetch('/api/admin/github/prod-probe').catch(() => null),
+        !prefsLoadedRef.current
+          ? authFetch('/api/admin/github/ui-prefs').catch(() => null)
+          : Promise.resolve(null),
       ]);
+
+      if (prefsRes && prefsRes.ok) {
+        const prefsData = (await prefsRes.json().catch(() => null)) as {
+          statusPanelExpanded?: boolean;
+        } | null;
+        if (prefsData && typeof prefsData.statusPanelExpanded === 'boolean') {
+          prefsLoadedRef.current = true;
+          setStatusPanelExpanded(prefsData.statusPanelExpanded);
+        }
+      }
 
       if (statusRes.ok) {
         const statusData = (await statusRes.json()) as GitHubSyncStatus;
@@ -521,8 +578,6 @@ export function GitHubSyncPanel({
     };
   }, [githubDiff, ignoredFiles.length]);
 
-  const isSelectAllSelected = selectionScope === 'all';
-
   const baseCategoryAndTextFiles = useMemo(() => {
     if (categoryFilter === 'ignored') return [];
     const byCategory =
@@ -536,7 +591,7 @@ export function GitHubSyncPanel({
   }, [githubDiff, categoryFilter, debouncedFileFilter]);
 
   const visibleFiles = useMemo(() => {
-    if (!filterBySelectedScope || isSelectAllSelected) {
+    if (!filterBySelectedScope) {
       return baseCategoryAndTextFiles;
     }
     if (selectionScope === 'pushable') {
@@ -553,7 +608,6 @@ export function GitHubSyncPanel({
   }, [
     baseCategoryAndTextFiles,
     filterBySelectedScope,
-    isSelectAllSelected,
     selectionScope,
     selectedPaths,
   ]);
@@ -631,9 +685,6 @@ export function GitHubSyncPanel({
   ) => {
     setConfirmDirectPush(false);
     setSelectionScope(scope);
-    if (scope === 'all') {
-      setFilterBySelectedScope(false);
-    }
     const matching = baseCategoryAndTextFiles.filter(predicate).map((f) => f.path);
     setSelectedPaths(matching);
   };
@@ -1007,13 +1058,13 @@ export function GitHubSyncPanel({
       </div>
 
       {error && (
-        <div className="mt-4 p-3.5 rounded-lg border border-red-300 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 text-xs text-red-700 dark:text-red-300">
+        <div className="mt-2 p-3.5 rounded-lg border border-red-300 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 text-xs text-red-700 dark:text-red-300">
           {error}
         </div>
       )}
 
       {githubNotice && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-lg border border-emerald-300 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/30 text-xs text-emerald-800 dark:text-emerald-200">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-lg border border-emerald-300 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/30 text-xs text-emerald-800 dark:text-emerald-200">
           <span>{githubNotice.message}</span>
           {githubNotice.url && (
             <a
@@ -1029,7 +1080,7 @@ export function GitHubSyncPanel({
         </div>
       )}
 
-      <div className="mt-5 rounded-lg border border-[#E5E0D5] dark:border-[#262B36] bg-[#FFFFFF] dark:bg-[#171A21] p-5 sm:p-6 space-y-6">
+      <div className="mt-2.5 rounded-lg border border-[#E5E0D5] dark:border-[#262B36] bg-[#FFFFFF] dark:bg-[#171A21] p-2.5 sm:p-3 space-y-3">
         {!githubStatus ? (
           <div className="text-xs text-[#57534E] dark:text-[#9CA3AF]">
             Checking GitHub repository status...
@@ -1040,88 +1091,208 @@ export function GitHubSyncPanel({
           </div>
         ) : (
           <>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-xs">
-              <div className="border-b lg:border-b-0 lg:border-r border-[#E5E0D5] dark:border-[#262B36] pb-3 lg:pb-0 lg:pr-4">
-                <div className="text-[#57534E] dark:text-[#9CA3AF]">
-                  Authenticated Account
-                </div>
-                <div className="mt-1 font-medium font-mono">
-                  @{githubStatus.tokenUser || 'unknown'}
-                </div>
-                <div className="mt-0.5 text-[#57534E] dark:text-[#9CA3AF]">
-                  Write access:{' '}
-                  {githubStatus.permissions?.push ? 'enabled' : 'read-only'}
-                  {githubStatus.scopes ? ` · ${githubStatus.scopes.join(', ')}` : ''}
-                </div>
-              </div>
+            <div className="border border-[#E5E0D5] dark:border-[#262B36] rounded-md bg-[#FAF8F4] dark:bg-[#111317] text-xs">
+              {(() => {
+                const toggleStatusPanel = () => {
+                  setStatusPanelExpanded((prev) => {
+                    const next = !prev;
+                    prefsLoadedRef.current = true;
+                    void authFetch('/api/admin/github/ui-prefs', {
+                      method: 'PATCH',
+                      body: JSON.stringify({ statusPanelExpanded: next }),
+                    }).catch(() => {});
+                    return next;
+                  });
+                };
 
-              <div className="border-b lg:border-b-0 lg:border-r border-[#E5E0D5] dark:border-[#262B36] pb-3 lg:pb-0 lg:pr-4">
-                <div className="text-[#57534E] dark:text-[#9CA3AF]">Target Branch</div>
-                <div className="mt-1 font-medium font-mono tabular-nums">
-                  {githubStatus.baseBranch} ({githubStatus.headSha?.slice(0, 8) || '—'})
-                </div>
-                <div className="mt-0.5 truncate text-[#57534E] dark:text-[#9CA3AF]">
-                  {githubStatus.headMessage || 'No commit message'}
-                </div>
-              </div>
+                const healthyProbeCount = prodProbe
+                  ? prodProbe.results.filter((r) => r.ok).length
+                  : 0;
+                const totalProbeCount = prodProbe ? prodProbe.results.length : 0;
 
-              <div className="border-b sm:border-b-0 lg:border-r border-[#E5E0D5] dark:border-[#262B36] pb-3 sm:pb-0 lg:pr-4">
-                <div className="text-[#57534E] dark:text-[#9CA3AF]">
-                  Branch Protection
-                </div>
-                <div className="mt-1 font-medium">
-                  {githubStatus.protectedBranch ? 'Protected' : 'Direct push allowed'}
-                </div>
-                <div className="mt-0.5 text-[#57534E] dark:text-[#9CA3AF] tabular-nums">
-                  Open PRs: {githubStatus.openPulls.length}
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between gap-2 text-[#57534E] dark:text-[#9CA3AF]">
-                  <span>Live Website</span>
-                  <a
-                    href="https://exonovel.exosystems.net/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[#1D4ED8] dark:text-[#60A5FA] hover:underline whitespace-nowrap"
-                  >
-                    <Globe className="w-3 h-3" />
-                    <span>Open</span>
-                  </a>
-                </div>
-                <div className="mt-1 space-y-0.5 font-mono tabular-nums">
-                  {!prodProbe ? (
-                    <div className="text-[#57534E] dark:text-[#9CA3AF]">
-                      Checking exonovel.exosystems.net...
-                    </div>
-                  ) : (
-                    prodProbe.results.map((item) => (
-                      <div
-                        key={item.path}
-                        className="flex items-center justify-between gap-2"
+                return (
+                  <>
+                    <div className="flex items-center justify-between gap-2 px-3 py-1 leading-tight">
+                      <button
+                        type="button"
+                        id="sync-status-panel-btn"
+                        aria-expanded={statusPanelExpanded}
+                        aria-controls="sync-status-panel-body"
+                        onClick={toggleStatusPanel}
+                        className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0 flex-1 text-left hover:opacity-85 transition-opacity"
                       >
-                        <span className="text-[#57534E] dark:text-[#9CA3AF]">
-                          {item.path}
+                        <span className="font-mono text-[#1C1917] dark:text-[#ECEEF2]">
+                          @{githubStatus.tokenUser || 'unknown'}
+                          <span
+                            className={`ml-1.5 ${
+                              githubStatus.permissions?.push
+                                ? 'text-emerald-700 dark:text-emerald-400'
+                                : 'text-amber-700 dark:text-amber-400'
+                            }`}
+                          >
+                            ({githubStatus.permissions?.push ? 'write' : 'read-only'})
+                          </span>
                         </span>
-                        <span
-                          className={
-                            item.ok
-                              ? 'text-emerald-700 dark:text-emerald-400 font-medium'
-                              : 'text-red-700 dark:text-red-400 font-medium'
-                          }
+                        <span className="text-[#D6D3D1] dark:text-[#374151]">·</span>
+                        <span className="font-mono tabular-nums text-[#1C1917] dark:text-[#ECEEF2]">
+                          {githubStatus.baseBranch} (
+                          {githubStatus.headSha?.slice(0, 8) || '—'})
+                        </span>
+                        <span className="text-[#D6D3D1] dark:text-[#374151]">·</span>
+                        <span className="text-[#57534E] dark:text-[#9CA3AF] tabular-nums">
+                          {githubStatus.protectedBranch
+                            ? 'Protected'
+                            : 'Direct push'}{' '}
+                          ({githubStatus.openPulls.length} PR
+                          {githubStatus.openPulls.length === 1 ? '' : 's'})
+                        </span>
+                        <span className="text-[#D6D3D1] dark:text-[#374151]">·</span>
+                        {!prodProbe ? (
+                          <span className="font-mono text-[#57534E] dark:text-[#9CA3AF]">
+                            Live: checking...
+                          </span>
+                        ) : (
+                          <span
+                            className={`font-mono tabular-nums font-medium ${
+                              prodProbe.allHealthy
+                                ? 'text-emerald-700 dark:text-emerald-400'
+                                : 'text-red-700 dark:text-red-400'
+                            }`}
+                          >
+                            Live: {healthyProbeCount}/{totalProbeCount} OK
+                          </span>
+                        )}
+                      </button>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <a
+                          href="https://exonovel.exosystems.net/"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-[#1D4ED8] dark:text-[#60A5FA] hover:underline whitespace-nowrap"
                         >
-                          {item.note}
-                        </span>
+                          <Globe className="w-3 h-3" />
+                          <span>Open</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={toggleStatusPanel}
+                          aria-expanded={statusPanelExpanded}
+                          aria-controls="sync-status-panel-body"
+                          aria-label={
+                            statusPanelExpanded
+                              ? 'Collapse repository and website status'
+                              : 'Expand repository and website status'
+                          }
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[#E5E0D5] dark:border-[#262B36] text-[11px] leading-tight text-[#57534E] dark:text-[#9CA3AF] hover:text-[#1C1917] dark:hover:text-[#ECEEF2] whitespace-nowrap"
+                        >
+                          <span>{statusPanelExpanded ? 'Collapse' : 'Details'}</span>
+                          {statusPanelExpanded ? (
+                            <ChevronUp className="w-3 h-3" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          )}
+                        </button>
                       </div>
-                    ))
-                  )}
-                </div>
-              </div>
+                    </div>
+
+                    {statusPanelExpanded && (
+                      <div
+                        id="sync-status-panel-body"
+                        role="region"
+                        aria-labelledby="sync-status-panel-btn"
+                        className="border-t border-[#E5E0D5] dark:border-[#262B36] divide-y divide-[#E5E0D5] dark:divide-[#262B36] bg-[#FFFFFF] dark:bg-[#171A21]"
+                      >
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-3 py-1 leading-tight">
+                          <span className="text-[#57534E] dark:text-[#9CA3AF] w-36 shrink-0">
+                            Authenticated Account
+                          </span>
+                          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 flex-1 min-w-0">
+                            <span className="font-medium font-mono">
+                              @{githubStatus.tokenUser || 'unknown'}
+                            </span>
+                            <span className="text-[#57534E] dark:text-[#9CA3AF]">
+                              Write access:{' '}
+                              {githubStatus.permissions?.push ? 'enabled' : 'read-only'}
+                              {githubStatus.scopes && githubStatus.scopes.length > 0
+                                ? ` · ${githubStatus.scopes.join(', ')}`
+                                : ''}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-3 py-1 leading-tight">
+                          <span className="text-[#57534E] dark:text-[#9CA3AF] w-36 shrink-0">
+                            Target Branch
+                          </span>
+                          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 flex-1 min-w-0">
+                            <span className="font-medium font-mono tabular-nums shrink-0">
+                              {githubStatus.baseBranch} (
+                              {githubStatus.headSha?.slice(0, 8) || '—'})
+                            </span>
+                            <span className="text-[#57534E] dark:text-[#9CA3AF] truncate min-w-0">
+                              {githubStatus.headMessage || 'No commit message'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-3 py-1 leading-tight">
+                          <span className="text-[#57534E] dark:text-[#9CA3AF] w-36 shrink-0">
+                            Branch Protection
+                          </span>
+                          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 flex-1 min-w-0">
+                            <span className="font-medium">
+                              {githubStatus.protectedBranch
+                                ? 'Protected'
+                                : 'Direct push allowed'}
+                            </span>
+                            <span className="text-[#57534E] dark:text-[#9CA3AF] tabular-nums">
+                              Open PRs: {githubStatus.openPulls.length}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-3 py-1 leading-tight">
+                          <span className="text-[#57534E] dark:text-[#9CA3AF] w-36 shrink-0">
+                            Live Website
+                          </span>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 flex-1 min-w-0 font-mono tabular-nums">
+                            {!prodProbe ? (
+                              <span className="text-[#57534E] dark:text-[#9CA3AF]">
+                                Checking exonovel.exosystems.net...
+                              </span>
+                            ) : (
+                              prodProbe.results.map((item) => (
+                                <span
+                                  key={item.path}
+                                  className="inline-flex items-center gap-1.5"
+                                >
+                                  <span className="text-[#57534E] dark:text-[#9CA3AF]">
+                                    {item.path}
+                                  </span>
+                                  <span
+                                    className={
+                                      item.ok
+                                        ? 'text-emerald-700 dark:text-emerald-400 font-medium'
+                                        : 'text-red-700 dark:text-red-400 font-medium'
+                                    }
+                                  >
+                                    {item.note}
+                                  </span>
+                                </span>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             {githubStatus.checkRuns.length > 0 && (
-              <div className="pt-4 border-t border-[#E5E0D5] dark:border-[#262B36]">
+              <div className="pt-2 border-t border-[#E5E0D5] dark:border-[#262B36]">
                 <div className="text-xs font-medium mb-2">
                   Latest GitHub Actions on <code className="font-mono">main</code>
                 </div>
@@ -1142,8 +1313,12 @@ export function GitHubSyncPanel({
                     const isExpanded = expandedCheckId === run.id;
 
                     return (
-                      <div key={run.id} className="text-xs">
-                        <div className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5">
+                      <div key={run.id} className="text-xs leading-tight">
+                        <div
+                          className={`flex flex-wrap items-center justify-between gap-3 px-3 ${
+                            hasLog ? 'py-0.5' : 'py-1'
+                          }`}
+                        >
                           <div className="flex items-center gap-2 min-w-0">
                             {passed ? (
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
@@ -1164,7 +1339,7 @@ export function GitHubSyncPanel({
                                     cur === run.id ? null : run.id
                                   )
                                 }
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[#E5E0D5] dark:border-[#262B36] text-[11px] text-[#57534E] dark:text-[#9CA3AF] hover:text-[#1C1917] dark:hover:text-[#ECEEF2] whitespace-nowrap"
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[#E5E0D5] dark:border-[#262B36] text-[11px] leading-tight text-[#57534E] dark:text-[#9CA3AF] hover:text-[#1C1917] dark:hover:text-[#ECEEF2] whitespace-nowrap"
                               >
                                 <span>{isExpanded ? 'Hide Log' : 'Read Log'}</span>
                                 {isExpanded ? (
@@ -1207,7 +1382,7 @@ export function GitHubSyncPanel({
               </div>
             )}
 
-            <div className="pt-4 border-t border-[#E5E0D5] dark:border-[#262B36] space-y-3">
+            <div className="pt-2 border-t border-[#E5E0D5] dark:border-[#262B36] space-y-3">
               <div className="flex flex-wrap items-center gap-1.5">
                 {filterTabs.map((tab) => {
                   const active = categoryFilter === tab.id;
@@ -1304,23 +1479,12 @@ export function GitHubSyncPanel({
                         Clear
                       </button>
                       <label
-                        className={`inline-flex items-center gap-1.5 whitespace-nowrap select-none ${
-                          isSelectAllSelected
-                            ? 'text-[#A8A29E] dark:text-[#4B5563] cursor-not-allowed'
-                            : 'text-[#57534E] dark:text-[#9CA3AF] hover:text-[#1C1917] dark:hover:text-[#ECEEF2] cursor-pointer'
-                        }`}
-                        title={
-                          isSelectAllSelected
-                            ? 'Disabled while Select All is active'
-                            : 'Filter list to the selected category'
-                        }
+                        className="inline-flex items-center gap-1.5 whitespace-nowrap select-none text-[#57534E] dark:text-[#9CA3AF] hover:text-[#1C1917] dark:hover:text-[#ECEEF2] cursor-pointer"
+                        title="Filter list to the selected files"
                       >
-                        <input
-                          type="checkbox"
-                          checked={filterBySelectedScope && !isSelectAllSelected}
-                          disabled={isSelectAllSelected}
-                          onChange={(e) => setFilterBySelectedScope(e.target.checked)}
-                          className="rounded border-[#D6D3D1] dark:border-[#374151] disabled:opacity-50"
+                        <ThemedCheckbox
+                          checked={filterBySelectedScope}
+                          onChange={setFilterBySelectedScope}
                         />
                         <span>Filter</span>
                       </label>
@@ -1355,7 +1519,7 @@ export function GitHubSyncPanel({
               )}
 
               {categoryFilter === 'ignored' ? (
-                <div className="space-y-4">
+                <div className="space-y-2">
                   <div className="rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] p-3.5 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
@@ -1396,7 +1560,9 @@ export function GitHubSyncPanel({
                       {gitignoreRules.map((rule) => (
                         <div
                           key={rule.pattern}
-                          className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
+                          className={`flex items-center justify-between gap-3 px-3 ${
+                            rule.locked ? 'py-1' : 'py-0.5'
+                          } text-xs leading-tight`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
                             <code className="font-mono truncate">{rule.pattern}</code>
@@ -1417,7 +1583,7 @@ export function GitHubSyncPanel({
                               onClick={() =>
                                 handleGitignoreMutation('remove', rule.pattern)
                               }
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[#E5E0D5] dark:border-[#262B36] text-[11px] text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50 whitespace-nowrap shrink-0"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[#E5E0D5] dark:border-[#262B36] text-[11px] leading-tight text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50 whitespace-nowrap shrink-0"
                             >
                               <Trash2 className="w-3 h-3" />
                               <span>Remove</span>
@@ -1452,16 +1618,16 @@ export function GitHubSyncPanel({
                           return (
                             <div
                               key={file.path}
-                              className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 text-xs"
+                              className={`flex flex-wrap items-center justify-between gap-2 px-3 ${
+                                file.ruleLocked ? 'py-1' : 'py-0.5'
+                              } text-xs leading-tight`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                 {file.existsRemote && (
-                                  <input
-                                    type="checkbox"
+                                  <ThemedCheckbox
                                     checked={untrackChecked}
                                     onChange={() => toggleUntrackSelection(file.path)}
                                     title="Select to untrack (remove) this ignored file from GitHub main on push"
-                                    className="rounded border-[#D6D3D1] shrink-0"
                                   />
                                 )}
                                 <span className="font-mono truncate">{file.path}</span>
@@ -1485,7 +1651,7 @@ export function GitHubSyncPanel({
                                     onClick={() =>
                                       handleGitignoreMutation('unignore', file.path)
                                     }
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[#E5E0D5] dark:border-[#262B36] text-[11px] text-[#1D4ED8] dark:text-[#60A5FA] hover:bg-[#1D4ED8]/10 disabled:opacity-50 whitespace-nowrap"
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[#E5E0D5] dark:border-[#262B36] text-[11px] leading-tight text-[#1D4ED8] dark:text-[#60A5FA] hover:bg-[#1D4ED8]/10 disabled:opacity-50 whitespace-nowrap"
                                   >
                                     <span>Unignore</span>
                                   </button>
@@ -1522,19 +1688,17 @@ export function GitHubSyncPanel({
                     return (
                       <div
                         key={file.path}
-                        className={`flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs transition-colors ${
+                        className={`flex items-center justify-between gap-3 px-3 py-0.5 text-xs leading-tight transition-colors ${
                           isPreviewOpen
                             ? 'bg-[#1D4ED8]/10 dark:bg-[#1D4ED8]/15'
                             : 'hover:bg-[#F3F0EA]/60 dark:hover:bg-[#1E232D]/50'
                         }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          <input
-                            type="checkbox"
+                          <ThemedCheckbox
                             checked={checked}
                             onChange={() => togglePathSelection(file.path)}
-                            aria-label={`Select ${file.path}`}
-                            className="rounded border-[#D6D3D1] shrink-0 cursor-pointer"
+                            ariaLabel={`Select ${file.path}`}
                           />
                           <button
                             type="button"
@@ -1564,7 +1728,7 @@ export function GitHubSyncPanel({
                           <button
                             type="button"
                             onClick={() => handlePreviewFile(file.path)}
-                            className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-[11px] whitespace-nowrap ${
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[11px] leading-tight whitespace-nowrap ${
                               isPreviewOpen
                                 ? 'border-[#1D4ED8] text-[#1D4ED8] dark:text-[#60A5FA]'
                                 : 'border-[#E5E0D5] dark:border-[#262B36] text-[#57534E] dark:text-[#9CA3AF] hover:text-[#1C1917] dark:hover:text-[#ECEEF2]'
@@ -1579,7 +1743,7 @@ export function GitHubSyncPanel({
                               disabled={gitignoreBusy}
                               onClick={() => handleGitignoreMutation('add', file.path)}
                               title="Add this file path to .gitignore"
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[#E5E0D5] dark:border-[#262B36] text-[11px] text-[#57534E] dark:text-[#9CA3AF] hover:text-[#1C1917] dark:hover:text-[#ECEEF2] disabled:opacity-50 whitespace-nowrap"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[#E5E0D5] dark:border-[#262B36] text-[11px] leading-tight text-[#57534E] dark:text-[#9CA3AF] hover:text-[#1C1917] dark:hover:text-[#ECEEF2] disabled:opacity-50 whitespace-nowrap"
                             >
                               <EyeOff className="w-3 h-3" />
                               <span className="hidden sm:inline">Ignore</span>
@@ -1846,7 +2010,7 @@ export function GitHubSyncPanel({
             </div>
 
             {(githubDiff.length > 0 || selectedUntrackPaths.length > 0) && (
-              <div className="space-y-4 pt-3 border-t border-[#E5E0D5] dark:border-[#262B36]">
+              <div className="space-y-2 pt-1.5 border-t border-[#E5E0D5] dark:border-[#262B36]">
                 {githubDiff.length > 0 && (
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4] dark:bg-[#111317] p-3.5 text-xs">
                     <div>
@@ -1886,11 +2050,10 @@ export function GitHubSyncPanel({
 
                 {selectedRemoteDeleteCandidates.length > 0 && (
                   <label className="flex items-start gap-2.5 rounded-md border border-amber-300/80 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/20 p-3 text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
+                    <ThemedCheckbox
                       checked={includeRemoteDeletions}
-                      onChange={(e) => setIncludeRemoteDeletions(e.target.checked)}
-                      className="mt-0.5 rounded border-[#D6D3D1]"
+                      onChange={setIncludeRemoteDeletions}
+                      className="mt-0.5"
                     />
                     <span>
                       <span className="font-medium inline-flex items-center gap-1">
@@ -2050,7 +2213,7 @@ export function GitHubSyncPanel({
             )}
 
             {githubStatus.openPulls.length > 0 && (
-              <div className="pt-4 border-t border-[#E5E0D5] dark:border-[#262B36]">
+              <div className="pt-2 border-t border-[#E5E0D5] dark:border-[#262B36]">
                 <div className="text-xs font-medium mb-2">
                   Open Pull Requests on{' '}
                   <code className="font-mono">exonomyapp/exonovel</code>
@@ -2059,7 +2222,7 @@ export function GitHubSyncPanel({
                   {githubStatus.openPulls.map((pr) => (
                     <div
                       key={pr.number}
-                      className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 text-xs"
+                      className="flex flex-wrap items-center justify-between gap-3 px-3 py-1 text-xs leading-tight"
                     >
                       <div className="min-w-0">
                         <div className="font-medium">
@@ -2074,7 +2237,7 @@ export function GitHubSyncPanel({
                           href={pr.htmlUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded border border-[#E5E0D5] dark:border-[#262B36] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D] whitespace-nowrap"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-[#E5E0D5] dark:border-[#262B36] hover:bg-[#F3F0EA] dark:hover:bg-[#1E232D] leading-tight whitespace-nowrap"
                         >
                           <span>GitHub</span>
                           <ExternalLink className="w-3 h-3" />
@@ -2083,7 +2246,7 @@ export function GitHubSyncPanel({
                           type="button"
                           disabled={mergingPr === pr.number}
                           onClick={() => handleMergePullRequest(pr.number)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-800 text-white whitespace-nowrap disabled:opacity-50"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-700 hover:bg-emerald-800 text-white leading-tight whitespace-nowrap disabled:opacity-50"
                         >
                           <GitMerge className="w-3 h-3" />
                           <span>

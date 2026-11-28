@@ -1378,13 +1378,13 @@ fn DearWorldGuidesView(
                         {move || {
                             let cur = selected_slug.get();
                             guides.get().into_iter().map(|g| {
-                                let slug_cmp = g.slug.clone();
+                                let is_active = cur == g.slug;
                                 let slug_click = g.slug.clone();
                                 let mins_suffix = i18n.tr("cms_min_read_suffix", "min read");
                                 view! {
                                     <button
                                         type="button"
-                                        class=move || if cur == slug_cmp {
+                                        class=if is_active {
                                             "exo-guides-chapter-btn exo-guides-chapter-active"
                                         } else {
                                             "exo-guides-chapter-btn"

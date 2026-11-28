@@ -146,7 +146,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF8F4] dark:bg-[#111317] text-[#1C1917] dark:text-[#ECEEF2]">
-      <header className="sticky top-0 z-30 h-14 px-4 sm:px-8 border-b border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4]/95 dark:bg-[#111317]/95 backdrop-blur-sm flex items-center justify-between gap-4 sm:gap-8">
+      <header className="sticky top-0 z-30 h-14 px-2 sm:px-4 border-b border-[#E5E0D5] dark:border-[#262B36] bg-[#FAF8F4]/95 dark:bg-[#111317]/95 backdrop-blur-sm flex items-center justify-between gap-4 sm:gap-8">
         <span className="font-display text-base sm:text-lg font-semibold tracking-tight text-[#1C1917] dark:text-[#ECEEF2] whitespace-nowrap truncate">
           Update{' '}
           <span className="font-mono text-xs sm:text-sm font-medium">
@@ -206,13 +206,13 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 w-full max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-2.5 sm:px-4 py-4 sm:py-5">
         {!authStatus ? (
           <div className="py-16 text-sm text-[#57534E] dark:text-[#9CA3AF]">
             Loading workspace session...
           </div>
         ) : authStatus.aiStudioRestricted ? (
-          <div className="max-w-md mx-auto mt-10 rounded-lg border border-red-300 dark:border-red-900/60 bg-[#FFFFFF] dark:bg-[#171A21] p-6 sm:p-8">
+          <div className="max-w-md mx-auto mt-10 rounded-lg border border-red-300 dark:border-red-900/60 bg-[#FFFFFF] dark:bg-[#171A21] p-3 sm:p-4">
             <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
               <ShieldAlert className="w-5 h-5 shrink-0" />
               <h1 className="font-display text-xl font-semibold tracking-tight">
@@ -232,7 +232,7 @@ export default function App() {
             onUnauthorized={handleUnauthorized}
           />
         ) : (
-          <div className="max-w-md mx-auto mt-10 rounded-lg border border-[#E5E0D5] dark:border-[#262B36] bg-[#FFFFFF] dark:bg-[#171A21] p-6 sm:p-8">
+          <div className="max-w-md mx-auto mt-10 rounded-lg border border-[#E5E0D5] dark:border-[#262B36] bg-[#FFFFFF] dark:bg-[#171A21] p-3 sm:p-4">
             <h1 className="font-display text-2xl font-semibold tracking-tight">
               {authStatus.claimed ? 'Unlock Sync Console' : 'Set Sync Passcode'}
             </h1>

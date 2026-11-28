@@ -8,6 +8,7 @@ import {
   addGitignorePattern,
   computeWorkspaceDiff,
   getGitHubSyncStatus,
+  getSyncConsoleUiPrefs,
   getWorkspaceFileDiff,
   GitHubSyncConflictError,
   mergeGitHubPullRequest,
@@ -17,6 +18,7 @@ import {
   resolveWorkspaceMerge,
   syncWorkspaceToGitHub,
   unignoreFileInGitignore,
+  updateSyncConsoleUiPrefs,
 } from './githubSync.ts';
 import {
   claimWorkspacePasscode,
@@ -129,6 +131,26 @@ async function startServer() {
     } catch (err) {
       console.error('Failed to check GitHub status:', err);
       res.status(500).json({ error: 'Unable to check GitHub repository status.' });
+    }
+  });
+
+  app.get('/api/admin/github/ui-prefs', requireWorkspaceSession, (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(getSyncConsoleUiPrefs());
+  });
+
+  app.patch('/api/admin/github/ui-prefs', requireWorkspaceSession, (req, res) => {
+    try {
+      const updated = updateSyncConsoleUiPrefs(req.body);
+      res.setHeader('Cache-Control', 'no-store');
+      res.json(updated);
+    } catch (err) {
+      res.status(400).json({
+        error:
+          err instanceof Error
+            ? err.message
+            : 'Unable to save workspace UI preferences.',
+      });
     }
   });
 

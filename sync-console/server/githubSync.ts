@@ -27,6 +27,7 @@ const ignoreFactory = require('ignore') as (options?: {
 const ROOT_DIR = process.cwd();
 const GITIGNORE_PATH = path.join(ROOT_DIR, '.gitignore');
 const PENDING_COMMIT_PATH = path.join(ROOT_DIR, '.local', 'pending-commit.json');
+const UI_PREFS_PATH = path.join(ROOT_DIR, '.local', 'ui-prefs.json');
 const PRODUCTION_SITE_URL = 'https://exonovel.exosystems.net';
 
 export const GITHUB_OWNER = 'exonomyapp';
@@ -43,8 +44,8 @@ const HARD_PROTECTED_DIRS = new Set([
   'build',
   'coverage',
   'target',
+  '__pycache__',
   '.aistudio',
-  '.agents',
   '.local',
   '.neon',
   '.vite',
@@ -81,7 +82,6 @@ const CONSOLE_ROOT_FILES = new Set([
   'metadata.json',
   'package.json',
   'server.ts',
-  'skills-lock.json',
   'tsconfig.json',
   'vite.config.ts',
   'workspace.md',
@@ -241,6 +241,9 @@ function isHardProtectedPath(relPath: string): boolean {
     return true;
   }
   const parts = normalized.split('/');
+  if (parts[0] === '.agents' && parts.length > 1 && parts[1] !== 'skills') {
+    return true;
+  }
   for (const part of parts) {
     if (!part || part === '.' || part === '..') return true;
     if (HARD_PROTECTED_DIRS.has(part)) return true;
@@ -248,7 +251,7 @@ function isHardProtectedPath(relPath: string): boolean {
   const base = parts[parts.length - 1];
   if (HARD_PROTECTED_BASENAMES.has(base)) return true;
   if (base.startsWith('.env.') && base !== '.env.example') return true;
-  if (base.endsWith('.log')) return true;
+  if (base.endsWith('.log') || base.endsWith('.pyc')) return true;
   return false;
 }
 
@@ -1916,4 +1919,54 @@ export async function mergeGitHubPullRequest(params: {
     sha: res.data.sha || null,
     message: res.data.message || 'Pull request merged.',
   };
+}
+
+export interface SyncConsoleUiPrefs {
+  statusPanelExpanded: boolean;
+}
+
+const DEFAULT_UI_PREFS: SyncConsoleUiPrefs = {
+  statusPanelExpanded: false,
+};
+
+function sanitizeUiPrefs(raw: unknown): SyncConsoleUiPrefs {
+  const input =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+
+  return {
+    statusPanelExpanded: Boolean(input.statusPanelExpanded),
+  };
+}
+
+export function getSyncConsoleUiPrefs(): SyncConsoleUiPrefs {
+  try {
+    if (!fs.existsSync(UI_PREFS_PATH)) {
+      return { ...DEFAULT_UI_PREFS };
+    }
+    const parsed = JSON.parse(fs.readFileSync(UI_PREFS_PATH, 'utf8'));
+    return sanitizeUiPrefs(parsed);
+  } catch {
+    return { ...DEFAULT_UI_PREFS };
+  }
+}
+
+export function updateSyncConsoleUiPrefs(patch: unknown): SyncConsoleUiPrefs {
+  const current = getSyncConsoleUiPrefs();
+  const input =
+    patch && typeof patch === 'object' && !Array.isArray(patch)
+      ? (patch as Record<string, unknown>)
+      : {};
+
+  const next: SyncConsoleUiPrefs = {
+    statusPanelExpanded:
+      typeof input.statusPanelExpanded === 'boolean'
+        ? input.statusPanelExpanded
+        : current.statusPanelExpanded,
+  };
+
+  fs.mkdirSync(path.dirname(UI_PREFS_PATH), { recursive: true });
+  fs.writeFileSync(UI_PREFS_PATH, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+  return next;
 }
